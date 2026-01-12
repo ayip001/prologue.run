@@ -34,3 +34,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python processing pipeline
+race-processor/data/*
+!race-processor/data/.gitkeep
+!race-processor/data/test/.gitkeep
+!race-processor/data/races/.gitkeep
+race-processor/output/*
+!race-processor/output/.gitignore
+race-processor/models/*.pt
+!race-processor/models/.gitkeep
+race-processor/.venv/
+race-processor/__pycache__/
+*.pyc

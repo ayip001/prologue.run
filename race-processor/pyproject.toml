@@ -1,0 +1,47 @@
+[project]
+name = "race-processor"
+version = "0.1.0"
+description = "Image processing pipeline for 360° race route viewer"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "GPL-2.0" }
+authors = [{ name = "prologue.run" }]
+dependencies = [
+    "click>=8.1",              # CLI framework
+    "pillow>=10.0",            # Image manipulation
+    "pillow-avif-plugin>=1.4", # AVIF support for Pillow
+    "opencv-python>=4.8",      # Image processing, blur, remapping
+    "ultralytics>=8.0",        # YOLOv8 for detection
+    "numpy>=1.24",
+    "exifread>=3.0",           # EXIF extraction
+    "boto3>=1.28",             # S3/R2 upload
+    "tqdm>=4.65",              # Progress bars
+    "rich>=13.0",              # CLI formatting
+    "pydantic>=2.0",           # Config validation
+    "gpxpy>=1.6",              # GPX parsing
+    "scipy>=1.11",             # Gyro data interpolation
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "mypy", "types-pillow"]
+
+[project.scripts]
+race-processor = "race_processor.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/race_processor"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
