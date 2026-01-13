@@ -1,6 +1,6 @@
 # Race Processor Usage Manual
 
-A CLI tool for processing 360° images from Insta360 X4 cameras into web-optimized, privacy-protected panoramic images.
+A CLI tool for processing 360° images from Insta360 X4 cameras into web-optimized, privacy-protected panoramic images. Note: This will be pretty much useless to you unless you have a similar setup to mine: Insta360 X4, Windows 11, NVIDIA GeForce RTX 2070
 
 ## Installation
 

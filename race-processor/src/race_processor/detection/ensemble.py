@@ -11,9 +11,15 @@ from enum import Enum
 from pathlib import Path
 from typing import Literal, Optional
 
+import re
 import cv2
 import numpy as np
 from rich.console import Console
+from ultralytics import YOLO
+try:
+    import easyocr
+except ImportError:
+    easyocr = None
 
 from ..config import BlurConfig
 
@@ -371,6 +377,8 @@ class PrivacyBlurEnsemble:
         mode: Literal["full", "demo", "skip"] = "skip",
         models_dir: Optional[Path] = None,
         edge_aware: bool = True,
+        conf_threshold: float = 0.25,
+        use_ocr: bool = True,
     ) -> None:
         """
         Initialize the ensemble.
@@ -382,40 +390,127 @@ class PrivacyBlurEnsemble:
                 - "skip": Return empty list (no detections)
             models_dir: Directory containing YOLO models (required for full mode)
             edge_aware: Whether to run edge-aware detection for equirectangular images
+            conf_threshold: Default confidence threshold for detections
+            use_ocr: Whether to use EasyOCR for license plate detection
         """
         self.mode = mode
         self.models_dir = models_dir
         self.edge_aware = edge_aware
+        self.conf_threshold = conf_threshold
+        self.use_ocr = use_ocr and (easyocr is not None)
         self._models_loaded = False
+        self.face_detector = None
+        self.pose_detector = None
+        self.plate_detector = None
+        self.ocr_reader = None
 
         if mode == "full" and models_dir:
             self._load_models()
 
     def _load_models(self) -> None:
-        """Load YOLO models for detection."""
+        """Load YOLO models and OCR for detection."""
         if self.models_dir is None:
             console.print("  [yellow]Warning: No models directory specified[/]")
             return
 
         try:
-            # Check if models exist
-            face_model_path = self.models_dir / "yolov8n-face.pt"
-            if not face_model_path.exists():
-                console.print(
-                    f"  [yellow]Warning: Face model not found at {face_model_path}[/]"
-                )
-                console.print("  [dim]Run: race-processor download-models[/]")
-                return
+            # Check for face models (prefer v12 if available)
+            face_model_v12 = self.models_dir / "yolov12m-face.pt"
+            face_model_v8 = self.models_dir / "yolov8n-face.pt"
+            face_path = face_model_v12 if face_model_v12.exists() else face_model_v8
 
-            # TODO: Actually load YOLO models when available
-            # from ultralytics import YOLO
-            # self.face_detector = YOLO(face_model_path)
+            if face_path.exists():
+                self.face_detector = YOLO(str(face_path))
+                console.print(f"  [green]Loaded face model:[/] {face_path.name}")
+            else:
+                console.print(f"  [yellow]Warning: Face model not found[/]")
 
-            self._models_loaded = True
-            console.print("  [green]Models loaded successfully[/]")
+            # Check for pose model
+            pose_path = self.models_dir / "yolov8n-pose.pt"
+            if pose_path.exists():
+                self.pose_detector = YOLO(str(pose_path))
+                console.print(f"  [green]Loaded pose model:[/] {pose_path.name}")
+            else:
+                console.print(f"  [yellow]Warning: Pose model not found[/]")
+
+            # Check for plate model
+            plate_path = self.models_dir / "yolov8n-plate.pt"
+            if plate_path.exists():
+                self.plate_detector = YOLO(str(plate_path))
+                console.print(f"  [green]Loaded plate model:[/] {plate_path.name}")
+            else:
+                console.print(f"  [yellow]Warning: Plate model not found[/]")
+
+            # Initialize EasyOCR
+            if self.use_ocr:
+                console.print("  [blue]Initializing EasyOCR (this may take a moment)...[/]")
+                self.ocr_reader = easyocr.Reader(['en'])
+                console.print("  [green]EasyOCR initialized[/]")
+
+            self._models_loaded = (
+                self.face_detector is not None 
+                or self.pose_detector is not None 
+                or self.plate_detector is not None
+                or self.ocr_reader is not None
+            )
 
         except Exception as e:
             console.print(f"  [red]Error loading models: {e}[/]")
+
+    def _detect_plates_ocr(self, image: np.ndarray) -> list[BlurRegion]:
+        """
+        Detect HK license plates using EasyOCR and Regex.
+        """
+        if not self.ocr_reader:
+            return []
+
+        # HK Plate Patterns:
+        # 1. XX 1234 or XX1234
+        # 2. 1234 (Exactly 4 digits)
+        hk_plate_pattern = re.compile(r'^[A-Z]{1,2}\s?\d{1,4}$|^\d{4}$')
+        
+        # Performance: OCR on full 8K is slow. 
+        # For testing, we might want to resize if the image is too large
+        h, w = image.shape[:2]
+        max_dim = 2500 # Reasonable for OCR
+        if max(h, w) > max_dim:
+            scale = max_dim / max(h, w)
+            ocr_image = cv2.resize(image, (int(w * scale), int(h * scale)))
+        else:
+            scale = 1.0
+            ocr_image = image
+
+        results = self.ocr_reader.readtext(ocr_image)
+        regions = []
+
+        for (bbox, text, conf) in results:
+            text = text.strip().upper()
+            if hk_plate_pattern.match(text):
+                # bbox is [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
+                pts = np.array(bbox)
+                min_pt = np.min(pts, axis=0)
+                max_pt = np.max(pts, axis=0)
+                
+                # Rescale back to original size
+                x1, y1 = min_pt / scale
+                x2, y2 = max_pt / scale
+                
+                # Add extra margin for plate blur
+                width = (x2 - x1) * 1.2
+                height = (y2 - y1) * 1.5
+                
+                regions.append(
+                    BlurRegion(
+                        x=int((x1 + x2) / 2),
+                        y=int((y1 + y2) / 2),
+                        width=int(width),
+                        height=int(height),
+                        confidence=float(conf),
+                        source=DetectionSource.LICENSE_PLATE,
+                    )
+                )
+        
+        return regions
 
     def _run_detection(
         self,
@@ -442,8 +537,108 @@ class PrivacyBlurEnsemble:
                 image, num_regions=3, seed=demo_seed, include_edge_region=False
             )
 
-        # TODO: Implement actual YOLO detection
         all_regions: list[BlurRegion] = []
+
+        # 1. Face Detection
+        if self.face_detector:
+            results = self.face_detector(image, conf=self.conf_threshold, verbose=False)
+            for r in results:
+                boxes = r.boxes
+                for box in boxes:
+                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                    conf = float(box.conf[0])
+                    all_regions.append(
+                        BlurRegion(
+                            x=int((x1 + x2) / 2),
+                            y=int((y1 + y2) / 2),
+                            width=int(x2 - x1),
+                            height=int(y2 - y1),
+                            confidence=conf,
+                            source=DetectionSource.FACE_YOLO_MEDIUM,
+                        )
+                    )
+
+        # 2. Pose Detection (to find heads based on shoulder position)
+        if self.pose_detector:
+            results = self.pose_detector(image, conf=self.conf_threshold, verbose=False)
+            for r in results:
+                if not r.keypoints or r.keypoints.data.shape[0] == 0:
+                    continue
+                
+                # keypoints are [N, 17, 3] or [17, 3]
+                kps = r.keypoints.data[0].cpu().numpy()
+                
+                # COCO Keypoints: 5=l-shoulder, 6=r-shoulder
+                l_sh = kps[5]
+                r_sh = kps[6]
+                
+                # Check if shoulders are visible (conf > 0.5)
+                if l_sh[2] > 0.5 and r_sh[2] > 0.5:
+                    # Calculate shoulder midpoint and width
+                    mid_x = (l_sh[0] + r_sh[0]) / 2
+                    mid_y = (l_sh[1] + r_sh[1]) / 2
+                    sh_width = np.sqrt((l_sh[0] - r_sh[0])**2 + (l_sh[1] - r_sh[1])**2)
+                    
+                    # Estimate head
+                    head_size = sh_width * 0.8
+                    head_y_offset = sh_width * 0.5
+                    
+                    all_regions.append(
+                        BlurRegion(
+                            x=int(mid_x),
+                            y=int(mid_y - head_y_offset),
+                            width=int(head_size),
+                            height=int(head_size * 1.2),
+                            confidence=float((l_sh[2] + r_sh[2]) / 2),
+                            source=DetectionSource.BODY_POSE_HEAD,
+                        )
+                    )
+                
+                # Fallback to facial features if shoulders aren't visible
+                else:
+                    head_points = kps[:5]
+                    visible = head_points[head_points[:, 2] > 0.5]
+                    if len(visible) > 0:
+                        min_x, min_y = np.min(visible[:, :2], axis=0)
+                        max_x, max_y = np.max(visible[:, :2], axis=0)
+                        w = max(max_x - min_x, 20)
+                        h = max(max_y - min_y, 20)
+                        
+                        all_regions.append(
+                            BlurRegion(
+                                x=int((min_x + max_x) / 2),
+                                y=int((min_y + max_y) / 2),
+                                width=int(w * 1.5),
+                                height=int(h * 1.5),
+                                confidence=float(np.mean(visible[:, 2])),
+                                source=DetectionSource.BODY_POSE_HEAD,
+                            )
+                        )
+
+        # 3. Plate Detection (YOLO)
+        if self.plate_detector:
+            results = self.plate_detector(image, conf=self.conf_threshold, verbose=False)
+            for r in results:
+                boxes = r.boxes
+                for box in boxes:
+                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                    conf = float(box.conf[0])
+                    all_regions.append(
+                        BlurRegion(
+                            x=int((x1 + x2) / 2),
+                            y=int((y1 + y2) / 2),
+                            width=int(x2 - x1),
+                            height=int(y2 - y1),
+                            confidence=conf,
+                            source=DetectionSource.LICENSE_PLATE,
+                        )
+                    )
+
+        # 4. Plate Detection (OCR)
+        if self.use_ocr:
+            ocr_regions = self._detect_plates_ocr(image)
+            all_regions.extend(ocr_regions)
+
         return all_regions
 
     def detect_all(

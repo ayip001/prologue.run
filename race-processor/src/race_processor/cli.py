@@ -378,11 +378,29 @@ def download_models() -> None:
     is_flag=True,
     help="Color-code detections by source",
 )
-def preview_blur(image_path: Path, output: Path, show_sources: bool) -> None:
-    """Preview blur detection without applying blur."""
-    console.print(f"[bold]Preview blur detection for:[/] {image_path}")
+@click.option(
+    "--blur",
+    is_flag=True,
+    help="Apply actual blur effect instead of drawing boxes",
+)
+@click.option(
+    "--mode",
+    type=click.Choice(["full", "demo"]),
+    default="full",
+    help="Detection mode (default: full)",
+)
+@click.option(
+    "--conf",
+    type=float,
+    default=0.25,
+    help="Confidence threshold for detections (default: 0.25)",
+)
+def preview_blur(image_path: Path, output: Path, show_sources: bool, blur: bool, mode: str, conf: float) -> None:
+    """Preview blur detection or the actual blurring effect."""
+    console.print(f"[bold]Preview blur {'effect' if blur else 'detection'} for:[/] {image_path}")
 
-    from .detection.ensemble import PrivacyBlurEnsemble
+    from .detection.ensemble import PrivacyBlurEnsemble, blur_image
+    from .config import DEFAULT_MODELS_DIR, BlurConfig
     import cv2
 
     # Load image
@@ -392,37 +410,43 @@ def preview_blur(image_path: Path, output: Path, show_sources: bool) -> None:
         return
 
     # Run detection
-    ensemble = PrivacyBlurEnsemble()
+    ensemble = PrivacyBlurEnsemble(mode=mode, models_dir=DEFAULT_MODELS_DIR, conf_threshold=conf)
     regions = ensemble.detect_all(image)
 
-    console.print(f"  Detected {len(regions)} regions to blur")
+    console.print(f"  Detected {len(regions)} regions (threshold: {conf})")
 
-    # Draw bounding boxes
-    for region in regions:
-        x1 = region.x - region.width // 2
-        y1 = region.y - region.height // 2
-        x2 = region.x + region.width // 2
-        y2 = region.y + region.height // 2
+    if blur:
+        # Apply actual blur
+        config = BlurConfig()
+        result = blur_image(image, regions, config)
+    else:
+        # Draw bounding boxes
+        result = image.copy()
+        for region in regions:
+            x1 = region.x - region.width // 2
+            y1 = region.y - region.height // 2
+            x2 = region.x + region.width // 2
+            y2 = region.y + region.height // 2
 
-        # Color by source if requested
-        if show_sources:
-            colors = {
-                "face_yolo_n": (0, 255, 0),
-                "face_yolo_m": (0, 200, 0),
-                "body_pose_head": (255, 0, 0),
-                "plate": (0, 0, 255),
-            }
-            color = colors.get(region.source.value, (255, 255, 255))
-        else:
-            color = (0, 255, 0)
+            # Color by source if requested
+            if show_sources:
+                colors = {
+                    "face_yolo_n": (0, 255, 0),
+                    "face_yolo_m": (0, 200, 0),
+                    "body_pose_head": (255, 0, 0),
+                    "plate": (0, 0, 255),
+                }
+                color = colors.get(region.source.value, (255, 255, 255))
+            else:
+                color = (0, 255, 0)
 
-        cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
-        label = f"{region.source.value}: {region.confidence:.2f}"
-        cv2.putText(image, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+            cv2.rectangle(result, (x1, y1), (x2, y2), color, 2)
+            label = f"{region.source.value}: {region.confidence:.2f}"
+            cv2.putText(result, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
-    # Save preview
-    cv2.imwrite(str(output), image)
-    console.print(f"[green]Preview saved to:[/] {output}")
+    # Save output
+    cv2.imwrite(str(output), result)
+    console.print(f"[green]Output saved to:[/] {output}")
 
 
 @main.command("generate-card-assets")

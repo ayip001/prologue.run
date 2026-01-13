@@ -47,3 +47,6 @@ race-processor/models/*.pt
 race-processor/.venv/
 race-processor/__pycache__/
 *.pyc
+blur-preview.jpg
+race-processor/*.jpg
+race-processor/*.pt
