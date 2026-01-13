@@ -37,6 +37,7 @@ interface RaceViewerProps {
   initialHeading?: number;
   initialPitch?: number;
   initialFov?: number;
+  testImageUrl?: string;
 }
 
 export function RaceViewer({
@@ -48,6 +49,7 @@ export function RaceViewer({
   initialHeading = 0,
   initialPitch = 0,
   initialFov = 75,
+  testImageUrl,
 }: RaceViewerProps) {
   // Viewer state
   const { state, actions } = useViewer({
@@ -65,11 +67,15 @@ export function RaceViewer({
   });
 
   // Image loading
-  const { currentImageUrl, isLoading } = useImageLoader({
+  const { currentImageUrl: loadedImageUrl, isLoading: isImageLoading } = useImageLoader({
     raceSlug: race.slug,
     currentIndex: state.currentIndex,
     totalImages: images.length,
   });
+
+  // Use test image URL if provided, otherwise use loaded image
+  const currentImageUrl = testImageUrl || loadedImageUrl;
+  const isLoading = testImageUrl ? false : isImageLoading;
 
   // Keyboard navigation
   useKeyboardNav({ actions });

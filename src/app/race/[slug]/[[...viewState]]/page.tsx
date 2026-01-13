@@ -4,8 +4,34 @@ import { getRaceBySlug, getImageMetadataByRaceId, getWaypointsByRaceId, getEleva
 import { parseViewState } from "@/lib/viewState";
 import { RaceViewer } from "@/components/viewer/RaceViewer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ENABLE_TESTING_CARD, TEST_CARD_DATA, TEST_VIEWER_IMAGE_URL } from "@/lib/constants";
+import type { Race } from "@/types";
 
 export const dynamic = "force-dynamic";
+
+// Mock data for test route
+const TEST_RACE: Race = {
+  ...TEST_CARD_DATA,
+  description: "A test route for development purposes.",
+  raceDate: null,
+  captureDate: "2024-01-01",
+  captureDevice: "Test Device",
+  status: "ready",
+  storageBucket: "test",
+  storagePrefix: "test",
+  totalViews: 0,
+  createdAt: "2024-01-01T00:00:00Z",
+  updatedAt: "2024-01-01T00:00:00Z",
+};
+
+const TEST_IMAGES = [{
+  id: "test-image-1",
+  positionIndex: 0,
+  latitude: 0,
+  longitude: 0,
+  distanceFromStart: 0,
+  capturedAt: "2024-01-01T00:00:00Z",
+}];
 
 interface PageProps {
   params: Promise<{
@@ -27,6 +53,28 @@ function ViewerSkeleton() {
 
 export default async function RaceViewerPage({ params }: PageProps) {
   const { slug, viewState: viewStateSegments } = await params;
+
+  // Handle test route
+  if (slug === "test-route" && ENABLE_TESTING_CARD) {
+    const viewStateStr = viewStateSegments?.[0] || "@0";
+    const parsedViewState = parseViewState(viewStateStr);
+
+    return (
+      <Suspense fallback={<ViewerSkeleton />}>
+        <RaceViewer
+          race={TEST_RACE}
+          images={TEST_IMAGES}
+          waypoints={[]}
+          elevationProfile={null}
+          initialPosition={parsedViewState?.position ?? 0}
+          initialHeading={parsedViewState?.heading ?? 0}
+          initialPitch={parsedViewState?.pitch ?? 0}
+          initialFov={parsedViewState?.fov ?? 75}
+          testImageUrl={TEST_VIEWER_IMAGE_URL}
+        />
+      </Suspense>
+    );
+  }
 
   // Fetch race data
   let race;
@@ -87,6 +135,19 @@ export default async function RaceViewerPage({ params }: PageProps) {
 
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params;
+
+  // Handle test route metadata
+  if (slug === "test-route" && ENABLE_TESTING_CARD) {
+    return {
+      title: `${TEST_RACE.name} - prologue.run`,
+      description: `Preview the ${TEST_RACE.name} route through interactive 360° street-level imagery.`,
+      openGraph: {
+        title: `${TEST_RACE.name} - prologue.run`,
+        description: `Preview the ${TEST_RACE.name} route through interactive 360° street-level imagery.`,
+        images: TEST_RACE.cardImageUrl ? [{ url: TEST_RACE.cardImageUrl }] : undefined,
+      },
+    };
+  }
 
   let race;
   try {

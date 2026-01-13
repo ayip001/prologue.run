@@ -1,12 +1,15 @@
 import type { RaceCardData } from "@/types";
 import { RaceCard } from "./RaceCard";
 import { AddRouteCard } from "./AddRouteCard";
+import { ENABLE_TESTING_CARD, TEST_CARD_DATA } from "@/lib/constants";
 
 interface RaceGridProps {
   races: RaceCardData[];
 }
 
 export function RaceGrid({ races }: RaceGridProps) {
+  const allRaces = ENABLE_TESTING_CARD ? [TEST_CARD_DATA, ...races] : races;
+
   return (
     <section id="races" className="py-20 bg-slate-950">
       <div className="container mx-auto px-4">
@@ -22,7 +25,7 @@ export function RaceGrid({ races }: RaceGridProps) {
 
         {/* Grid */}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {races.map((race) => (
+          {allRaces.map((race) => (
             <RaceCard key={race.id} race={race} />
           ))}
           <AddRouteCard />
