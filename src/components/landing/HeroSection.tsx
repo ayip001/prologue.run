@@ -5,7 +5,11 @@ import { GlobeBackground } from "./GlobeBackground";
 
 export function HeroSection() {
   return (
-    <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden bg-black">
+    <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+      {/* Background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 z-0" />
+
+      {/* Three.js globe overlay */}
       <GlobeBackground />
 
       {/* Content */}
