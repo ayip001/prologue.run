@@ -1,23 +1,12 @@
 import { ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GradientText } from "@/components/shared/GradientText";
+import { GlobeBackground } from "./GlobeBackground";
 
 export function HeroSection() {
   return (
-    <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950" />
-
-      {/* Animated background dots/grid */}
-      <div className="absolute inset-0 opacity-30">
-        <div
-          className="absolute inset-0"
-          style={{
-            backgroundImage: `radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0)`,
-            backgroundSize: "40px 40px",
-          }}
-        />
-      </div>
+    <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden bg-black">
+      <GlobeBackground />
 
       {/* Content */}
       <div className="relative z-10 container mx-auto px-4 text-center">
