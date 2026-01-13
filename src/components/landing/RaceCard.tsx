@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Link as LinkIcon, Mountain, Route, Check } from "lucide-react";
-import { useState } from "react";
+import { ArrowRight, Link as LinkIcon, Mountain, Route } from "lucide-react";
+import { useEffect, useRef } from "react";
 import type { RaceCardData } from "@/types";
 import { ElevationBars } from "./ElevationBars";
 import { GoldBadge } from "./GoldBadge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatRaceDistance, formatElevationSummary } from "@/lib/formatters";
+import { getRouteSvgUrl } from "@/lib/imageUrl";
 
 interface RaceCardProps {
   race: RaceCardData;
@@ -17,25 +18,94 @@ interface RaceCardProps {
 }
 
 export function RaceCard({ race, className }: RaceCardProps) {
-  const [copied, setCopied] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const pathRef = useRef<HTMLDivElement>(null);
+  const rotationRef = useRef({ angle: 0, animationId: null as number | null, isHovering: false });
 
-  const handleCopyLink = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  useEffect(() => {
+    const card = cardRef.current;
+    const path = pathRef.current;
+    if (!card || !path) return;
 
-    const url = `${window.location.origin}/race/${race.slug}`;
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+    const animate = () => {
+      if (!rotationRef.current.isHovering) return;
+
+      rotationRef.current.angle += 1;
+      path.style.transform = `rotateZ(${rotationRef.current.angle}deg)`;
+      rotationRef.current.animationId = requestAnimationFrame(animate);
+    };
+
+    const handleMouseEnter = () => {
+      rotationRef.current.isHovering = true;
+      
+      // Sync starting angle with current computed style to prevent jumps
+      const style = window.getComputedStyle(path);
+      const matrix = new DOMMatrix(style.transform);
+      const currentRotation = Math.atan2(matrix.b, matrix.a) * (180 / Math.PI);
+      rotationRef.current.angle = currentRotation;
+      
+      path.style.transition = 'none';
+      animate();
+    };
+
+    const handleMouseLeave = () => {
+      rotationRef.current.isHovering = false;
+      if (rotationRef.current.animationId) {
+        cancelAnimationFrame(rotationRef.current.animationId);
+      }
+
+      // Snap to nearest upright position (multiple of 360)
+      const rounds = Math.round(rotationRef.current.angle / 360);
+      const targetAngle = rounds * 360;
+      
+      path.style.transition = 'transform 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+      rotationRef.current.angle = targetAngle;
+      
+      requestAnimationFrame(() => {
+        path.style.transform = `rotateZ(${targetAngle}deg)`;
+      });
+    };
+
+    card.addEventListener('mouseenter', handleMouseEnter);
+    card.addEventListener('mouseleave', handleMouseLeave);
+
+    return () => {
+      card.removeEventListener('mouseenter', handleMouseEnter);
+      card.removeEventListener('mouseleave', handleMouseLeave);
+      if (rotationRef.current.animationId) {
+        cancelAnimationFrame(rotationRef.current.animationId);
+      }
+    };
+  }, []);
+
+  const routeImageUrl = race.routeSvgPath?.startsWith("/") 
+    ? race.routeSvgPath 
+    : getRouteSvgUrl(race.slug, race.routeSvgPath);
 
   return (
     <div
+      ref={cardRef}
       className={cn(
-        "group relative overflow-hidden rounded-xl border border-white/10 bg-slate-900/80 transition-all duration-300 hover:bg-slate-900/90 hover:border-white/20 hover:shadow-xl hover:shadow-coral/5",
+        "group relative overflow-hidden rounded-xl border border-white/10 bg-slate-900/80 transition-all duration-500 hover:bg-slate-900/90 hover:border-coral/50 hover:shadow-xl hover:shadow-coral/5",
+        "perspective-1000",
         className
       )}
     >
+      <style jsx>{`
+        .perspective-1000 {
+          perspective: 1000px;
+        }
+        .preserve-3d {
+          transform-style: preserve-3d;
+        }
+        .pitch-wrapper {
+          transition: transform 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        .group:hover .pitch-wrapper {
+          transform: scale(1.1) rotateX(60deg);
+        }
+      `}</style>
+
       {/* Card Image */}
       <div className="relative aspect-[16/10] overflow-hidden">
         {race.cardImageUrl ? (
@@ -44,7 +114,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
             alt={race.name}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
+            className="object-cover transition-transform duration-700 group-hover:scale-105"
           />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900" />
@@ -53,10 +123,22 @@ export function RaceCard({ race, className }: RaceCardProps) {
         {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/50 to-transparent" />
 
-        {/* Route SVG Overlay */}
-        {race.routeSvgPath && (
-          <div className="absolute inset-0 flex items-center justify-center opacity-40 group-hover:opacity-60 transition-opacity">
-            {/* SVG would be loaded here */}
+        {/* Route Path Overlay */}
+        {routeImageUrl && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-8 preserve-3d">
+            <div className="relative w-full h-full pitch-wrapper preserve-3d">
+              <div 
+                ref={pathRef}
+                className="relative w-full h-full opacity-60 group-hover:opacity-100 transition-opacity duration-500"
+              >
+                <Image
+                  src={routeImageUrl}
+                  alt="Route Map"
+                  fill
+                  className="object-contain"
+                />
+              </div>
+            </div>
           </div>
         )}
 
@@ -78,7 +160,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
               {race.flagEmoji && (
                 <span className="text-lg">{race.flagEmoji}</span>
               )}
-              <h3 className="text-lg font-semibold text-white group-hover:text-gradient transition-colors">
+              <h3 className="text-lg font-semibold text-white">
                 {race.name}
               </h3>
             </div>
@@ -112,25 +194,27 @@ export function RaceCard({ race, className }: RaceCardProps) {
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
-          <Link href={`/race/${race.slug}`} className="flex-1">
+        <div className="grid grid-cols-2 gap-2">
+          <Link href={`/race/${race.slug}`}>
             <Button className="w-full group/btn">
               View Route
               <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
             </Button>
           </Link>
-          <Button
-            variant="secondary"
-            size="icon"
-            onClick={handleCopyLink}
-            className="shrink-0"
+          
+          <a 
+            href={race.officialUrl || "#"} 
+            target="_blank" 
+            rel="noopener noreferrer"
           >
-            {copied ? (
-              <Check className="h-4 w-4 text-green-400" />
-            ) : (
+            <Button
+              variant="secondary"
+              className="w-full gap-2"
+            >
               <LinkIcon className="h-4 w-4" />
-            )}
-          </Button>
+              Official Site
+            </Button>
+          </a>
         </div>
       </div>
     </div>

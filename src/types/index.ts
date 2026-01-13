@@ -103,6 +103,7 @@ export interface RaceCardData {
   routeSvgPath: string | null;
   elevationBars: number[] | null;
   totalImages: number;
+  officialUrl?: string | null;
 }
 
 export interface RacesResponse {

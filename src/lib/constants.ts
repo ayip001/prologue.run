@@ -19,9 +19,10 @@ export const TEST_CARD_DATA = {
   country: "Testland",
   tier: "bronze" as const,
   cardImageUrl: "https://images.unsplash.com/photo-1672182701054-20654f8f52cd?q=80&w=700",
-  routeSvgPath: null,
+  routeSvgPath: "/default-path.png",
   elevationBars: [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 30, 35, 40, 45, 50, 55, 60, 65],
   totalImages: 1,
+  officialUrl: "https://www.worldmarathonmajors.com/",
 };
 
 export const TEST_VIEWER_IMAGE_URL = "https://upload.wikimedia.org/wikipedia/commons/5/50/Alcazar_de_Toledo_y_Academia_de_Infanter%C3%ADa.jpg";

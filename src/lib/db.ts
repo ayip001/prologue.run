@@ -132,6 +132,7 @@ function transformRaceCard(row: RaceRow): RaceCardData {
     routeSvgPath: row.route_svg_path,
     elevationBars: row.elevation_bars,
     totalImages: row.total_images,
+    officialUrl: (row as any).official_url || null,
   };
 }
 
