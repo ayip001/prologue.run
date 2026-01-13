@@ -2,7 +2,7 @@
 name = "race-processor"
 version = "0.1.0"
 description = "Image processing pipeline for 360° race route viewer"
-readme = "README.md"
+readme = "USAGE.md"
 requires-python = ">=3.11"
 license = { text = "GPL-2.0" }
 authors = [{ name = "prologue.run" }]
