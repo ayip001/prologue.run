@@ -32,10 +32,10 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/#about"
+                  href="/#features"
                   className="text-sm text-slate-400 hover:text-white transition-colors"
                 >
-                  About
+                  Features
                 </Link>
               </li>
               <li>

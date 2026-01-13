@@ -1,15 +1,18 @@
 import { Navbar } from "@/components/shared/Navbar";
 import { Footer } from "@/components/shared/Footer";
 import { HeroSection } from "@/components/landing/HeroSection";
-import { RaceGrid } from "@/components/landing/RaceGrid";
-import { AboutSection } from "@/components/landing/AboutSection";
+import { FeaturesSection } from "@/components/landing/FeaturesSection";
+import { StorySection } from "@/components/landing/StorySection";
+import { MethodologySection } from "@/components/landing/MethodologySection";
+import { ContactSection } from "@/components/landing/ContactSection";
 import { getAllRaces } from "@/lib/db";
+import type { RaceCardData } from "@/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   // Fetch races from database
-  let races;
+  let races: RaceCardData[];
   try {
     races = await getAllRaces();
   } catch {
@@ -21,9 +24,11 @@ export default async function HomePage() {
     <>
       <Navbar transparent />
       <main>
-        <HeroSection />
-        <RaceGrid races={races} />
-        <AboutSection />
+        <HeroSection races={races} />
+        <FeaturesSection />
+        <StorySection />
+        <MethodologySection />
+        <ContactSection />
       </main>
       <Footer />
     </>

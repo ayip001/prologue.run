@@ -509,7 +509,7 @@ export function GlobeBackground({
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 w-full h-full z-[1]"
+      className="absolute inset-0 w-full h-full z-[1] opacity-30"
     />
   );
 }

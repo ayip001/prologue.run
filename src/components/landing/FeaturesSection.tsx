@@ -28,9 +28,9 @@ const features = [
   },
 ];
 
-export function AboutSection() {
+export function FeaturesSection() {
   return (
-    <section id="about" className="py-20 bg-slate-900/50">
+    <section id="features" className="py-20 bg-slate-900/50">
       <div className="container mx-auto px-4">
         {/* Section Header */}
         <div className="text-center mb-12">

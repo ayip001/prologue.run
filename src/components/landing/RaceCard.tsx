@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, Copy, Mountain, Route, Check } from "lucide-react";
+import { ArrowRight, Link as LinkIcon, Mountain, Route, Check } from "lucide-react";
 import { useState } from "react";
 import type { RaceCardData } from "@/types";
 import { ElevationBars } from "./ElevationBars";
@@ -32,7 +32,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-xl border border-white/10 bg-slate-900/50 transition-all duration-300 hover:border-white/20 hover:shadow-xl hover:shadow-coral/5",
+        "group relative overflow-hidden rounded-xl border border-white/10 bg-slate-900/80 transition-all duration-300 hover:bg-slate-900/90 hover:border-white/20 hover:shadow-xl hover:shadow-coral/5",
         className
       )}
     >
@@ -43,6 +43,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
             src={race.cardImageUrl}
             alt={race.name}
             fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             className="object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
@@ -114,7 +115,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
         <div className="flex items-center gap-2">
           <Link href={`/race/${race.slug}`} className="flex-1">
             <Button className="w-full group/btn">
-              Scout Route
+              View Route
               <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
             </Button>
           </Link>
@@ -127,7 +128,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
             {copied ? (
               <Check className="h-4 w-4 text-green-400" />
             ) : (
-              <Copy className="h-4 w-4" />
+              <LinkIcon className="h-4 w-4" />
             )}
           </Button>
         </div>

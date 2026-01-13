@@ -8,23 +8,23 @@ interface GoldBadgeProps {
 
 const tierConfig = {
   gold: {
-    bg: "bg-amber-500/20",
+    bg: "bg-amber-500/80",
     border: "border-amber-500/50",
-    text: "text-amber-400",
+    text: "text-white",
     label: "Gold",
     Icon: Award,
   },
   silver: {
-    bg: "bg-slate-400/20",
+    bg: "bg-slate-400/80",
     border: "border-slate-400/50",
-    text: "text-slate-300",
+    text: "text-white",
     label: "Silver",
     Icon: Star,
   },
   bronze: {
-    bg: "bg-orange-700/20",
+    bg: "bg-orange-700/80",
     border: "border-orange-700/50",
-    text: "text-orange-500",
+    text: "text-white",
     label: "Bronze",
     Icon: Medal,
   },

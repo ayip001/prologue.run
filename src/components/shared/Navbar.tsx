@@ -38,10 +38,10 @@ export function Navbar({ className, transparent = false }: NavbarProps) {
             Races
           </Link>
           <Link
-            href="/#about"
+            href="/#features"
             className="text-sm text-slate-300 hover:text-white transition-colors"
           >
-            About
+            Features
           </Link>
           <a
             href="https://github.com/prologue-run/prologue.run"
@@ -80,11 +80,11 @@ export function Navbar({ className, transparent = false }: NavbarProps) {
               Races
             </Link>
             <Link
-              href="/#about"
+              href="/#features"
               className="text-slate-300 hover:text-white transition-colors py-2"
               onClick={() => setIsMobileMenuOpen(false)}
             >
-              About
+              Features
             </Link>
             <a
               href="https://github.com/prologue-run/prologue.run"
