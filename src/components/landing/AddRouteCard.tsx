@@ -10,7 +10,7 @@ export function AddRouteCard({ className }: AddRouteCardProps) {
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/80 transition-all duration-300 hover:border-coral/50 hover:bg-slate-900/90",
+        "relative overflow-hidden rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/90 transition-all duration-300 hover:border-coral/50 hover:bg-slate-900/95",
         className
       )}
     >

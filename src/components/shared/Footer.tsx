@@ -56,7 +56,7 @@ export function Footer() {
               </li>
               <li>
                 <a
-                  href="https://github.com/prologue-run/prologue.run"
+                  href="https://github.com/ayip001/prologue.run/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-slate-400 hover:text-white transition-colors inline-flex items-center gap-1"
