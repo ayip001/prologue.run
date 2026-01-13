@@ -51,13 +51,20 @@ export function RaceViewer({
   initialFov = 75,
   testImageUrl,
 }: RaceViewerProps) {
+  // Memoize mapped images to prevent infinite loop
+  const mappedImages = useMemo(
+    () =>
+      images.map((img) => ({
+        positionIndex: img.positionIndex,
+        distanceFromStart: img.distanceFromStart ?? 0,
+      })),
+    [images]
+  );
+
   // Viewer state
   const { state, actions } = useViewer({
     totalImages: images.length,
-    images: images.map((img) => ({
-      positionIndex: img.positionIndex,
-      distanceFromStart: img.distanceFromStart ?? 0,
-    })),
+    images: mappedImages,
     initialPosition,
     initialCamera: {
       yaw: initialHeading,
@@ -66,11 +73,12 @@ export function RaceViewer({
     },
   });
 
-  // Image loading
+  // Image loading (disabled for test routes)
   const { currentImageUrl: loadedImageUrl, isLoading: isImageLoading } = useImageLoader({
     raceSlug: race.slug,
     currentIndex: state.currentIndex,
     totalImages: images.length,
+    enabled: !testImageUrl,
   });
 
   // Use test image URL if provided, otherwise use loaded image

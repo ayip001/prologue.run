@@ -9,6 +9,7 @@ interface UseImageLoaderOptions {
   raceSlug: string;
   currentIndex: number;
   totalImages: number;
+  enabled?: boolean;
 }
 
 interface UseImageLoaderReturn {
@@ -22,6 +23,7 @@ export function useImageLoader({
   raceSlug,
   currentIndex,
   totalImages,
+  enabled = true,
 }: UseImageLoaderOptions): UseImageLoaderReturn {
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const [loadedTier, setLoadedTier] = useState<ImageTier>("thumbnail");
@@ -35,13 +37,18 @@ export function useImageLoader({
 
   // Detect AVIF support on mount
   useEffect(() => {
+    if (!enabled) return;
     supportsAvif().then((supported) => {
       setFormat(supported ? "avif" : "webp");
     });
-  }, []);
+  }, [enabled]);
 
   // Load current image with progressive quality
   useEffect(() => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
     currentIndexRef.current = currentIndex;
     setIsLoading(true);
     setLoadedTier("thumbnail");
@@ -77,10 +84,11 @@ export function useImageLoader({
     };
 
     loadSequence();
-  }, [raceSlug, currentIndex, format]);
+  }, [raceSlug, currentIndex, format, enabled]);
 
   // Preload adjacent images
   useEffect(() => {
+    if (!enabled) return;
     const preloadAdjacent = async () => {
       const indicesToPreload: number[] = [];
 
@@ -123,7 +131,7 @@ export function useImageLoader({
     };
 
     preloadAdjacent();
-  }, [raceSlug, currentIndex, totalImages, format]);
+  }, [raceSlug, currentIndex, totalImages, format, enabled]);
 
   return {
     currentImageUrl,
