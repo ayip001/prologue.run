@@ -40,7 +40,10 @@ export function ViewerHUD({
       {/* HUD content */}
       <div className="relative px-4 pt-4 flex items-start justify-between">
         {/* Left side - Context & Metrics */}
-        <div className="flex flex-col gap-2 pointer-events-auto">
+        <div
+          className="flex flex-col gap-2 pointer-events-auto"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
           {/* Logo */}
           <div className="mb-2">
             <Logo size="sm" showText={false} />
@@ -54,7 +57,10 @@ export function ViewerHUD({
         </div>
 
         {/* Right side - Close button */}
-        <div className="pointer-events-auto">
+        <div
+          className="pointer-events-auto"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
           <Button variant="ghost" size="icon" asChild>
             <Link href="/" aria-label="Close viewer">
               <X className="h-5 w-5" />
