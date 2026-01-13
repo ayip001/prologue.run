@@ -88,6 +88,12 @@ def main() -> None:
     help="Blur detection mode: full (requires models), demo (fake detections), skip (no blur)",
 )
 @click.option(
+    "--conf",
+    type=float,
+    default=0.25,
+    help="Confidence threshold for blur detection (default: 0.25)",
+)
+@click.option(
     "--debug",
     is_flag=True,
     help="Enable debug mode to save intermediate images at each step",
@@ -137,6 +143,7 @@ def process(
     skip_blur: bool,
     skip_upload: bool,
     blur_mode: str,
+    conf: float,
     debug: bool,
     debug_format: str,
     start_step: int,
@@ -192,6 +199,7 @@ def process(
         console.print(f"  Destination: {dst}")
         console.print(f"  Steps: {start_step}-{end_step}")
         console.print(f"  Blur mode: {blur_mode}")
+        console.print(f"  Confidence: {conf}")
 
         from .pipeline.orchestrator import run_direct_processing
 
@@ -201,6 +209,7 @@ def process(
             start_step=start_step,
             end_step=end_step,
             blur_mode=blur_mode,
+            blur_conf=conf,
             debug=debug,
             debug_format=debug_format,
             single_image=single_image,
@@ -221,6 +230,7 @@ def process(
     console.print(f"  Output: {output_dir}")
     console.print(f"  Workers: {workers}")
     console.print(f"  Blur mode: {blur_mode}")
+    console.print(f"  Confidence: {conf}")
 
     # Handle --step shorthand
     if step is not None:
@@ -261,7 +271,7 @@ def process(
     # Import and run orchestrator
     from .pipeline.orchestrator import run_pipeline
 
-    run_pipeline(config, blur_mode=blur_mode)
+    run_pipeline(config, blur_mode=blur_mode, blur_conf=conf)
 
 
 @main.command()

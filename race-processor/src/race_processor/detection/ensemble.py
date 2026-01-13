@@ -263,8 +263,8 @@ def blur_image(
     """
     Apply blur to specified regions in an image.
 
-    Handles both standard regions and edge-spanning regions for
-    equirectangular projections. Skips non-blurring sources (e.g., VEHICLE).
+    Ensures each pixel is blurred only once by using a mask-based approach.
+    Regions that overlap are treated as a single combined area.
 
     Args:
         image: OpenCV image (BGR format)
@@ -274,15 +274,109 @@ def blur_image(
     Returns:
         Image with blur applied to regions
     """
-    result = image.copy()
+    if not regions:
+        return image.copy()
 
+    height, width = image.shape[:2]
+    result = image.copy()
+    
+    # 1. Create a single mask for all pixels that need blurring
+    mask = np.zeros((height, width), dtype=np.uint8)
+    
     for region in regions:
-        # Skip regions that shouldn't be blurred (e.g., vehicles, only used for tracking)
         if region.source == DetectionSource.VEHICLE:
             continue
             
-        result = blur_region_on_image(result, region, config)
+        if region.spans_edge:
+            # Draw both sides of the edge-spanning region
+            region_half_width = region.width // 2
+            y1 = max(0, region.y - region.height // 2)
+            y2 = min(height, region.y + region.height // 2)
+            
+            if region.x > width // 2:
+                # Wraps from right to left
+                # Right side
+                rx1, rx2 = max(0, region.x - region_half_width), width
+                cv2.rectangle(mask, (rx1, y1), (rx2, y2), 255, -1)
+                # Left side
+                lx1, lx2 = 0, min(width, (region.x + region_half_width) - width)
+                cv2.rectangle(mask, (lx1, y1), (lx2, y2), 255, -1)
+            else:
+                # Wraps from left to right
+                # Left side
+                lx1, lx2 = 0, min(width, region.x + region_half_width)
+                cv2.rectangle(mask, (lx1, y1), (lx2, y2), 255, -1)
+                # Right side
+                rx1, rx2 = max(0, width + region.x - region_half_width), width
+                cv2.rectangle(mask, (rx1, y1), (rx2, y2), 255, -1)
+        else:
+            # Standard region
+            x1 = max(0, region.x - region.width // 2)
+            y1 = max(0, region.y - region.height // 2)
+            x2 = min(width, region.x + region.width // 2)
+            y2 = min(height, region.y + region.height // 2)
+            cv2.rectangle(mask, (x1, y1), (x2, y2), 255, -1)
 
+    # 2. Find connected components (groups of overlapping regions)
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask)
+    
+    # 3. Process each component (skip background label 0)
+    for i in range(1, num_labels):
+        x, y, w, h, area = stats[i]
+        
+        # Calculate feather size as 5% of the component's largest dimension
+        feather_size = int(max(w, h) * 0.05)
+        feather_size = max(4, feather_size)  # Ensure at least a small feather
+        
+        # Pad the ROI to allow the external feather to bleed out
+        pad = feather_size + 4
+        
+        # Calculate padded coordinates
+        px1 = max(0, x - pad)
+        py1 = max(0, y - pad)
+        px2 = min(width, x + w + pad)
+        py2 = min(height, y + h + pad)
+        
+        # 1. Extract the ROI from the ORIGINAL image and create a local mask
+        roi = image[py1:py2, px1:px2].copy()
+        local_mask = (labels[py1:py2, px1:px2] == i).astype(np.uint8) * 255
+        
+        # 2. Perform the blur on the entire padded ROI
+        # Use the original component dimensions for blur strength
+        component_size = max(w, h)
+        kernel_size = max(
+            config.min_kernel_size,
+            int(component_size * config.kernel_size_factor),
+        )
+        kernel_size = kernel_size + 1 if kernel_size % 2 == 0 else kernel_size
+        
+        blurred_roi = roi.copy()
+        for _ in range(config.iterations):
+            blurred_roi = cv2.GaussianBlur(blurred_roi, (kernel_size, kernel_size), 0)
+            
+        # 3. Create the feathered alpha mask using Distance Transform
+        # This makes the interior (original mask) 100% white (1.0) and fades out externally
+        # distanceTransform calculates distance to the nearest zero pixel.
+        # We invert local_mask so it finds distance from the boundary moving outward.
+        dist_outside = cv2.distanceTransform(255 - local_mask, cv2.DIST_L2, 3)
+        
+        # Normalize distance to 0.0 - 1.0 range based on feather_size
+        # Inside mask: distance is 0 -> alpha is 1.0
+        # Outside mask: distance increases -> alpha decreases to 0.0
+        alpha_mask = 1.0 - np.clip(dist_outside / feather_size, 0, 1)
+        
+        # Smooth the alpha transition slightly
+        if feather_size > 4:
+            alpha_mask = cv2.GaussianBlur(alpha_mask, (3, 3), 0)
+            
+        alpha_3 = cv2.merge([alpha_mask, alpha_mask, alpha_mask])
+        
+        # 4. Blend the blurred ROI with the original ROI using the alpha mask
+        blended = (blurred_roi.astype(float) * alpha_3 + roi.astype(float) * (1.0 - alpha_3)).astype(np.uint8)
+        
+        # 5. Place the blended result back into the main image
+        result[py1:py2, px1:px2] = blended
+        
     return result
 
 
@@ -805,6 +899,7 @@ def process_blur_single(
     mode: Literal["full", "demo", "skip"] = "demo",
     models_dir: Optional[Path] = None,
     edge_aware: bool = True,
+    conf_threshold: float = 0.25,
 ) -> bool:
     """
     Apply privacy blur to a single image.
@@ -816,6 +911,7 @@ def process_blur_single(
         mode: Detection mode ("full", "demo", or "skip")
         models_dir: Directory containing YOLO models
         edge_aware: Whether to detect faces spanning equirectangular edges
+        conf_threshold: Confidence threshold for detections
 
     Returns:
         True if successful, False otherwise
@@ -827,7 +923,12 @@ def process_blur_single(
         return False
 
     # Create detector
-    detector = PrivacyBlurEnsemble(mode=mode, models_dir=models_dir, edge_aware=edge_aware)
+    detector = PrivacyBlurEnsemble(
+        mode=mode, 
+        models_dir=models_dir, 
+        edge_aware=edge_aware,
+        conf_threshold=conf_threshold
+    )
 
     # Detect regions
     regions = detector.detect_all(image)
@@ -857,6 +958,7 @@ def process_blur_batch(
     mode: Literal["full", "demo", "skip"] = "demo",
     models_dir: Optional[Path] = None,
     edge_aware: bool = True,
+    conf_threshold: float = 0.25,
 ) -> list[Path]:
     """
     Apply privacy blur to all images in a directory.
@@ -868,6 +970,7 @@ def process_blur_batch(
         mode: Detection mode
         models_dir: Directory containing YOLO models
         edge_aware: Whether to detect faces spanning equirectangular edges
+        conf_threshold: Confidence threshold for detections
 
     Returns:
         List of output file paths
@@ -875,7 +978,12 @@ def process_blur_batch(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Create detector once for batch
-    detector = PrivacyBlurEnsemble(mode=mode, models_dir=models_dir, edge_aware=edge_aware)
+    detector = PrivacyBlurEnsemble(
+        mode=mode, 
+        models_dir=models_dir, 
+        edge_aware=edge_aware,
+        conf_threshold=conf_threshold
+    )
 
     # Find all image files
     image_extensions = {".jpg", ".jpeg", ".png", ".tiff", ".tif"}

@@ -226,6 +226,7 @@ def run_direct_processing(
     start_step: int,
     end_step: int,
     blur_mode: str = "demo",
+    blur_conf: float = 0.25,
     debug: bool = False,
     debug_format: str = "jpg",
     single_image: Optional[str] = None,
@@ -243,6 +244,7 @@ def run_direct_processing(
         start_step: Starting step number (1-8)
         end_step: Ending step number (1-8)
         blur_mode: Blur detection mode ("full", "demo", "skip")
+        blur_conf: Confidence threshold for blur detection
         debug: Enable debug output
         debug_format: Format for debug images
         single_image: Process only this specific filename
@@ -298,7 +300,7 @@ def run_direct_processing(
             continue
 
         elif step == PipelineStep.BLUR:
-            console.print(f"  Mode: {blur_mode}")
+            console.print(f"  Mode: {blur_mode} (conf: {blur_conf})")
             blur_config = BlurConfig()
 
             processed = 0
@@ -310,6 +312,7 @@ def run_direct_processing(
                     blur_config,
                     mode=blur_mode,
                     models_dir=DEFAULT_MODELS_DIR,
+                    conf_threshold=blur_conf,
                 )
                 if success:
                     current_files[name] = output_path
@@ -415,6 +418,7 @@ def run_direct_processing(
 def run_pipeline(
     config: PipelineConfig,
     blur_mode: Literal["full", "demo", "skip"] = "demo",
+    blur_conf: float = 0.25,
 ) -> None:
     """
     Run the processing pipeline with step control and debug output.
@@ -545,7 +549,7 @@ def run_pipeline(
             console.print(f"  Copied {len(equirect_images)} images to blurred/")
 
         elif equirect_images:
-            console.print(f"  Mode: {blur_mode}")
+            console.print(f"  Mode: {blur_mode} (conf: {blur_conf})")
             console.print(f"  Processing {len(equirect_images)} images...")
 
             output_files = process_blur_batch(
@@ -554,6 +558,7 @@ def run_pipeline(
                 config.blur,
                 mode=blur_mode,
                 models_dir=DEFAULT_MODELS_DIR,
+                conf_threshold=blur_conf,
             )
             console.print(f"  [green]Blurred {len(output_files)} images[/]")
 

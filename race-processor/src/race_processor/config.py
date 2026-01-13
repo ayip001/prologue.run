@@ -67,10 +67,10 @@ class BlurConfig(BaseModel):
         default="gaussian", description="Blur method"
     )
     kernel_size_factor: float = Field(
-        default=0.15, description="Kernel size as fraction of region size"
+        default=0.25, description="Kernel size as fraction of region size"
     )
-    min_kernel_size: int = Field(default=15, description="Minimum kernel size")
-    iterations: int = Field(default=2, description="Number of blur iterations")
+    min_kernel_size: int = Field(default=25, description="Minimum kernel size")
+    iterations: int = Field(default=3, description="Number of blur iterations")
 
 
 class ImageTierConfig(BaseModel):
