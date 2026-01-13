@@ -47,6 +47,14 @@ export function StorySection() {
               reading the prologue for a book!). Then I noticed my 360 camera
               that's been gathering dust, and that's how this idea came to be.
             </p>
+            <p className="text-lg text-slate-400 leading-relaxed">
+              Prologue.run allows you to preview the route of a race before you run it,
+              like using Google Maps' Street View feature. Right now, the selection of races is limited
+              to races that I have run, but I plan to add more races in the future as I complete more races.
+              If you have a race that you would like to see on Prologue.run, or if you want to help log a race,
+              please let me know by emailing me at&nbsp;
+              <a href="mailto:hello@prologue.run" className="text-coral hover:underline">hello@prologue.run</a>.
+            </p>
           </div>
 
           {/* Right Image Stack */}

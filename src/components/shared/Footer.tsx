@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Github, Heart } from "lucide-react";
+import { Github, Heart, Coffee } from "lucide-react";
 import { Logo } from "./Logo";
 
 export function Footer() {
@@ -89,9 +89,21 @@ export function Footer() {
           <p className="text-sm text-slate-500">
             © {currentYear} prologue.run. All rights reserved.
           </p>
-          <p className="text-sm text-slate-500 flex items-center gap-1">
-            Made with <Heart className="h-4 w-4 text-coral" /> for runners
-          </p>
+          <div className="flex flex-col md:flex-row items-center gap-4">
+            <p className="text-sm text-slate-500 flex items-center gap-1">
+              Made with <Heart className="h-4 w-4 text-coral" /> for runners
+            </p>
+            <span className="hidden md:block text-slate-700">|</span>
+            <a
+              href="https://buymeacoffee.com/angusflies"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-slate-500 hover:text-white transition-colors flex items-center gap-1.5 group"
+            >
+              <Coffee className="h-4 w-4 text-amber-500 group-hover:animate-bounce" />
+              Buy me a coffee
+            </a>
+          </div>
         </div>
       </div>
     </footer>
