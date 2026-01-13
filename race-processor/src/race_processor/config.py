@@ -111,6 +111,78 @@ class StitchConfig(BaseModel):
     output_quality: int = Field(default=100, description="Output quality")
 
 
+class CopyrightConfig(BaseModel):
+    """Configuration for copyright watermark."""
+
+    text: str = Field(
+        default="© {year} Prologue.run",
+        description="Copyright text template. {year} will be replaced with current year",
+    )
+    font_size_ratio: float = Field(
+        default=0.012,
+        description="Font size as ratio of image height",
+    )
+    font_color: tuple[int, int, int, int] = Field(
+        default=(255, 255, 255, 180),
+        description="RGBA color for text",
+    )
+    shadow_color: tuple[int, int, int, int] = Field(
+        default=(0, 0, 0, 120),
+        description="RGBA color for text shadow",
+    )
+    shadow_offset: int = Field(
+        default=2,
+        description="Shadow offset in pixels",
+    )
+    position: Literal["bottom-left", "bottom-center", "bottom-right"] = Field(
+        default="bottom-left",
+        description="Position of copyright text",
+    )
+    margin_ratio: float = Field(
+        default=0.015,
+        description="Margin from edge as ratio of image dimension",
+    )
+
+
+class DebugConfig(BaseModel):
+    """Configuration for debug mode with intermediate output."""
+
+    enabled: bool = Field(
+        default=False,
+        description="Enable debug mode to save intermediate files",
+    )
+    output_format: Literal["jpg", "png", "tiff"] = Field(
+        default="jpg",
+        description="Format for debug output images",
+    )
+    output_quality: int = Field(
+        default=90,
+        description="Quality for debug output images (for jpg)",
+    )
+
+
+class StepControlConfig(BaseModel):
+    """Configuration for controlling which pipeline steps to run."""
+
+    # Step numbers: 1=Ingest, 2=Stabilize, 3=Stitch, 4=Blur, 5=Watermark, 6=Resize, 7=Export, 8=Upload
+    start_step: int = Field(
+        default=1,
+        ge=1,
+        le=8,
+        description="Start processing from this step (1-8)",
+    )
+    end_step: int = Field(
+        default=8,
+        ge=1,
+        le=8,
+        description="Stop processing after this step (1-8)",
+    )
+    single_image: str | None = Field(
+        default=None,
+        description="Process only this specific image filename (e.g., 'IMG_20260112_182529_00_328.insp')",
+    )
+
+
 class R2Config(BaseModel):
     """Configuration for Cloudflare R2 storage."""
 
@@ -149,6 +221,11 @@ class PipelineConfig(BaseModel):
     blur: BlurConfig = Field(default_factory=BlurConfig)
     image_tiers: ImageTiersConfig = Field(default_factory=ImageTiersConfig)
     stitch: StitchConfig = Field(default_factory=StitchConfig)
+    copyright: CopyrightConfig = Field(default_factory=CopyrightConfig)
+
+    # Debug and step control
+    debug: DebugConfig = Field(default_factory=DebugConfig)
+    step_control: StepControlConfig = Field(default_factory=StepControlConfig)
 
     # R2 config (optional, loaded from env if not provided)
     r2: R2Config | None = Field(default=None, description="R2 storage config")

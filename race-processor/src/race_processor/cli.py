@@ -7,7 +7,13 @@ from pathlib import Path
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from .config import PipelineConfig, DEFAULT_OUTPUT_DIR
+from .config import (
+    PipelineConfig,
+    DEFAULT_OUTPUT_DIR,
+    DebugConfig,
+    StepControlConfig,
+    CopyrightConfig,
+)
 
 console = Console()
 
@@ -63,6 +69,45 @@ def main() -> None:
     is_flag=True,
     help="Skip R2 upload stage",
 )
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Enable debug mode to save intermediate images at each step",
+)
+@click.option(
+    "--debug-format",
+    type=click.Choice(["jpg", "png", "tiff"]),
+    default="jpg",
+    help="Output format for debug images (default: jpg)",
+)
+@click.option(
+    "--start-step",
+    type=click.IntRange(1, 8),
+    default=1,
+    help="Start processing from this step (1-8). Steps: 1=Ingest, 2=Stabilize, 3=Stitch, 4=Blur, 5=Watermark, 6=Resize, 7=Export, 8=Upload",
+)
+@click.option(
+    "--end-step",
+    type=click.IntRange(1, 8),
+    default=8,
+    help="Stop processing after this step (1-8)",
+)
+@click.option(
+    "--step",
+    type=click.IntRange(1, 8),
+    default=None,
+    help="Run only this single step (shorthand for --start-step N --end-step N)",
+)
+@click.option(
+    "--single-image",
+    default=None,
+    help="Process only this specific image filename (e.g., 'IMG_20260112_182529_00_328.insp')",
+)
+@click.option(
+    "--copyright-text",
+    default=None,
+    help="Custom copyright text (default: '© {year} Prologue.run'). Use {year} for current year.",
+)
 def process(
     input_dir: Path,
     race_slug: str,
@@ -71,12 +116,66 @@ def process(
     use_sdk: bool,
     skip_blur: bool,
     skip_upload: bool,
+    debug: bool,
+    debug_format: str,
+    start_step: int,
+    end_step: int,
+    step: int | None,
+    single_image: str | None,
+    copyright_text: str | None,
 ) -> None:
-    """Process a race from raw .insp files to final output."""
+    """Process a race from raw .insp files to final output.
+
+    \b
+    Pipeline Steps:
+      1. Ingest     - Discover files and create manifest
+      2. Stabilize  - Extract gyro data and calculate corrections
+      3. Stitch     - Convert to equirectangular with stabilization
+      4. Blur       - Apply privacy blurring (faces, plates)
+      5. Watermark  - Add copyright text overlay
+      6. Resize     - Generate quality tiers (thumbnail, medium, full)
+      7. Export     - Encode to AVIF/WebP formats
+      8. Upload     - Upload to R2 (optional)
+
+    \b
+    Examples:
+      # Process with debug output
+      race-processor process -i ./data -r my-race --debug
+
+      # Run only step 5 (watermark)
+      race-processor process -i ./data -r my-race --step 5
+
+      # Run steps 4-6 for a single image
+      race-processor process -i ./data -r my-race --start-step 4 --end-step 6 \\
+          --single-image IMG_20260112_182529_00_328.insp
+    """
     console.print(f"[bold green]Processing race:[/] {race_slug}")
     console.print(f"  Input: {input_dir}")
     console.print(f"  Output: {output_dir}")
     console.print(f"  Workers: {workers}")
+
+    # Handle --step shorthand
+    if step is not None:
+        start_step = step
+        end_step = step
+
+    # Build debug config
+    debug_config = DebugConfig(
+        enabled=debug,
+        output_format=debug_format,
+    )
+
+    # Build step control config
+    step_control = StepControlConfig(
+        start_step=start_step,
+        end_step=end_step,
+        single_image=single_image,
+    )
+
+    # Build copyright config
+    copyright_config = CopyrightConfig()
+    if copyright_text:
+        copyright_config = CopyrightConfig(text=copyright_text)
 
     config = PipelineConfig(
         input_dir=input_dir,
@@ -86,6 +185,9 @@ def process(
         workers=workers,
         skip_blur=skip_blur,
         skip_upload=skip_upload,
+        debug=debug_config,
+        step_control=step_control,
+        copyright=copyright_config,
     )
 
     # Import and run orchestrator
