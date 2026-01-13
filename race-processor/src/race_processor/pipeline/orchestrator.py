@@ -13,20 +13,36 @@ Pipeline Steps:
 
 Debug mode saves intermediate equirectangular images after each step to allow
 inspection and debugging of the processing pipeline.
+
+Direct mode (--src/--dst) allows testing individual steps on arbitrary images.
 """
 
+from datetime import datetime
 from enum import IntEnum
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 import shutil
 
 import cv2
 from rich.console import Console
 from rich.table import Table
 
-from ..config import PipelineConfig, DebugConfig
+from ..config import (
+    PipelineConfig,
+    DebugConfig,
+    BlurConfig,
+    CopyrightConfig,
+    ImageTiersConfig,
+    DEFAULT_MODELS_DIR,
+)
 from .ingest import discover_and_create_manifest, ProcessingManifest
 from .watermark import add_copyright_watermark, process_single_image as watermark_single
+from ..detection.ensemble import (
+    PrivacyBlurEnsemble,
+    blur_image,
+    process_blur_single,
+    process_blur_batch,
+)
 
 console = Console()
 
@@ -158,7 +174,7 @@ def save_debug_image_from_array(
     return output_path
 
 
-def print_step_summary(config: PipelineConfig) -> None:
+def print_step_summary(config: PipelineConfig, blur_mode: str = "demo") -> None:
     """Print a summary of which steps will run."""
     table = Table(title="Pipeline Steps")
     table.add_column("Step", style="cyan")
@@ -168,8 +184,11 @@ def print_step_summary(config: PipelineConfig) -> None:
     for step in PipelineStep:
         step_name = STEP_NAMES[step]
         if should_run_step(step, config):
-            if step == PipelineStep.BLUR and config.skip_blur:
-                status = "[yellow]Skipped (--skip-blur)[/]"
+            if step == PipelineStep.BLUR:
+                if config.skip_blur:
+                    status = "[yellow]Skipped (--skip-blur)[/]"
+                else:
+                    status = f"[green]Will run ({blur_mode} mode)[/]"
             elif step == PipelineStep.UPLOAD and config.skip_upload:
                 status = "[yellow]Skipped (--skip-upload)[/]"
             else:
@@ -195,7 +214,208 @@ def print_step_summary(config: PipelineConfig) -> None:
     console.print()
 
 
-def run_pipeline(config: PipelineConfig) -> None:
+def get_image_files(directory: Path) -> list[Path]:
+    """Get all image files from a directory."""
+    extensions = {".jpg", ".jpeg", ".png", ".tiff", ".tif"}
+    return [f for f in directory.iterdir() if f.suffix.lower() in extensions]
+
+
+def run_direct_processing(
+    src: Path,
+    dst: Path,
+    start_step: int,
+    end_step: int,
+    blur_mode: str = "demo",
+    debug: bool = False,
+    debug_format: str = "jpg",
+    single_image: Optional[str] = None,
+    copyright_text: Optional[str] = None,
+) -> None:
+    """
+    Run direct processing on arbitrary images without the full pipeline structure.
+
+    This mode bypasses the standard directory structure and processes images
+    directly from --src to --dst, useful for testing individual steps.
+
+    Args:
+        src: Source directory or file
+        dst: Destination directory
+        start_step: Starting step number (1-8)
+        end_step: Ending step number (1-8)
+        blur_mode: Blur detection mode ("full", "demo", "skip")
+        debug: Enable debug output
+        debug_format: Format for debug images
+        single_image: Process only this specific filename
+        copyright_text: Custom copyright text
+    """
+    # Ensure destination exists
+    dst.mkdir(parents=True, exist_ok=True)
+
+    # Create debug directory if needed
+    debug_dir = dst / "debug" if debug else None
+    if debug_dir:
+        debug_dir.mkdir(exist_ok=True)
+
+    debug_config = DebugConfig(enabled=debug, output_format=debug_format)
+
+    # Determine source files
+    if src.is_file():
+        source_files = [src]
+    else:
+        source_files = get_image_files(src)
+        if single_image:
+            source_files = [f for f in source_files if f.name == single_image]
+            if not source_files:
+                console.print(f"[red]Error: '{single_image}' not found in {src}[/]")
+                return
+
+    if not source_files:
+        console.print(f"[red]Error: No image files found in {src}[/]")
+        return
+
+    console.print(f"\n  Found {len(source_files)} image(s) to process")
+
+    # Track current working files (start with source files)
+    current_files = {f.name: f for f in source_files}
+
+    # Process each step
+    for step_num in range(start_step, end_step + 1):
+        step = PipelineStep(step_num)
+        step_name = STEP_NAMES[step]
+
+        console.print(f"\n[bold]Step {step_num}: {step_name}[/]")
+
+        # Create step output directory
+        step_output = dst / f"step{step_num}_{step_name.lower()}"
+        step_output.mkdir(exist_ok=True)
+
+        if step == PipelineStep.INGEST:
+            console.print("  [dim]Skipping in direct mode (no manifest needed)[/]")
+            continue
+
+        elif step in (PipelineStep.STABILIZE, PipelineStep.STITCH):
+            console.print("  [dim]Skipping (requires Insta360 SDK)[/]")
+            continue
+
+        elif step == PipelineStep.BLUR:
+            console.print(f"  Mode: {blur_mode}")
+            blur_config = BlurConfig()
+
+            processed = 0
+            for name, path in current_files.items():
+                output_path = step_output / name
+                success = process_blur_single(
+                    path,
+                    output_path,
+                    blur_config,
+                    mode=blur_mode,
+                    models_dir=DEFAULT_MODELS_DIR,
+                )
+                if success:
+                    current_files[name] = output_path
+                    processed += 1
+
+                    if debug:
+                        save_debug_image(output_path, step, dst, debug_config)
+
+            console.print(f"  [green]Processed {processed} images[/]")
+
+        elif step == PipelineStep.WATERMARK:
+            copyright_config = CopyrightConfig()
+            if copyright_text:
+                copyright_config = CopyrightConfig(text=copyright_text)
+
+            year = datetime.now().year
+            console.print(f"  Text: {copyright_config.text.format(year=year)}")
+
+            processed = 0
+            for name, path in current_files.items():
+                output_path = step_output / name
+                success = watermark_single(path, output_path, copyright_config)
+                if success:
+                    current_files[name] = output_path
+                    processed += 1
+
+                    if debug:
+                        save_debug_image(output_path, step, dst, debug_config)
+
+            console.print(f"  [green]Watermarked {processed} images[/]")
+
+        elif step == PipelineStep.RESIZE:
+            tier_config = ImageTiersConfig()
+
+            # Create tier subdirectories
+            for tier in ["thumbnail", "medium", "full"]:
+                (step_output / tier).mkdir(exist_ok=True)
+
+            tiers = {
+                "thumbnail": tier_config.thumbnail,
+                "medium": tier_config.medium,
+                "full": tier_config.full,
+            }
+
+            processed = 0
+            for name, path in current_files.items():
+                image = cv2.imread(str(path))
+                if image is None:
+                    continue
+
+                height, width = image.shape[:2]
+
+                for tier_name, tier in tiers.items():
+                    new_width = tier.width
+                    new_height = int(height * (new_width / width))
+
+                    resized = cv2.resize(
+                        image, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4
+                    )
+
+                    tier_output = step_output / tier_name / name
+                    cv2.imwrite(str(tier_output), resized)
+
+                    if debug:
+                        debug_name = f"{Path(name).stem}_{tier_name}"
+                        save_debug_image_from_array(resized, step, dst, debug_config, debug_name)
+
+                # Update current_files to point to full resolution
+                current_files[name] = step_output / "full" / name
+                processed += 1
+
+            console.print(
+                f"  [green]Resized {processed} images to 3 tiers: "
+                f"{tier_config.thumbnail.width}px, "
+                f"{tier_config.medium.width}px, "
+                f"{tier_config.full.width}px[/]"
+            )
+
+        elif step == PipelineStep.EXPORT:
+            console.print("  [yellow]AVIF/WebP encoding not yet implemented[/]")
+            # Copy files to step output
+            for name, path in current_files.items():
+                shutil.copy(path, step_output / name)
+                current_files[name] = step_output / name
+
+        elif step == PipelineStep.UPLOAD:
+            console.print("  [dim]Skipping in direct mode (no R2 config)[/]")
+            continue
+
+    # Summary
+    console.print(f"\n[bold green]Direct processing complete![/]")
+    console.print(f"  Output: {dst}")
+
+    # List output directories
+    output_dirs = [d for d in dst.iterdir() if d.is_dir()]
+    for d in sorted(output_dirs):
+        if d.name == "debug":
+            continue
+        file_count = len(list(d.rglob("*")) if d.is_dir() else [])
+        console.print(f"    - {d.name}/: {file_count} files")
+
+
+def run_pipeline(
+    config: PipelineConfig,
+    blur_mode: Literal["full", "demo", "skip"] = "demo",
+) -> None:
     """
     Run the processing pipeline with step control and debug output.
 
@@ -212,7 +432,7 @@ def run_pipeline(config: PipelineConfig) -> None:
     console.print("[bold blue]Starting pipeline...[/]")
 
     # Print step summary
-    print_step_summary(config)
+    print_step_summary(config, blur_mode)
 
     # Create output directories
     output_base = config.output_dir / config.race_slug
@@ -309,53 +529,60 @@ def run_pipeline(config: PipelineConfig) -> None:
     # =========================================================================
     if should_run_step(PipelineStep.BLUR, config):
         console.print("\n[bold]Stage 4: Blur[/]")
+
+        equirect_images = get_image_files(dirs["equirect"])
+
         if config.skip_blur:
             console.print("  [yellow]Skipping - --skip-blur flag set[/]")
-            # Copy equirect images to blurred directory
-            equirect_images = list(dirs["equirect"].glob("*.jpg")) + list(
-                dirs["equirect"].glob("*.png")
-            ) + list(dirs["equirect"].glob("*.tiff"))
             for img in equirect_images:
                 shutil.copy(img, dirs["blurred"] / img.name)
             console.print(f"  Copied {len(equirect_images)} images to blurred/")
-        else:
-            console.print("  [yellow]Skipping - YOLO models required[/]")
-            console.print("  Run: race-processor download-models")
 
-            # For now, copy source images if they exist
-            equirect_images = list(dirs["equirect"].glob("*.jpg")) + list(
-                dirs["equirect"].glob("*.png")
-            ) + list(dirs["equirect"].glob("*.tiff"))
-            if equirect_images:
-                for img in equirect_images:
-                    shutil.copy(img, dirs["blurred"] / img.name)
-                console.print(f"  Copied {len(equirect_images)} images (no blur applied)")
+        elif blur_mode == "skip":
+            console.print("  [yellow]Skipping - --blur-mode skip[/]")
+            for img in equirect_images:
+                shutil.copy(img, dirs["blurred"] / img.name)
+            console.print(f"  Copied {len(equirect_images)} images to blurred/")
+
+        elif equirect_images:
+            console.print(f"  Mode: {blur_mode}")
+            console.print(f"  Processing {len(equirect_images)} images...")
+
+            output_files = process_blur_batch(
+                dirs["equirect"],
+                dirs["blurred"],
+                config.blur,
+                mode=blur_mode,
+                models_dir=DEFAULT_MODELS_DIR,
+            )
+            console.print(f"  [green]Blurred {len(output_files)} images[/]")
+
+        else:
+            console.print("  [yellow]No equirectangular images found[/]")
+            console.print(f"  Place images in: {dirs['equirect']}")
 
         # Debug output
         if config.debug.enabled:
-            blurred_images = list(dirs["blurred"].glob("*"))
+            blurred_images = get_image_files(dirs["blurred"])
             for img in blurred_images[:5]:
                 save_debug_image(img, PipelineStep.BLUR, output_base, config.debug)
     else:
         console.print("\n[dim]Stage 4: Blur - Skipped (step control)[/]")
 
     # =========================================================================
-    # Stage 5: Watermark (NEW)
+    # Stage 5: Watermark
     # =========================================================================
     if should_run_step(PipelineStep.WATERMARK, config):
         console.print("\n[bold]Stage 5: Watermark[/]")
 
         # Get source images from blurred directory (or equirect if blur was skipped)
-        source_dir = dirs["blurred"] if list(dirs["blurred"].glob("*")) else dirs["equirect"]
-        source_images = (
-            list(source_dir.glob("*.jpg"))
-            + list(source_dir.glob("*.png"))
-            + list(source_dir.glob("*.tiff"))
-        )
+        source_dir = dirs["blurred"] if get_image_files(dirs["blurred"]) else dirs["equirect"]
+        source_images = get_image_files(source_dir)
 
         if source_images:
+            year = datetime.now().year
             console.print(f"  Processing {len(source_images)} images...")
-            console.print(f"  Copyright text: {config.copyright.text.format(year=2026)}")
+            console.print(f"  Copyright text: {config.copyright.text.format(year=year)}")
 
             processed_count = 0
             for img_path in source_images:
@@ -393,16 +620,12 @@ def run_pipeline(config: PipelineConfig) -> None:
 
         # Get source images from watermarked directory
         source_dir = dirs["watermarked"]
-        if not list(source_dir.glob("*")):
+        if not get_image_files(source_dir):
             source_dir = dirs["blurred"]
-        if not list(source_dir.glob("*")):
+        if not get_image_files(source_dir):
             source_dir = dirs["equirect"]
 
-        source_images = (
-            list(source_dir.glob("*.jpg"))
-            + list(source_dir.glob("*.png"))
-            + list(source_dir.glob("*.tiff"))
-        )
+        source_images = get_image_files(source_dir)
 
         if source_images:
             console.print(f"  Processing {len(source_images)} images...")
@@ -466,7 +689,7 @@ def run_pipeline(config: PipelineConfig) -> None:
 
         # Check for resized images
         has_resized = any(
-            list((dirs["resized"] / tier).glob("*"))
+            get_image_files(dirs["resized"] / tier)
             for tier in ["thumbnail", "medium", "full"]
         )
 

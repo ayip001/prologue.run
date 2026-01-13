@@ -12,7 +12,7 @@ pip install -e .
 ## Quick Start
 
 ```bash
-# Basic processing
+# Basic processing (standard mode)
 race-processor process -i ./data/my-race -r my-race-2026
 
 # With debug output to inspect each step
@@ -20,6 +20,12 @@ race-processor process -i ./data/my-race -r my-race-2026 --debug
 
 # Process only the watermark step
 race-processor process -i ./data/my-race -r my-race-2026 --step 5
+
+# Direct mode: test blur on arbitrary JPEG files
+race-processor process --step 4 --src ./my-images --dst ./output-test
+
+# Direct mode: test watermark on a single image
+race-processor process --step 5 --src ./image.jpg --dst ./output
 ```
 
 ## Pipeline Steps
@@ -45,19 +51,31 @@ The processor runs an 8-stage pipeline:
 race-processor process [OPTIONS]
 ```
 
-#### Required Options
+The `process` command supports two modes:
+
+1. **Standard Mode**: Full pipeline with race directory structure (requires `-i` and `-r`)
+2. **Direct Mode**: Process arbitrary images directly (uses `--src` and `--dst`)
+
+#### Standard Mode Options
 
 | Option | Description |
 |--------|-------------|
 | `-i, --input PATH` | Input directory containing `insp/` and `gpx/` subdirectories |
 | `-r, --race-slug TEXT` | URL-friendly race identifier (e.g., `hk-marathon-2026`) |
+| `-o, --output PATH` | Output directory (default: `./output`) |
+| `-w, --workers INT` | Number of parallel workers (default: `4`) |
 
-#### Output Options
+#### Direct Mode Options
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `-o, --output PATH` | `./output` | Output directory |
-| `-w, --workers INT` | `4` | Number of parallel workers |
+Direct mode bypasses the standard directory structure and processes arbitrary images.
+Useful for testing individual pipeline steps on pre-processed images.
+
+| Option | Description |
+|--------|-------------|
+| `--src PATH` | Source directory or single image file |
+| `--dst PATH` | Destination directory for output |
+
+When using `--src`, the `-i` and `-r` options are not required.
 
 #### Pipeline Control
 
@@ -66,6 +84,17 @@ race-processor process [OPTIONS]
 | `--skip-blur` | Skip privacy blur stage |
 | `--skip-upload` | Skip R2 upload stage |
 | `--use-sdk / --use-cli` | Use Insta360 SDK (default) or Studio CLI |
+
+#### Blur Mode
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--blur-mode` | `demo` | Detection mode for blur stage |
+
+Blur modes:
+- `full` - Use YOLO models for real face/plate detection (requires `download-models`)
+- `demo` - Generate fake detections for testing the pipeline
+- `skip` - Skip blur entirely (same as `--skip-blur`)
 
 #### Debug Mode
 
@@ -194,6 +223,54 @@ race-processor process -i ./data/hk-marathon -r hk-marathon-2026 --skip-blur
 
 # Skip upload (process locally only)
 race-processor process -i ./data/hk-marathon -r hk-marathon-2026 --skip-upload
+```
+
+### Direct Mode (Testing Individual Steps)
+
+Direct mode allows you to test individual pipeline steps on arbitrary images without
+the full race directory structure. Great for debugging and development.
+
+```bash
+# Test blur (step 4) on a folder of JPEG images
+race-processor process --step 4 --src ./testing-images --dst ./blur-output
+
+# Test watermark (step 5) on a single image
+race-processor process --step 5 --src ./my-image.jpg --dst ./watermark-output
+
+# Run steps 4-6 on a folder with debug output
+race-processor process --start-step 4 --end-step 6 \
+    --src ./equirect-images --dst ./processed --debug
+
+# Test blur with demo mode (fake detections for testing)
+race-processor process --step 4 --src ./images --dst ./output --blur-mode demo
+
+# Test blur with actual YOLO models
+race-processor process --step 4 --src ./images --dst ./output --blur-mode full
+```
+
+Direct mode output structure:
+```
+output/
+├── step4_blur/           # Blurred images
+├── step5_watermark/      # Watermarked images
+├── step6_resize/         # Resized images
+│   ├── thumbnail/
+│   ├── medium/
+│   └── full/
+└── debug/                # Debug output (if --debug enabled)
+```
+
+### Blur Mode Testing
+
+```bash
+# Demo mode: generates fake blur regions for testing the pipeline
+race-processor process -i ./data/race -r race --blur-mode demo
+
+# Full mode: uses YOLO models for real detection (requires download-models)
+race-processor process -i ./data/race -r race --blur-mode full
+
+# Skip mode: no blur applied
+race-processor process -i ./data/race -r race --blur-mode skip
 ```
 
 ### Combined Options

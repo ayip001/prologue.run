@@ -31,13 +31,13 @@ def main() -> None:
     "-i",
     "input_dir",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
-    required=True,
+    default=None,
     help="Input directory containing race data (insp/ and gpx/ subdirs)",
 )
 @click.option(
     "--race-slug",
     "-r",
-    required=True,
+    default=None,
     help="URL-friendly race identifier (e.g., 'hk-marathon-2026')",
 )
 @click.option(
@@ -47,6 +47,18 @@ def main() -> None:
     type=click.Path(file_okay=False, path_type=Path),
     default=DEFAULT_OUTPUT_DIR,
     help="Output directory",
+)
+@click.option(
+    "--src",
+    type=click.Path(exists=True, path_type=Path),
+    default=None,
+    help="Source directory or file for direct processing (bypasses standard structure)",
+)
+@click.option(
+    "--dst",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Destination directory for direct processing output",
 )
 @click.option(
     "--workers",
@@ -68,6 +80,12 @@ def main() -> None:
     "--skip-upload",
     is_flag=True,
     help="Skip R2 upload stage",
+)
+@click.option(
+    "--blur-mode",
+    type=click.Choice(["full", "demo", "skip"]),
+    default="demo",
+    help="Blur detection mode: full (requires models), demo (fake detections), skip (no blur)",
 )
 @click.option(
     "--debug",
@@ -109,13 +127,16 @@ def main() -> None:
     help="Custom copyright text (default: '© {year} Prologue.run'). Use {year} for current year.",
 )
 def process(
-    input_dir: Path,
-    race_slug: str,
+    input_dir: Path | None,
+    race_slug: str | None,
     output_dir: Path,
+    src: Path | None,
+    dst: Path | None,
     workers: int,
     use_sdk: bool,
     skip_blur: bool,
     skip_upload: bool,
+    blur_mode: str,
     debug: bool,
     debug_format: str,
     start_step: int,
@@ -138,21 +159,68 @@ def process(
       8. Upload     - Upload to R2 (optional)
 
     \b
-    Examples:
-      # Process with debug output
+    Standard Mode (requires -i and -r):
       race-processor process -i ./data -r my-race --debug
 
-      # Run only step 5 (watermark)
-      race-processor process -i ./data -r my-race --step 5
+    \b
+    Direct Mode (--src/--dst for testing individual steps):
+      # Test blur on a folder of JPEGs
+      race-processor process --step 4 --src ./testing-jpg --dst ./blurred-test
 
-      # Run steps 4-6 for a single image
-      race-processor process -i ./data -r my-race --start-step 4 --end-step 6 \\
-          --single-image IMG_20260112_182529_00_328.insp
+      # Test watermark on a single image
+      race-processor process --step 5 --src ./img.jpg --dst ./output/
+
+    \b
+    Blur Modes:
+      --blur-mode full   Use YOLO models (requires download-models)
+      --blur-mode demo   Generate fake detections for testing (default)
+      --blur-mode skip   Skip blur entirely
     """
+    # Direct processing mode (--src/--dst)
+    if src is not None:
+        if dst is None:
+            console.print("[red]Error: --dst is required when using --src[/]")
+            raise SystemExit(1)
+
+        # Handle --step shorthand
+        if step is not None:
+            start_step = step
+            end_step = step
+
+        console.print(f"[bold green]Direct processing mode[/]")
+        console.print(f"  Source: {src}")
+        console.print(f"  Destination: {dst}")
+        console.print(f"  Steps: {start_step}-{end_step}")
+        console.print(f"  Blur mode: {blur_mode}")
+
+        from .pipeline.orchestrator import run_direct_processing
+
+        run_direct_processing(
+            src=src,
+            dst=dst,
+            start_step=start_step,
+            end_step=end_step,
+            blur_mode=blur_mode,
+            debug=debug,
+            debug_format=debug_format,
+            single_image=single_image,
+            copyright_text=copyright_text,
+        )
+        return
+
+    # Standard pipeline mode (requires -i and -r)
+    if input_dir is None:
+        console.print("[red]Error: --input/-i is required (or use --src/--dst for direct mode)[/]")
+        raise SystemExit(1)
+    if race_slug is None:
+        console.print("[red]Error: --race-slug/-r is required (or use --src/--dst for direct mode)[/]")
+        raise SystemExit(1)
+
     console.print(f"[bold green]Processing race:[/] {race_slug}")
     console.print(f"  Input: {input_dir}")
     console.print(f"  Output: {output_dir}")
     console.print(f"  Workers: {workers}")
+    console.print(f"  Blur mode: {blur_mode}")
 
     # Handle --step shorthand
     if step is not None:
@@ -193,7 +261,7 @@ def process(
     # Import and run orchestrator
     from .pipeline.orchestrator import run_pipeline
 
-    run_pipeline(config)
+    run_pipeline(config, blur_mode=blur_mode)
 
 
 @main.command()
