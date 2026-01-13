@@ -39,6 +39,22 @@ export function Footer() {
                 </Link>
               </li>
               <li>
+                <Link
+                  href="/terms"
+                  className="text-sm text-slate-400 hover:text-white transition-colors"
+                >
+                  Terms of Service
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/privacy"
+                  className="text-sm text-slate-400 hover:text-white transition-colors"
+                >
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
                 <a
                   href="https://github.com/prologue-run/prologue.run"
                   target="_blank"

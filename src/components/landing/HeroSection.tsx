@@ -32,17 +32,6 @@ export function HeroSection({ races }: HeroSectionProps) {
           Preview marathon routes through interactive 360° street-level imagery.
           Know exactly what to expect before race day.
         </p>
-
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Button size="lg" asChild>
-            <a href="#races">
-              Browse Races
-            </a>
-          </Button>
-          <Button variant="secondary" size="lg" asChild>
-            <a href="#features">Learn More</a>
-          </Button>
-        </div>
       </div>
 
       {/* Race Grid Integrated */}
@@ -52,6 +41,20 @@ export function HeroSection({ races }: HeroSectionProps) {
             <RaceCard key={race.id} race={race} />
           ))}
           <AddRouteCard />
+        </div>
+      </div>
+
+      {/* Buttons */}
+      <div className="relative z-10 container mx-auto px-4 text-center mt-12 mb-12">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <Button size="lg" asChild disabled className="opacity-60 pointer-events-none">
+            <a href="#">
+              Browse More Races
+            </a>
+          </Button>
+          <Button variant="secondary" size="lg" asChild>
+            <a href="#features">Learn More</a>
+          </Button>
         </div>
       </div>
     </section>
