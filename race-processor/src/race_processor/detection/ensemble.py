@@ -11,15 +11,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Literal, Optional
 
-import re
 import cv2
 import numpy as np
 from rich.console import Console
 from ultralytics import YOLO
-try:
-    import easyocr
-except ImportError:
-    easyocr = None
 
 from ..config import BlurConfig
 
@@ -36,6 +31,7 @@ class DetectionSource(Enum):
     FACE_YOLO_MEDIUM = "face_yolo_m"
     BODY_POSE_HEAD = "body_pose_head"
     LICENSE_PLATE = "plate"
+    VEHICLE = "vehicle"
     DEMO = "demo"
     EDGE_WRAPPED = "edge_wrapped"
 
@@ -268,7 +264,7 @@ def blur_image(
     Apply blur to specified regions in an image.
 
     Handles both standard regions and edge-spanning regions for
-    equirectangular projections.
+    equirectangular projections. Skips non-blurring sources (e.g., VEHICLE).
 
     Args:
         image: OpenCV image (BGR format)
@@ -281,6 +277,10 @@ def blur_image(
     result = image.copy()
 
     for region in regions:
+        # Skip regions that shouldn't be blurred (e.g., vehicles, only used for tracking)
+        if region.source == DetectionSource.VEHICLE:
+            continue
+            
         result = blur_region_on_image(result, region, config)
 
     return result
@@ -378,7 +378,6 @@ class PrivacyBlurEnsemble:
         models_dir: Optional[Path] = None,
         edge_aware: bool = True,
         conf_threshold: float = 0.25,
-        use_ocr: bool = True,
     ) -> None:
         """
         Initialize the ensemble.
@@ -391,24 +390,21 @@ class PrivacyBlurEnsemble:
             models_dir: Directory containing YOLO models (required for full mode)
             edge_aware: Whether to run edge-aware detection for equirectangular images
             conf_threshold: Default confidence threshold for detections
-            use_ocr: Whether to use EasyOCR for license plate detection
         """
         self.mode = mode
         self.models_dir = models_dir
         self.edge_aware = edge_aware
         self.conf_threshold = conf_threshold
-        self.use_ocr = use_ocr and (easyocr is not None)
         self._models_loaded = False
         self.face_detector = None
         self.pose_detector = None
         self.plate_detector = None
-        self.ocr_reader = None
 
         if mode == "full" and models_dir:
             self._load_models()
 
     def _load_models(self) -> None:
-        """Load YOLO models and OCR for detection."""
+        """Load YOLO models for detection."""
         if self.models_dir is None:
             console.print("  [yellow]Warning: No models directory specified[/]")
             return
@@ -441,76 +437,23 @@ class PrivacyBlurEnsemble:
             else:
                 console.print(f"  [yellow]Warning: Plate model not found[/]")
 
-            # Initialize EasyOCR
-            if self.use_ocr:
-                console.print("  [blue]Initializing EasyOCR (this may take a moment)...[/]")
-                self.ocr_reader = easyocr.Reader(['en'])
-                console.print("  [green]EasyOCR initialized[/]")
+            # Check for vehicle detector (standard YOLOv8n)
+            vehicle_path = self.models_dir / "yolov8n.pt"
+            if vehicle_path.exists():
+                self.vehicle_detector = YOLO(str(vehicle_path))
+                console.print(f"  [green]Loaded vehicle detector:[/] {vehicle_path.name}")
+            else:
+                self.vehicle_detector = None
+                console.print(f"  [yellow]Warning: Vehicle detector (yolov8n.pt) not found[/]")
 
             self._models_loaded = (
                 self.face_detector is not None 
                 or self.pose_detector is not None 
                 or self.plate_detector is not None
-                or self.ocr_reader is not None
             )
 
         except Exception as e:
             console.print(f"  [red]Error loading models: {e}[/]")
-
-    def _detect_plates_ocr(self, image: np.ndarray) -> list[BlurRegion]:
-        """
-        Detect HK license plates using EasyOCR and Regex.
-        """
-        if not self.ocr_reader:
-            return []
-
-        # HK Plate Patterns:
-        # 1. XX 1234 or XX1234
-        # 2. 1234 (Exactly 4 digits)
-        hk_plate_pattern = re.compile(r'^[A-Z]{1,2}\s?\d{1,4}$|^\d{4}$')
-        
-        # Performance: OCR on full 8K is slow. 
-        # For testing, we might want to resize if the image is too large
-        h, w = image.shape[:2]
-        max_dim = 2500 # Reasonable for OCR
-        if max(h, w) > max_dim:
-            scale = max_dim / max(h, w)
-            ocr_image = cv2.resize(image, (int(w * scale), int(h * scale)))
-        else:
-            scale = 1.0
-            ocr_image = image
-
-        results = self.ocr_reader.readtext(ocr_image)
-        regions = []
-
-        for (bbox, text, conf) in results:
-            text = text.strip().upper()
-            if hk_plate_pattern.match(text):
-                # bbox is [[x1, y1], [x2, y1], [x2, y2], [x1, y2]]
-                pts = np.array(bbox)
-                min_pt = np.min(pts, axis=0)
-                max_pt = np.max(pts, axis=0)
-                
-                # Rescale back to original size
-                x1, y1 = min_pt / scale
-                x2, y2 = max_pt / scale
-                
-                # Add extra margin for plate blur
-                width = (x2 - x1) * 1.2
-                height = (y2 - y1) * 1.5
-                
-                regions.append(
-                    BlurRegion(
-                        x=int((x1 + x2) / 2),
-                        y=int((y1 + y2) / 2),
-                        width=int(width),
-                        height=int(height),
-                        confidence=float(conf),
-                        source=DetectionSource.LICENSE_PLATE,
-                    )
-                )
-        
-        return regions
 
     def _run_detection(
         self,
@@ -558,7 +501,7 @@ class PrivacyBlurEnsemble:
                         )
                     )
 
-        # 2. Pose Detection (to find heads based on shoulder position)
+        # 2. Pose Detection (to find heads when faces aren't visible)
         if self.pose_detector:
             results = self.pose_detector(image, conf=self.conf_threshold, verbose=False)
             for r in results:
@@ -579,9 +522,11 @@ class PrivacyBlurEnsemble:
                     mid_y = (l_sh[1] + r_sh[1]) / 2
                     sh_width = np.sqrt((l_sh[0] - r_sh[0])**2 + (l_sh[1] - r_sh[1])**2)
                     
-                    # Estimate head
-                    head_size = sh_width * 0.8
-                    head_y_offset = sh_width * 0.5
+                    # Estimate head: 
+                    # 1. Center is above the shoulder midpoint
+                    # 2. Head height/width is proportional to shoulder width
+                    head_size = sh_width * 0.8  # Head is roughly 80% of shoulder width
+                    head_y_offset = sh_width * 0.5  # Shift up by 50% of shoulder width
                     
                     all_regions.append(
                         BlurRegion(
@@ -594,15 +539,20 @@ class PrivacyBlurEnsemble:
                         )
                     )
                 
-                # Fallback to facial features if shoulders aren't visible
+                # Fallback: if shoulders aren't visible, try facial features (0-4)
                 else:
                     head_points = kps[:5]
                     visible = head_points[head_points[:, 2] > 0.5]
                     if len(visible) > 0:
+                        # Create a box around visible head points
                         min_x, min_y = np.min(visible[:, :2], axis=0)
                         max_x, max_y = np.max(visible[:, :2], axis=0)
-                        w = max(max_x - min_x, 20)
-                        h = max(max_y - min_y, 20)
+                        
+                        # Expand the box slightly
+                        w = max_x - min_x
+                        h = max_y - min_y
+                        w = max(w, 20)  # Min size
+                        h = max(h, 20)
                         
                         all_regions.append(
                             BlurRegion(
@@ -615,14 +565,69 @@ class PrivacyBlurEnsemble:
                             )
                         )
 
-        # 3. Plate Detection (YOLO)
+        # 3. Two-Stage Plate Detection (Vehicle -> Plate)
+        if self.vehicle_detector and self.plate_detector:
+            # Detect vehicles first (COCO: 2=car, 3=motorcycle, 5=bus, 7=truck)
+            v_results = self.vehicle_detector(image, conf=0.3, classes=[2, 3, 5, 7], verbose=False)
+            for v_r in v_results:
+                for v_box in v_r.boxes:
+                    vx1, vy1, vx2, vy2 = v_box.xyxy[0].cpu().numpy().astype(int)
+                    v_conf = float(v_box.conf[0])
+                    
+                    # Add vehicle box to regions (for preview purposes)
+                    all_regions.append(
+                        BlurRegion(
+                            x=int((vx1 + vx2) / 2),
+                            y=int((vy1 + vy2) / 2),
+                            width=int(vx2 - vx1),
+                            height=int(vy2 - vy1),
+                            confidence=v_conf,
+                            source=DetectionSource.VEHICLE,
+                        )
+                    )
+                    
+                    # Crop to vehicle with a small buffer
+                    pad = 40
+                    img_h, img_w = image.shape[:2]
+                    cx1, cy1 = max(0, vx1-pad), max(0, vy1-pad)
+                    cx2, cy2 = min(img_w, vx2+pad), min(img_h, vy2+pad)
+                    
+                    vehicle_crop = image[cy1:cy2, cx1:cx2]
+                    crop_h = cy2 - cy1
+                    
+                    # Ignore top 15% of the vehicle crop (where plates are unlikely to be)
+                    ignore_top = int(crop_h * 0.15)
+                    if crop_h - ignore_top < 10:  # Safety check
+                        ignore_top = 0
+                        
+                    plate_search_area = vehicle_crop[ignore_top:, :]
+                    
+                    # Detect plates within the reduced search area
+                    if plate_search_area.size > 0:
+                        p_results = self.plate_detector(plate_search_area, conf=self.conf_threshold, verbose=False)
+                        for p_r in p_results:
+                            for p_box in p_r.boxes:
+                                px1, py1, px2, py2 = p_box.xyxy[0].cpu().numpy()
+                                # Translate back to original image coordinates
+                                all_regions.append(
+                                    BlurRegion(
+                                        x=int(cx1 + (px1 + px2) / 2),
+                                        y=int(cy1 + ignore_top + (py1 + py2) / 2),
+                                        width=int(px2 - px1),
+                                        height=int(py2 - py1),
+                                        confidence=float(p_box.conf[0]),
+                                        source=DetectionSource.LICENSE_PLATE,
+                                    )
+                                )
+
+        # 4. Fallback: Standalone Plate Detection
+        # (Only if no plates were found via vehicles, or just to be safe)
         if self.plate_detector:
-            results = self.plate_detector(image, conf=self.conf_threshold, verbose=False)
-            for r in results:
-                boxes = r.boxes
-                for box in boxes:
-                    x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                    conf = float(box.conf[0])
+            p_results = self.plate_detector(image, conf=self.conf_threshold, verbose=False)
+            for p_r in p_results:
+                for p_box in p_r.boxes:
+                    x1, y1, x2, y2 = p_box.xyxy[0].cpu().numpy()
+                    conf = float(p_box.conf[0])
                     all_regions.append(
                         BlurRegion(
                             x=int((x1 + x2) / 2),
@@ -633,11 +638,6 @@ class PrivacyBlurEnsemble:
                             source=DetectionSource.LICENSE_PLATE,
                         )
                     )
-
-        # 4. Plate Detection (OCR)
-        if self.use_ocr:
-            ocr_regions = self._detect_plates_ocr(image)
-            all_regions.extend(ocr_regions)
 
         return all_regions
 

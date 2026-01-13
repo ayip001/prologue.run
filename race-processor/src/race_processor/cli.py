@@ -431,10 +431,25 @@ def preview_blur(image_path: Path, output: Path, show_sources: bool, blur: bool,
             # Color by source if requested
             if show_sources:
                 colors = {
-                    "face_yolo_n": (0, 255, 0),
-                    "face_yolo_m": (0, 200, 0),
-                    "body_pose_head": (255, 0, 0),
-                    "plate": (0, 0, 255),
+                    "face_yolo_n": (0, 255, 0),      # Green
+                    "face_yolo_m": (0, 200, 0),      # Darker Green
+                    "body_pose_head": (255, 0, 0),   # Blue
+                    "plate": (0, 0, 255),            # Red
+                    "vehicle": (255, 255, 0),        # Cyan/Yellow-ish (Cyan is 255,255,0 in BGR? No, Cyan is 255,255,0 in RGB. BGR: 255,255,0 is Cyan)
+                }
+                # BGR Colors:
+                # Green: (0, 255, 0)
+                # Blue: (255, 0, 0)
+                # Red: (0, 0, 255)
+                # Yellow: (0, 255, 255)
+                # Cyan: (255, 255, 0)
+                # Magenta: (255, 0, 255)
+                colors = {
+                    "face_yolo_n": (0, 255, 0),      # Green
+                    "face_yolo_m": (0, 200, 0),      # Dark Green
+                    "body_pose_head": (255, 0, 0),   # Blue
+                    "plate": (0, 0, 255),            # Red
+                    "vehicle": (255, 255, 0),        # Cyan
                 }
                 color = colors.get(region.source.value, (255, 255, 255))
             else:
