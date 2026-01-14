@@ -26,8 +26,8 @@ console = Console()
 class ImageMetadata:
     """Metadata extracted from a single image.
 
-    Note: heading_degrees is NOT extracted here - it will be calculated
-    separately by correlating with GPX track data.
+    Note: heading_degrees is NOT extracted from EXIF - it is calculated
+    separately by correlating with GPX track data using the override-gps command.
     """
 
     position_index: int
@@ -36,6 +36,7 @@ class ImageMetadata:
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     altitude_meters: Optional[float] = None
+    heading_degrees: Optional[float] = None  # Calculated from GPX via override-gps
 
 
 @dataclass

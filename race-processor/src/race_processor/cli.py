@@ -672,6 +672,97 @@ def preview_export(image_path: Path, output_dir: Path | None, avif_quality: int,
     console.print(f"[green]Output saved to:[/] {output_dir}")
 
 
+@main.command("override-gps")
+@click.argument(
+    "manifest_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.argument(
+    "gpx_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--utc-offset",
+    type=int,
+    default=8,
+    help="UTC offset for the camera's local time (default: 8 for UTC+8)",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Output path for updated manifest (default: overwrites input)",
+)
+@click.option(
+    "--max-time-diff",
+    type=float,
+    default=60.0,
+    help="Maximum time difference in seconds before warning (default: 60)",
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Enable detailed debug logging",
+)
+def override_gps(
+    manifest_path: Path,
+    gpx_path: Path,
+    utc_offset: int,
+    output: Path | None,
+    max_time_diff: float,
+    debug: bool,
+) -> None:
+    """Override image GPS data using GPX track data.
+
+    This utility correlates images with GPX track points by timestamp to:
+    - Override latitude and longitude from GPX
+    - Override altitude from GPX elevation
+    - Calculate heading direction (bearing to next track point)
+
+    \b
+    Time Zone Handling:
+    - GPX timestamps are in UTC (Zulu time): 2026-01-12T09:12:55.000Z
+    - EXIF timestamps are in local time: 2026-01-12T17:12:22
+    - Use --utc-offset to specify your local timezone offset from UTC
+
+    \b
+    Heading Calculation:
+    - Assumes you're facing forward (direction of travel)
+    - Calculates bearing from current GPS point to next point on track
+
+    \b
+    Examples:
+      # Basic usage (UTC+8 timezone, default)
+      race-processor override-gps ./output/intake/metadata.json ./track.gpx
+
+      # Different timezone (UTC+0)
+      race-processor override-gps ./metadata.json ./track.gpx --utc-offset 0
+
+      # Debug mode to see detailed matching info
+      race-processor override-gps ./metadata.json ./track.gpx --debug
+
+      # Save to different file instead of overwriting
+      race-processor override-gps ./metadata.json ./track.gpx -o ./metadata-updated.json
+    """
+    from .utils.gpx_override import override_gps_from_gpx, save_manifest
+
+    # Run the GPS override
+    updated_manifest = override_gps_from_gpx(
+        manifest_path=manifest_path,
+        gpx_path=gpx_path,
+        utc_offset=utc_offset,
+        debug=debug,
+        max_time_diff_seconds=max_time_diff,
+    )
+
+    # Determine output path
+    output_path = output if output else manifest_path
+
+    # Save the updated manifest
+    save_manifest(updated_manifest, output_path)
+
+
 @main.command("check-exif")
 @click.argument(
     "path",
