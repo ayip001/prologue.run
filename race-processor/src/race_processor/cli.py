@@ -32,7 +32,7 @@ def main() -> None:
     "input_dir",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     default=None,
-    help="Input directory containing race data (insp/ and gpx/ subdirs)",
+    help="Input directory containing equirectangular images (exported from Insta360 Studio)",
 )
 @click.option(
     "--race-slug",
@@ -65,11 +65,6 @@ def main() -> None:
     "-w",
     default=4,
     help="Number of parallel workers",
-)
-@click.option(
-    "--use-sdk/--use-cli",
-    default=True,
-    help="Use Insta360 SDK (default) or Studio CLI",
 )
 @click.option(
     "--skip-blur",
@@ -106,26 +101,26 @@ def main() -> None:
 )
 @click.option(
     "--start-step",
-    type=click.IntRange(1, 8),
+    type=click.IntRange(1, 6),
     default=1,
-    help="Start processing from this step (1-8). Steps: 1=Ingest, 2=Stabilize, 3=Stitch, 4=Blur, 5=Watermark, 6=Resize, 7=Export, 8=Upload",
+    help="Start processing from this step (1-6). Steps: 1=Intake, 2=Blur, 3=Watermark, 4=Resize, 5=Export, 6=Upload",
 )
 @click.option(
     "--end-step",
-    type=click.IntRange(1, 8),
-    default=8,
-    help="Stop processing after this step (1-8)",
+    type=click.IntRange(1, 6),
+    default=6,
+    help="Stop processing after this step (1-6)",
 )
 @click.option(
     "--step",
-    type=click.IntRange(1, 8),
+    type=click.IntRange(1, 6),
     default=None,
     help="Run only this single step (shorthand for --start-step N --end-step N)",
 )
 @click.option(
     "--single-image",
     default=None,
-    help="Process only this specific image filename (e.g., 'IMG_20260112_182529_00_328.insp')",
+    help="Process only this specific image filename",
 )
 @click.option(
     "--copyright-text",
@@ -139,7 +134,6 @@ def process(
     src: Path | None,
     dst: Path | None,
     workers: int,
-    use_sdk: bool,
     skip_blur: bool,
     skip_upload: bool,
     blur_mode: str,
@@ -152,30 +146,28 @@ def process(
     single_image: str | None,
     copyright_text: str | None,
 ) -> None:
-    """Process a race from raw .insp files to final output.
+    """Process equirectangular images through the pipeline.
 
     \b
     Pipeline Steps:
-      1. Ingest     - Discover files and create manifest
-      2. Stabilize  - Extract gyro data and calculate corrections
-      3. Stitch     - Convert to equirectangular with stabilization
-      4. Blur       - Apply privacy blurring (faces, plates)
-      5. Watermark  - Add copyright text overlay
-      6. Resize     - Generate quality tiers (thumbnail, medium, full)
-      7. Export     - Encode to AVIF/WebP formats
-      8. Upload     - Upload to R2 (optional)
+      1. Intake    - Import images, extract EXIF, sort by timestamp, rename sequentially
+      2. Blur      - Apply privacy blurring (faces, plates)
+      3. Watermark - Add copyright text overlay
+      4. Resize    - Generate quality tiers (thumbnail, medium, full)
+      5. Export    - Encode to AVIF/WebP formats
+      6. Upload    - Privacy check, upload to R2, generate DB records
 
     \b
     Standard Mode (requires -i and -r):
-      race-processor process -i ./data -r my-race --debug
+      race-processor process -i ./exported-images -r my-race --debug
 
     \b
     Direct Mode (--src/--dst for testing individual steps):
       # Test blur on a folder of JPEGs
-      race-processor process --step 4 --src ./testing-jpg --dst ./blurred-test
+      race-processor process --step 2 --src ./testing-jpg --dst ./blurred-test
 
       # Test watermark on a single image
-      race-processor process --step 5 --src ./img.jpg --dst ./output/
+      race-processor process --step 3 --src ./img.jpg --dst ./output/
 
     \b
     Blur Modes:
@@ -259,7 +251,6 @@ def process(
         input_dir=input_dir,
         output_dir=output_dir,
         race_slug=race_slug,
-        use_sdk=use_sdk,
         workers=workers,
         skip_blur=skip_blur,
         skip_upload=skip_upload,
@@ -280,60 +271,29 @@ def process(
     type=click.Path(exists=True, file_okay=False, path_type=Path),
 )
 @click.option(
-    "--gpx",
-    type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    help="GPX file to associate with the race",
+    "--race-slug",
+    "-r",
+    default="preview",
+    help="Race slug for the manifest",
 )
-@click.option(
-    "--output",
-    "-o",
-    type=click.Path(dir_okay=False, path_type=Path),
-    default="manifest.json",
-    help="Output manifest file",
-)
-def ingest(input_dir: Path, gpx: Path | None, output: Path) -> None:
-    """Discover .insp files and create processing manifest."""
-    console.print(f"[bold]Ingesting files from:[/] {input_dir}")
+def intake(input_dir: Path, race_slug: str) -> None:
+    """Preview intake step: extract EXIF and show image ordering.
 
-    from .pipeline.ingest import discover_and_create_manifest
+    This command runs only the intake step to preview how images
+    will be sorted and what EXIF data is available.
+    """
+    console.print(f"[bold]Previewing intake for:[/] {input_dir}")
 
-    manifest = discover_and_create_manifest(input_dir, gpx)
+    from .pipeline.intake import run_intake
+    import tempfile
 
-    console.print(f"  Found {len(manifest.sources)} images")
-    console.print(f"  Total distance: {manifest.total_distance}m")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        manifest = run_intake(input_dir, Path(tmpdir), race_slug)
 
-    # Save manifest
-    import json
-
-    with open(output, "w") as f:
-        json.dump(manifest.model_dump(), f, indent=2, default=str)
-
-    console.print(f"[green]Manifest saved to:[/] {output}")
-
-
-@main.command()
-@click.argument(
-    "input_dir",
-    type=click.Path(exists=True, file_okay=False, path_type=Path),
-)
-def validate(input_dir: Path) -> None:
-    """Validate .insp file naming and count."""
-    console.print(f"[bold]Validating files in:[/] {input_dir}")
-
-    from .insta360.filename import discover_insp_files
-
-    insp_dir = input_dir / "insp" if (input_dir / "insp").exists() else input_dir
-    files = discover_insp_files(insp_dir)
-
-    console.print(f"  Found {len(files)} valid .insp files")
-
-    if files:
-        first = files[0]
-        last = files[-1]
-        duration = last.captured_at - first.captured_at
-        console.print(f"  Time span: {duration}")
-        console.print(f"  First: {first.path.name} ({first.captured_at})")
-        console.print(f"  Last: {last.path.name} ({last.captured_at})")
+        if manifest:
+            console.print(f"\n[green]Would process {manifest.total_images} images[/]")
+        else:
+            console.print("[red]No images found[/]")
 
 
 @main.command("download-models")
@@ -442,20 +402,6 @@ def preview_blur(image_path: Path, output: Path, show_sources: bool, blur: bool,
             if show_sources:
                 colors = {
                     "face_yolo_n": (0, 255, 0),      # Green
-                    "face_yolo_m": (0, 200, 0),      # Darker Green
-                    "body_pose_head": (255, 0, 0),   # Blue
-                    "plate": (0, 0, 255),            # Red
-                    "vehicle": (255, 255, 0),        # Cyan/Yellow-ish (Cyan is 255,255,0 in BGR? No, Cyan is 255,255,0 in RGB. BGR: 255,255,0 is Cyan)
-                }
-                # BGR Colors:
-                # Green: (0, 255, 0)
-                # Blue: (255, 0, 0)
-                # Red: (0, 0, 255)
-                # Yellow: (0, 255, 255)
-                # Cyan: (255, 255, 0)
-                # Magenta: (255, 0, 255)
-                colors = {
-                    "face_yolo_n": (0, 255, 0),      # Green
                     "face_yolo_m": (0, 200, 0),      # Dark Green
                     "body_pose_head": (255, 0, 0),   # Blue
                     "plate": (0, 0, 255),            # Red
@@ -474,36 +420,51 @@ def preview_blur(image_path: Path, output: Path, show_sources: bool, blur: bool,
     console.print(f"[green]Output saved to:[/] {output}")
 
 
-@main.command("generate-card-assets")
-@click.option(
-    "--gpx",
-    type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    required=True,
-    help="GPX file with route data",
+@main.command("check-exif")
+@click.argument(
+    "path",
+    type=click.Path(exists=True, path_type=Path),
 )
-@click.option(
-    "--output",
-    "-o",
-    type=click.Path(file_okay=False, path_type=Path),
-    required=True,
-    help="Output directory for card assets",
-)
-@click.option(
-    "--race-slug",
-    "-r",
-    required=True,
-    help="Race slug for naming",
-)
-def generate_card_assets(gpx: Path, output: Path, race_slug: str) -> None:
-    """Generate landing page card assets from GPX data."""
-    console.print(f"[bold]Generating card assets for:[/] {race_slug}")
+def check_exif(path: Path) -> None:
+    """Check EXIF data in an image or directory of images.
 
-    from .pipeline.card_assets import generate_all_card_assets
+    Reports any GPS/location data found - useful for verifying
+    privacy before upload.
+    """
+    console.print(f"[bold]Checking EXIF data in:[/] {path}")
 
-    output.mkdir(parents=True, exist_ok=True)
-    generate_all_card_assets(gpx, output, race_slug)
+    import exifread
 
-    console.print(f"[green]Card assets saved to:[/] {output}")
+    if path.is_file():
+        files = [path]
+    else:
+        extensions = {".jpg", ".jpeg", ".png", ".avif", ".webp"}
+        files = [f for f in path.rglob("*") if f.suffix.lower() in extensions]
+
+    console.print(f"  Scanning {len(files)} files...")
+
+    files_with_gps = 0
+    for file_path in files:
+        try:
+            with open(file_path, "rb") as f:
+                tags = exifread.process_file(f, details=False)
+
+            gps_tags = [k for k in tags.keys() if k.startswith("GPS")]
+            if gps_tags:
+                files_with_gps += 1
+                console.print(f"\n  [yellow]{file_path.name}[/]")
+                for tag in gps_tags[:5]:
+                    console.print(f"    {tag}: {tags[tag]}")
+                if len(gps_tags) > 5:
+                    console.print(f"    ... and {len(gps_tags) - 5} more GPS tags")
+        except Exception as e:
+            console.print(f"  [dim]Could not read {file_path.name}: {e}[/]")
+
+    console.print()
+    if files_with_gps:
+        console.print(f"[red]Found GPS data in {files_with_gps} of {len(files)} files[/]")
+    else:
+        console.print(f"[green]No GPS data found in {len(files)} files[/]")
 
 
 if __name__ == "__main__":

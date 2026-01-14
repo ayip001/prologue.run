@@ -77,38 +77,22 @@ class ImageTierConfig(BaseModel):
     """Configuration for an image quality tier."""
 
     width: int
-    quality_avif: int
-    quality_webp: int
+    avif_quality: int
+    webp_quality: int
 
 
 class ImageTiersConfig(BaseModel):
     """Configuration for all image quality tiers."""
 
     thumbnail: ImageTierConfig = Field(
-        default=ImageTierConfig(width=512, quality_avif=60, quality_webp=70)
+        default=ImageTierConfig(width=512, avif_quality=60, webp_quality=70)
     )
     medium: ImageTierConfig = Field(
-        default=ImageTierConfig(width=2048, quality_avif=70, quality_webp=75)
+        default=ImageTierConfig(width=2048, avif_quality=70, webp_quality=75)
     )
     full: ImageTierConfig = Field(
-        default=ImageTierConfig(width=4096, quality_avif=75, quality_webp=80)
+        default=ImageTierConfig(width=4096, avif_quality=75, webp_quality=80)
     )
-
-
-class StitchConfig(BaseModel):
-    """Configuration for stitching pipeline."""
-
-    output_width: int = Field(default=7680, description="Output width (8K)")
-    output_height: int = Field(default=3840, description="Output height (2:1 ratio)")
-    use_flowstate: bool = Field(default=True, description="Use FlowState stabilization")
-    horizon_lock: bool = Field(default=True, description="Lock horizon level")
-    blend_mode: Literal["optical_flow", "template", "natural"] = Field(
-        default="optical_flow", description="Stitch blend mode"
-    )
-    output_format: Literal["tiff", "jpg", "png"] = Field(
-        default="tiff", description="Intermediate output format"
-    )
-    output_quality: int = Field(default=100, description="Output quality")
 
 
 class CopyrightConfig(BaseModel):
@@ -164,22 +148,22 @@ class DebugConfig(BaseModel):
 class StepControlConfig(BaseModel):
     """Configuration for controlling which pipeline steps to run."""
 
-    # Step numbers: 1=Ingest, 2=Stabilize, 3=Stitch, 4=Blur, 5=Watermark, 6=Resize, 7=Export, 8=Upload
+    # Step numbers: 1=Intake, 2=Blur, 3=Watermark, 4=Resize, 5=Export, 6=Upload
     start_step: int = Field(
         default=1,
         ge=1,
-        le=8,
-        description="Start processing from this step (1-8)",
+        le=6,
+        description="Start processing from this step (1-6)",
     )
     end_step: int = Field(
-        default=8,
+        default=6,
         ge=1,
-        le=8,
-        description="Stop processing after this step (1-8)",
+        le=6,
+        description="Stop processing after this step (1-6)",
     )
     single_image: str | None = Field(
         default=None,
-        description="Process only this specific image filename (e.g., 'IMG_20260112_182529_00_328.insp')",
+        description="Process only this specific image filename",
     )
 
 
@@ -189,7 +173,7 @@ class R2Config(BaseModel):
     endpoint: str = Field(description="R2 endpoint URL")
     access_key_id: str = Field(description="R2 access key ID")
     secret_access_key: str = Field(description="R2 secret access key")
-    bucket_name: str = Field(default="race-images", description="R2 bucket name")
+    bucket: str = Field(default="race-images", description="R2 bucket name")
     region: str = Field(default="auto", description="R2 region")
 
 
@@ -197,17 +181,9 @@ class PipelineConfig(BaseModel):
     """Main pipeline configuration."""
 
     # Input/output paths
-    input_dir: Path = Field(description="Input directory with .insp files")
+    input_dir: Path = Field(description="Input directory with equirectangular images")
     output_dir: Path = Field(description="Output directory")
     race_slug: str = Field(description="Race slug for naming")
-
-    # SDK settings
-    use_sdk: bool = Field(
-        default=True, description="Use Insta360 SDK (vs Studio CLI)"
-    )
-    sdk_path: Path = Field(
-        default=Path("/opt/insta360-sdk"), description="Path to Insta360 SDK"
-    )
 
     # Processing settings
     workers: int = Field(default=4, description="Number of parallel workers")
@@ -220,7 +196,6 @@ class PipelineConfig(BaseModel):
     plate_detection: PlateDetectionConfig = Field(default_factory=PlateDetectionConfig)
     blur: BlurConfig = Field(default_factory=BlurConfig)
     image_tiers: ImageTiersConfig = Field(default_factory=ImageTiersConfig)
-    stitch: StitchConfig = Field(default_factory=StitchConfig)
     copyright: CopyrightConfig = Field(default_factory=CopyrightConfig)
 
     # Debug and step control

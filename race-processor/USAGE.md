@@ -1,6 +1,12 @@
 # Race Processor Usage Manual
 
-A CLI tool for processing 360° images from Insta360 X4 cameras into web-optimized, privacy-protected panoramic images. Note: This will be pretty much useless to you unless you have a similar setup to mine: Insta360 X4, Windows 11, NVIDIA GeForce RTX 2070
+A CLI tool for processing 360° equirectangular images into web-optimized, privacy-protected panoramic images for the Prologue.run race viewer.
+
+## Prerequisites
+
+- Equirectangular images exported from Insta360 Studio (with horizon lock enabled)
+- Python 3.11+
+- NVIDIA GPU recommended for blur detection
 
 ## Installation
 
@@ -12,36 +18,37 @@ pip install -e .
 ## Quick Start
 
 ```bash
-# Basic processing (standard mode)
-race-processor process -i ./data/my-race -r my-race-2026
+# Process a folder of equirectangular images
+race-processor process -i ./exported-images -r my-race-2026
 
 # With debug output to inspect each step
-race-processor process -i ./data/my-race -r my-race-2026 --debug
+race-processor process -i ./exported-images -r my-race-2026 --debug
 
-# Process only the watermark step
-race-processor process -i ./data/my-race -r my-race-2026 --step 5
+# Process only the blur step
+race-processor process -i ./exported-images -r my-race-2026 --step 2
 
 # Direct mode: test blur on arbitrary JPEG files
-race-processor process --step 4 --src ./my-images --dst ./output-test
-
-# Direct mode: test watermark on a single image
-race-processor process --step 5 --src ./image.jpg --dst ./output
+race-processor process --step 2 --src ./my-images --dst ./output-test
 ```
 
 ## Pipeline Steps
 
-The processor runs an 8-stage pipeline:
+The processor runs a 6-stage pipeline:
 
-| Step | Name       | Description                                      |
-|------|------------|--------------------------------------------------|
-| 1    | Ingest     | Discover .insp files and create processing manifest |
-| 2    | Stabilize  | Extract gyro data and calculate corrections     |
-| 3    | Stitch     | Convert to equirectangular with stabilization   |
-| 4    | Blur       | Apply privacy blurring (faces, license plates)  |
-| 5    | Watermark  | Add copyright text overlay                      |
-| 6    | Resize     | Generate quality tiers (512px, 2048px, 4096px)  |
-| 7    | Export     | Encode to AVIF/WebP formats                     |
-| 8    | Upload     | Upload to Cloudflare R2 storage                 |
+| Step | Name      | Description                                        |
+|------|-----------|----------------------------------------------------|
+| 1    | Intake    | Import images, extract EXIF, sort by timestamp, rename sequentially |
+| 2    | Blur      | Apply privacy blurring (faces, license plates)     |
+| 3    | Watermark | Add copyright text overlay                         |
+| 4    | Resize    | Generate quality tiers (512px, 2048px, 4096px)     |
+| 5    | Export    | Encode to AVIF/WebP formats                        |
+| 6    | Upload    | Privacy check, upload to R2, generate DB records   |
+
+## Workflow
+
+1. **Export from Insta360 Studio**: Batch export your .insp files to equirectangular JPGs with horizon lock enabled
+2. **Run the processor**: `race-processor process -i ./exported-images -r my-race`
+3. **Review output**: Check `output/my-race/` for processed images and `metadata.json`
 
 ## Commands
 
@@ -53,14 +60,14 @@ race-processor process [OPTIONS]
 
 The `process` command supports two modes:
 
-1. **Standard Mode**: Full pipeline with race directory structure (requires `-i` and `-r`)
+1. **Standard Mode**: Full pipeline (requires `-i` and `-r`)
 2. **Direct Mode**: Process arbitrary images directly (uses `--src` and `--dst`)
 
 #### Standard Mode Options
 
 | Option | Description |
 |--------|-------------|
-| `-i, --input PATH` | Input directory containing `insp/` and `gpx/` subdirectories |
+| `-i, --input PATH` | Input directory containing equirectangular images |
 | `-r, --race-slug TEXT` | URL-friendly race identifier (e.g., `hk-marathon-2026`) |
 | `-o, --output PATH` | Output directory (default: `./output`) |
 | `-w, --workers INT` | Number of parallel workers (default: `4`) |
@@ -68,14 +75,11 @@ The `process` command supports two modes:
 #### Direct Mode Options
 
 Direct mode bypasses the standard directory structure and processes arbitrary images.
-Useful for testing individual pipeline steps on pre-processed images.
 
 | Option | Description |
 |--------|-------------|
 | `--src PATH` | Source directory or single image file |
 | `--dst PATH` | Destination directory for output |
-
-When using `--src`, the `-i` and `-r` options are not required.
 
 #### Pipeline Control
 
@@ -83,13 +87,13 @@ When using `--src`, the `-i` and `-r` options are not required.
 |--------|-------------|
 | `--skip-blur` | Skip privacy blur stage |
 | `--skip-upload` | Skip R2 upload stage |
-| `--use-sdk / --use-cli` | Use Insta360 SDK (default) or Studio CLI |
 
 #### Blur Mode
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--blur-mode` | `demo` | Detection mode for blur stage |
+| `--conf` | `0.25` | Confidence threshold for detections |
 
 Blur modes:
 - `full` - Use YOLO models for real face/plate detection (requires `download-models`)
@@ -107,9 +111,9 @@ Blur modes:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--start-step INT` | `1` | Start processing from this step (1-8) |
-| `--end-step INT` | `8` | Stop processing after this step (1-8) |
-| `--step INT` | - | Run only this single step (shorthand for `--start-step N --end-step N`) |
+| `--start-step INT` | `1` | Start processing from this step (1-6) |
+| `--end-step INT` | `6` | Stop processing after this step (1-6) |
+| `--step INT` | - | Run only this single step |
 | `--single-image TEXT` | - | Process only this specific image filename |
 
 #### Copyright Watermark
@@ -118,21 +122,21 @@ Blur modes:
 |--------|---------|-------------|
 | `--copyright-text TEXT` | `© {year} Prologue.run` | Custom copyright text. Use `{year}` for current year |
 
-### `ingest` - Discover Files
+### `intake` - Preview Image Ordering
 
 ```bash
-race-processor ingest PATH [--race-slug TEXT]
+race-processor intake PATH [--race-slug TEXT]
 ```
 
-Discovers .insp files and creates a processing manifest without running the full pipeline.
+Preview how images will be sorted by EXIF timestamp without running the full pipeline.
 
-### `validate` - Validate Filenames
+### `check-exif` - Verify Privacy
 
 ```bash
-race-processor validate PATH
+race-processor check-exif PATH
 ```
 
-Validates that .insp filenames match the expected Insta360 X4 naming pattern.
+Check images for GPS/location EXIF data. Useful for verifying privacy before upload.
 
 ### `download-models` - Download AI Models
 
@@ -145,18 +149,16 @@ Downloads YOLO models required for privacy blur detection.
 ### `preview-blur` - Preview Blur Detection
 
 ```bash
-race-processor preview-blur IMAGE_PATH
+race-processor preview-blur IMAGE_PATH [OPTIONS]
 ```
 
-Preview blur detection on a single image without processing.
-
-### `generate-card-assets` - Generate Landing Page Assets
-
-```bash
-race-processor generate-card-assets -i PATH -r RACE_SLUG
-```
-
-Generate elevation profile and route SVG for landing page cards.
+| Option | Description |
+|--------|-------------|
+| `-o, --output PATH` | Output preview image (default: `blur-preview.jpg`) |
+| `--show-sources` | Color-code detections by source |
+| `--blur` | Apply actual blur instead of drawing boxes |
+| `--mode` | Detection mode: `full` or `demo` |
+| `--conf` | Confidence threshold (default: `0.25`) |
 
 ## Examples
 
@@ -164,171 +166,123 @@ Generate elevation profile and route SVG for landing page cards.
 
 ```bash
 # Process a race with all steps
-race-processor process -i ./data/hk-marathon -r hk-marathon-2026
+race-processor process -i ./exported-images -r hk-marathon-2026
 ```
 
 ### Debug Mode
 
 ```bash
 # Enable debug mode to save intermediate images
-race-processor process -i ./data/hk-marathon -r hk-marathon-2026 --debug
+race-processor process -i ./exported-images -r hk-marathon-2026 --debug
 
 # Use PNG format for lossless debug output
-race-processor process -i ./data/hk-marathon -r hk-marathon-2026 --debug --debug-format png
+race-processor process -i ./exported-images -r hk-marathon-2026 --debug --debug-format png
 ```
 
 Debug output is saved to:
 ```
 output/hk-marathon-2026/debug/
-├── manifest.json           # Processing manifest (step 1)
-├── step3_stitch/           # Stitched equirectangular images
-├── step4_blur/             # After privacy blur
-├── step5_watermark/        # After copyright watermark
-└── step6_resize/           # After resizing (with tier suffixes)
-    ├── image_001_thumbnail.jpg
-    ├── image_001_medium.jpg
-    └── image_001_full.jpg
+├── step1_intake/         # Renamed images
+├── step2_blur/           # After privacy blur
+├── step3_watermark/      # After copyright watermark
+└── step4_resize/         # After resizing (with tier suffixes)
 ```
 
 ### Step Control
 
 ```bash
-# Run only the watermark step (step 5)
-race-processor process -i ./data/hk-marathon -r hk-marathon-2026 --step 5
+# Run only the blur step (step 2)
+race-processor process -i ./exported-images -r hk-marathon-2026 --step 2
 
-# Run steps 4 through 6 (blur, watermark, resize)
-race-processor process -i ./data/hk-marathon -r hk-marathon-2026 --start-step 4 --end-step 6
-
-# Process a single image through specific steps
-race-processor process -i ./data/hk-marathon -r hk-marathon-2026 \
-    --step 5 \
-    --single-image IMG_20260112_182529_00_328.insp
-```
-
-### Custom Copyright
-
-```bash
-# Use custom copyright text
-race-processor process -i ./data/hk-marathon -r hk-marathon-2026 \
-    --copyright-text "© {year} Hong Kong Marathon"
-
-# The {year} placeholder is replaced with the current year
-```
-
-### Skip Stages
-
-```bash
-# Skip blur (useful for testing or when models aren't installed)
-race-processor process -i ./data/hk-marathon -r hk-marathon-2026 --skip-blur
-
-# Skip upload (process locally only)
-race-processor process -i ./data/hk-marathon -r hk-marathon-2026 --skip-upload
+# Run steps 2 through 4 (blur, watermark, resize)
+race-processor process -i ./exported-images -r hk-marathon-2026 --start-step 2 --end-step 4
 ```
 
 ### Direct Mode (Testing Individual Steps)
 
-Direct mode allows you to test individual pipeline steps on arbitrary images without
-the full race directory structure. Great for debugging and development.
-
 ```bash
-# Test blur (step 4) on a folder of JPEG images
-race-processor process --step 4 --src ./testing-images --dst ./blur-output
+# Test blur (step 2) on a folder of JPEG images
+race-processor process --step 2 --src ./testing-images --dst ./blur-output
 
-# Test watermark (step 5) on a single image
-race-processor process --step 5 --src ./my-image.jpg --dst ./watermark-output
+# Test watermark (step 3) on a single image
+race-processor process --step 3 --src ./my-image.jpg --dst ./watermark-output
 
-# Run steps 4-6 on a folder with debug output
-race-processor process --start-step 4 --end-step 6 \
+# Run steps 2-4 on a folder with debug output
+race-processor process --start-step 2 --end-step 4 \
     --src ./equirect-images --dst ./processed --debug
-
-# Test blur with demo mode (fake detections for testing)
-race-processor process --step 4 --src ./images --dst ./output --blur-mode demo
-
-# Test blur with actual YOLO models
-race-processor process --step 4 --src ./images --dst ./output --blur-mode full
 ```
 
-Direct mode output structure:
-```
-output/
-├── step4_blur/           # Blurred images
-├── step5_watermark/      # Watermarked images
-├── step6_resize/         # Resized images
-│   ├── thumbnail/
-│   ├── medium/
-│   └── full/
-└── debug/                # Debug output (if --debug enabled)
-```
-
-### Blur Mode Testing
+### Privacy Verification
 
 ```bash
-# Demo mode: generates fake blur regions for testing the pipeline
-race-processor process -i ./data/race -r race --blur-mode demo
+# Check if images have GPS data
+race-processor check-exif ./output/my-race/final/
 
-# Full mode: uses YOLO models for real detection (requires download-models)
-race-processor process -i ./data/race -r race --blur-mode full
-
-# Skip mode: no blur applied
-race-processor process -i ./data/race -r race --blur-mode skip
-```
-
-### Combined Options
-
-```bash
-# Full debug workflow for a single image
-race-processor process -i ./data/hk-marathon -r hk-marathon-2026 \
-    --debug \
-    --debug-format png \
-    --single-image IMG_20260112_182529_00_328.insp \
-    --skip-blur \
-    --skip-upload
+# Preview what the blur step will detect
+race-processor preview-blur ./image.jpg --show-sources
 ```
 
 ## Input Directory Structure
 
 ```
-data/hk-marathon/
-├── insp/                   # Raw .insp files from Insta360 X4
-│   ├── IMG_20260112_182529_00_001.insp
-│   ├── IMG_20260112_182530_00_002.insp
-│   └── ...
-└── gpx/                    # Optional GPX track file
-    └── route.gpx
+exported-images/
+├── IMG_20260112_182529_00_001.jpg    # Equirectangular from Insta360 Studio
+├── IMG_20260112_182530_00_002.jpg
+└── ...
 ```
 
-### .insp Filename Format
-
-Files must follow the Insta360 X4 naming convention:
-```
-IMG_YYYYMMDD_HHMMSS_CC_NNN.insp
-```
-
-| Field | Description |
-|-------|-------------|
-| `YYYYMMDD` | Capture date |
-| `HHMMSS` | Capture time |
-| `CC` | Camera index (00 = front) |
-| `NNN` | Sequence number |
+Images can have any filename - they will be sorted by EXIF timestamp during intake and renamed to `001.jpg`, `002.jpg`, etc.
 
 ## Output Directory Structure
 
 ```
 output/hk-marathon-2026/
-├── equirect/               # Stitched equirectangular images
+├── intake/                 # Renamed images + metadata.json
+│   ├── 001.jpg
+│   ├── 002.jpg
+│   └── metadata.json       # EXIF data (GPS, timestamps)
 ├── blurred/                # After privacy blur
 ├── watermarked/            # After copyright watermark
 ├── resized/                # Quality tiers
 │   ├── thumbnail/          # 512px width
 │   ├── medium/             # 2048px width
 │   └── full/               # 4096px width
-├── final/                  # Encoded AVIF/WebP
+├── final/                  # Encoded formats
+│   ├── thumb/              # AVIF thumbnails
+│   ├── thumb_webp/         # WebP fallbacks
+│   ├── medium/
+│   ├── medium_webp/
+│   ├── full/
+│   └── full_webp/
+├── db_records.json         # Ready for database insertion
 └── debug/                  # Debug output (when --debug enabled)
 ```
 
-## Configuration
+## Metadata Flow
 
-Default settings can be overridden via the CLI or programmatically:
+1. **Intake**: EXIF data (GPS, timestamp, altitude) is extracted and saved to `metadata.json`
+2. **Blur**: EXIF is stripped during blur processing (privacy protection)
+3. **Upload**: `db_records.json` contains all metadata for database insertion
+
+The `metadata.json` format:
+```json
+{
+  "race_slug": "hk-marathon-2026",
+  "total_images": 500,
+  "images": [
+    {
+      "position_index": 0,
+      "original_filename": "IMG_20260112_182529_00_001.jpg",
+      "captured_at": "2026-01-12T18:25:29",
+      "latitude": 22.2855637,
+      "longitude": 114.1576957,
+      "altitude_meters": 15.3
+    }
+  ]
+}
+```
+
+## Configuration
 
 ### Image Tiers
 
@@ -350,25 +304,24 @@ Default settings can be overridden via the CLI or programmatically:
 
 ## Troubleshooting
 
-### "No valid .insp files found"
+### "No images found"
 
-Ensure your input directory has an `insp/` subdirectory containing `.insp` files, or contains `.insp` files directly.
+Ensure your input directory contains `.jpg`, `.jpeg`, or `.png` files.
 
 ### "YOLO models required"
 
 Run `race-processor download-models` to download the AI models needed for privacy blur.
 
-### "Insta360 SDK integration required"
+### "Found GPS data in X files" (during upload)
 
-Steps 2-3 (Stabilize/Stitch) require the Insta360 SDK. Place pre-stitched equirectangular images in `output/{race}/equirect/` and start from step 4:
+The privacy sanity check found GPS EXIF data in output images. This should not happen if blur was applied. Check that:
+1. Blur step was not skipped
+2. Images were processed correctly
 
-```bash
-race-processor process -i ./data/my-race -r my-race --start-step 4
-```
+### Images not sorted correctly
 
-### Debug mode not showing images
+Check that your source images have valid EXIF timestamps. Use `race-processor intake ./path` to preview the ordering.
 
-Ensure there are source images in the expected directories:
-- Step 4+: `output/{race}/equirect/`
-- Step 5+: `output/{race}/blurred/`
-- Step 6+: `output/{race}/watermarked/`
+### AVIF encoding fails
+
+Ensure `pillow-avif-plugin` is installed. It should be included in the package dependencies.

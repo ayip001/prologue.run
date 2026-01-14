@@ -1,19 +1,15 @@
 """
 Main pipeline orchestrator that coordinates all processing stages.
 
-Pipeline Steps:
-    1. Ingest     - Discover files and create manifest
-    2. Stabilize  - Extract gyro data and calculate corrections
-    3. Stitch     - Convert to equirectangular with stabilization
-    4. Blur       - Apply privacy blurring (faces, plates)
-    5. Watermark  - Add copyright text overlay
-    6. Resize     - Generate quality tiers (thumbnail, medium, full)
-    7. Export     - Encode to AVIF/WebP formats
-    8. Upload     - Upload to R2 (optional)
+Simplified Pipeline Steps:
+    1. Intake    - Import images, extract EXIF, sort by timestamp, rename sequentially
+    2. Blur      - Apply privacy blurring (faces, plates)
+    3. Watermark - Add copyright text overlay
+    4. Resize    - Generate quality tiers (thumbnail, medium, full)
+    5. Export    - Encode to AVIF/WebP formats
+    6. Upload    - Privacy check, upload to R2, generate DB records
 
-Debug mode saves intermediate equirectangular images after each step to allow
-inspection and debugging of the processing pipeline.
-
+Debug mode saves intermediate images after each step for inspection.
 Direct mode (--src/--dst) allows testing individual steps on arbitrary images.
 """
 
@@ -35,8 +31,10 @@ from ..config import (
     ImageTiersConfig,
     DEFAULT_MODELS_DIR,
 )
-from .ingest import discover_and_create_manifest, ProcessingManifest
+from .intake import run_intake, load_manifest, IntakeManifest
 from .watermark import add_copyright_watermark, process_single_image as watermark_single
+from .export import run_export
+from .upload import run_upload, run_privacy_check
 from ..detection.ensemble import (
     PrivacyBlurEnsemble,
     blur_image,
@@ -50,20 +48,16 @@ console = Console()
 class PipelineStep(IntEnum):
     """Pipeline step numbers for step control."""
 
-    INGEST = 1
-    STABILIZE = 2
-    STITCH = 3
-    BLUR = 4
-    WATERMARK = 5
-    RESIZE = 6
-    EXPORT = 7
-    UPLOAD = 8
+    INTAKE = 1
+    BLUR = 2
+    WATERMARK = 3
+    RESIZE = 4
+    EXPORT = 5
+    UPLOAD = 6
 
 
 STEP_NAMES = {
-    PipelineStep.INGEST: "Ingest",
-    PipelineStep.STABILIZE: "Stabilize",
-    PipelineStep.STITCH: "Stitch",
+    PipelineStep.INTAKE: "Intake",
     PipelineStep.BLUR: "Blur",
     PipelineStep.WATERMARK: "Watermark",
     PipelineStep.RESIZE: "Resize",
@@ -217,7 +211,7 @@ def print_step_summary(config: PipelineConfig, blur_mode: str = "demo") -> None:
 def get_image_files(directory: Path) -> list[Path]:
     """Get all image files from a directory."""
     extensions = {".jpg", ".jpeg", ".png", ".tiff", ".tif"}
-    return [f for f in directory.iterdir() if f.suffix.lower() in extensions]
+    return sorted([f for f in directory.iterdir() if f.suffix.lower() in extensions])
 
 
 def run_direct_processing(
@@ -241,8 +235,8 @@ def run_direct_processing(
     Args:
         src: Source directory or file
         dst: Destination directory
-        start_step: Starting step number (1-8)
-        end_step: Ending step number (1-8)
+        start_step: Starting step number (1-6)
+        end_step: Ending step number (1-6)
         blur_mode: Blur detection mode ("full", "demo", "skip")
         blur_conf: Confidence threshold for blur detection
         debug: Enable debug output
@@ -291,12 +285,8 @@ def run_direct_processing(
         step_output = dst / f"step{step_num}_{step_name.lower()}"
         step_output.mkdir(exist_ok=True)
 
-        if step == PipelineStep.INGEST:
-            console.print("  [dim]Skipping in direct mode (no manifest needed)[/]")
-            continue
-
-        elif step in (PipelineStep.STABILIZE, PipelineStep.STITCH):
-            console.print("  [dim]Skipping (requires Insta360 SDK)[/]")
+        if step == PipelineStep.INTAKE:
+            console.print("  [dim]Skipping in direct mode (use full pipeline for intake)[/]")
             continue
 
         elif step == PipelineStep.BLUR:
@@ -392,7 +382,7 @@ def run_direct_processing(
             )
 
         elif step == PipelineStep.EXPORT:
-            console.print("  [yellow]AVIF/WebP encoding not yet implemented[/]")
+            console.print("  [dim]Export requires full pipeline structure[/]")
             # Copy files to step output
             for name, path in current_files.items():
                 shutil.copy(path, step_output / name)
@@ -423,15 +413,13 @@ def run_pipeline(
     """
     Run the processing pipeline with step control and debug output.
 
-    Steps:
-    1. Ingest - Discover files and create manifest
-    2. Stabilize - Extract gyro data and calculate corrections
-    3. Stitch - Convert to equirectangular with stabilization
-    4. Blur - Apply privacy blurring
-    5. Watermark - Add copyright text
-    6. Resize - Generate quality tiers
-    7. Export - Encode to AVIF/WebP
-    8. Upload - Upload to R2 (optional)
+    Simplified 6-Step Pipeline:
+    1. Intake - Import images, extract EXIF, sort by timestamp, rename sequentially
+    2. Blur - Apply privacy blurring
+    3. Watermark - Add copyright text
+    4. Resize - Generate quality tiers
+    5. Export - Encode to AVIF/WebP
+    6. Upload - Privacy check, upload to R2, generate DB records
     """
     console.print("[bold blue]Starting pipeline...[/]")
 
@@ -443,7 +431,7 @@ def run_pipeline(
     output_base.mkdir(parents=True, exist_ok=True)
 
     dirs = {
-        "equirect": output_base / "equirect",
+        "intake": output_base / "intake",
         "blurred": output_base / "blurred",
         "watermarked": output_base / "watermarked",
         "resized": output_base / "resized",
@@ -456,104 +444,72 @@ def run_pipeline(
     if config.debug.enabled:
         (output_base / "debug").mkdir(exist_ok=True)
 
-    manifest: Optional[ProcessingManifest] = None
+    manifest: Optional[IntakeManifest] = None
 
     # =========================================================================
-    # Stage 1: Ingest
+    # Stage 1: Intake
     # =========================================================================
-    if should_run_step(PipelineStep.INGEST, config):
-        console.print("\n[bold]Stage 1: Ingest[/]")
-        gpx_dir = config.input_dir / "gpx"
-        gpx_files = list(gpx_dir.glob("*.gpx")) if gpx_dir.exists() else []
-        gpx_file = gpx_files[0] if gpx_files else None
+    if should_run_step(PipelineStep.INTAKE, config):
+        console.print("\n[bold]Stage 1: Intake[/]")
 
-        manifest = discover_and_create_manifest(
+        manifest = run_intake(
             config.input_dir,
-            gpx_file=gpx_file,
-            race_slug=config.race_slug,
+            dirs["intake"],
+            config.race_slug,
         )
+
+        if not manifest:
+            console.print("  [red]Intake failed - no images found[/]")
+            return
 
         # Filter to single image if specified
         if config.step_control.single_image:
-            original_count = len(manifest.sources)
-            manifest.sources = [
-                s
-                for s in manifest.sources
-                if s.original_filename == config.step_control.single_image
+            console.print(f"  [cyan]Single image mode: {config.step_control.single_image}[/]")
+            # Find the matching image in intake
+            matching = [
+                img for img in manifest.images
+                if img.original_filename == config.step_control.single_image
             ]
-            if not manifest.sources:
-                console.print(
-                    f"  [red]Error: Image '{config.step_control.single_image}' not found[/]"
-                )
-                console.print(f"  [dim]Searched {original_count} images[/]")
-                return
-            console.print(f"  [cyan]Filtered to single image: {config.step_control.single_image}[/]")
+            if matching:
+                manifest.images = matching
+                console.print(f"  Filtered to 1 image")
+            else:
+                console.print(f"  [yellow]Warning: Image not found, processing all[/]")
 
-        console.print(f"  Found {len(manifest.sources)} images")
-        console.print(f"  Total distance: {manifest.total_distance}m")
-
-        # Save manifest in debug mode
-        if config.debug.enabled:
-            import json
-            manifest_path = output_base / "debug" / "manifest.json"
-            with open(manifest_path, "w") as f:
-                json.dump(manifest.model_dump(), f, indent=2, default=str)
-            console.print(f"  [dim]Debug: saved manifest.json[/]")
+        console.print(f"  [green]Intake complete: {manifest.total_images} images[/]")
     else:
-        console.print("\n[dim]Stage 1: Ingest - Skipped (step control)[/]")
+        console.print("\n[dim]Stage 1: Intake - Skipped (step control)[/]")
+        # Try to load existing manifest
+        manifest = load_manifest(dirs["intake"])
+        if manifest:
+            console.print(f"  [dim]Loaded existing manifest: {manifest.total_images} images[/]")
 
     # =========================================================================
-    # Stage 2-3: Stabilize & Stitch
-    # =========================================================================
-    if should_run_step(PipelineStep.STABILIZE, config) or should_run_step(
-        PipelineStep.STITCH, config
-    ):
-        console.print("\n[bold]Stage 2-3: Stabilize & Stitch[/]")
-        console.print("  [yellow]Skipping - Insta360 SDK integration required[/]")
-        console.print(f"  Place equirectangular images in: {dirs['equirect']}")
-
-        # In debug mode, copy any existing equirect images to debug folder
-        if config.debug.enabled:
-            existing_images = list(dirs["equirect"].glob("*.jpg")) + list(
-                dirs["equirect"].glob("*.png")
-            )
-            if existing_images:
-                console.print(
-                    f"  [dim]Found {len(existing_images)} existing equirect images[/]"
-                )
-                for img in existing_images[:5]:  # Save first 5 for debug
-                    save_debug_image(
-                        img, PipelineStep.STITCH, output_base, config.debug
-                    )
-    else:
-        console.print("\n[dim]Stage 2-3: Stabilize & Stitch - Skipped (step control)[/]")
-
-    # =========================================================================
-    # Stage 4: Blur
+    # Stage 2: Blur
     # =========================================================================
     if should_run_step(PipelineStep.BLUR, config):
-        console.print("\n[bold]Stage 4: Blur[/]")
+        console.print("\n[bold]Stage 2: Blur[/]")
 
-        equirect_images = get_image_files(dirs["equirect"])
+        source_images = get_image_files(dirs["intake"])
 
         if config.skip_blur:
             console.print("  [yellow]Skipping - --skip-blur flag set[/]")
-            for img in equirect_images:
+            for img in source_images:
                 shutil.copy(img, dirs["blurred"] / img.name)
-            console.print(f"  Copied {len(equirect_images)} images to blurred/")
+            console.print(f"  Copied {len(source_images)} images to blurred/")
 
         elif blur_mode == "skip":
             console.print("  [yellow]Skipping - --blur-mode skip[/]")
-            for img in equirect_images:
+            for img in source_images:
                 shutil.copy(img, dirs["blurred"] / img.name)
-            console.print(f"  Copied {len(equirect_images)} images to blurred/")
+            console.print(f"  Copied {len(source_images)} images to blurred/")
 
-        elif equirect_images:
+        elif source_images:
             console.print(f"  Mode: {blur_mode} (conf: {blur_conf})")
-            console.print(f"  Processing {len(equirect_images)} images...")
+            console.print(f"  Processing {len(source_images)} images...")
 
             output_files = process_blur_batch(
-                dirs["equirect"],
+                dirs["intake"],
                 dirs["blurred"],
                 config.blur,
                 mode=blur_mode,
@@ -563,8 +519,7 @@ def run_pipeline(
             console.print(f"  [green]Blurred {len(output_files)} images[/]")
 
         else:
-            console.print("  [yellow]No equirectangular images found[/]")
-            console.print(f"  Place images in: {dirs['equirect']}")
+            console.print("  [yellow]No source images found in intake/[/]")
 
         # Debug output
         if config.debug.enabled:
@@ -572,16 +527,16 @@ def run_pipeline(
             for img in blurred_images[:5]:
                 save_debug_image(img, PipelineStep.BLUR, output_base, config.debug)
     else:
-        console.print("\n[dim]Stage 4: Blur - Skipped (step control)[/]")
+        console.print("\n[dim]Stage 2: Blur - Skipped (step control)[/]")
 
     # =========================================================================
-    # Stage 5: Watermark
+    # Stage 3: Watermark
     # =========================================================================
     if should_run_step(PipelineStep.WATERMARK, config):
-        console.print("\n[bold]Stage 5: Watermark[/]")
+        console.print("\n[bold]Stage 3: Watermark[/]")
 
-        # Get source images from blurred directory (or equirect if blur was skipped)
-        source_dir = dirs["blurred"] if get_image_files(dirs["blurred"]) else dirs["equirect"]
+        # Get source images from blurred directory (or intake if blur was skipped)
+        source_dir = dirs["blurred"] if get_image_files(dirs["blurred"]) else dirs["intake"]
         source_images = get_image_files(source_dir)
 
         if source_images:
@@ -615,20 +570,20 @@ def run_pipeline(
             console.print("  [yellow]No source images found[/]")
             console.print(f"  Expected images in: {source_dir}")
     else:
-        console.print("\n[dim]Stage 5: Watermark - Skipped (step control)[/]")
+        console.print("\n[dim]Stage 3: Watermark - Skipped (step control)[/]")
 
     # =========================================================================
-    # Stage 6: Resize
+    # Stage 4: Resize
     # =========================================================================
     if should_run_step(PipelineStep.RESIZE, config):
-        console.print("\n[bold]Stage 6: Resize[/]")
+        console.print("\n[bold]Stage 4: Resize[/]")
 
         # Get source images from watermarked directory
         source_dir = dirs["watermarked"]
         if not get_image_files(source_dir):
             source_dir = dirs["blurred"]
         if not get_image_files(source_dir):
-            source_dir = dirs["equirect"]
+            source_dir = dirs["intake"]
 
         source_images = get_image_files(source_dir)
 
@@ -684,13 +639,13 @@ def run_pipeline(
         else:
             console.print("  [yellow]No source images found[/]")
     else:
-        console.print("\n[dim]Stage 6: Resize - Skipped (step control)[/]")
+        console.print("\n[dim]Stage 4: Resize - Skipped (step control)[/]")
 
     # =========================================================================
-    # Stage 7: Export
+    # Stage 5: Export
     # =========================================================================
     if should_run_step(PipelineStep.EXPORT, config):
-        console.print("\n[bold]Stage 7: Export[/]")
+        console.print("\n[bold]Stage 5: Export[/]")
 
         # Check for resized images
         has_resized = any(
@@ -699,26 +654,31 @@ def run_pipeline(
         )
 
         if has_resized:
-            console.print("  [yellow]AVIF/WebP encoding not yet implemented[/]")
-            console.print("  Images available in resized/ directory")
+            run_export(output_base, output_base, config.image_tiers)
         else:
             console.print("  [yellow]No resized images found[/]")
     else:
-        console.print("\n[dim]Stage 7: Export - Skipped (step control)[/]")
+        console.print("\n[dim]Stage 5: Export - Skipped (step control)[/]")
 
     # =========================================================================
-    # Stage 8: Upload
+    # Stage 6: Upload
     # =========================================================================
     if should_run_step(PipelineStep.UPLOAD, config):
-        console.print("\n[bold]Stage 8: Upload[/]")
-        if config.skip_upload:
-            console.print("  [yellow]Skipping - --skip-upload flag set[/]")
-        elif config.r2:
-            console.print("  [yellow]Upload not yet implemented[/]")
+        console.print("\n[bold]Stage 6: Upload[/]")
+
+        success = run_upload(
+            output_base,
+            config.r2,
+            config.race_slug,
+            skip_upload=config.skip_upload,
+        )
+
+        if success:
+            console.print("  [green]Upload step complete[/]")
         else:
-            console.print("  [yellow]Skipping - R2 config not provided[/]")
+            console.print("  [red]Upload step failed[/]")
     else:
-        console.print("\n[dim]Stage 8: Upload - Skipped (step control)[/]")
+        console.print("\n[dim]Stage 6: Upload - Skipped (step control)[/]")
 
     # =========================================================================
     # Summary
@@ -728,8 +688,9 @@ def run_pipeline(
 
     if config.debug.enabled:
         debug_dir = output_base / "debug"
-        debug_folders = [d for d in debug_dir.iterdir() if d.is_dir()]
-        console.print(f"  Debug output: {debug_dir}")
-        for folder in sorted(debug_folders):
-            file_count = len(list(folder.glob("*")))
-            console.print(f"    - {folder.name}: {file_count} files")
+        if debug_dir.exists():
+            debug_folders = [d for d in debug_dir.iterdir() if d.is_dir()]
+            console.print(f"  Debug output: {debug_dir}")
+            for folder in sorted(debug_folders):
+                file_count = len(list(folder.glob("*")))
+                console.print(f"    - {folder.name}: {file_count} files")
