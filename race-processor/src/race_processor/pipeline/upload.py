@@ -257,13 +257,12 @@ def generate_db_records(
             continue
 
         # Build paths relative to storage_prefix
-        prefix = storage_prefix.rstrip("/")
+        # Note: heading_degrees is NOT included - calculated separately from GPX
         record = {
             "position_index": position_index,
             "latitude": meta.latitude,
             "longitude": meta.longitude,
             "altitude_meters": meta.altitude_meters,
-            "heading_degrees": meta.heading_degrees,
             "captured_at": meta.captured_at,
             "path_thumbnail": f"thumb/{base_name}.avif",
             "path_medium": f"medium/{base_name}.avif",

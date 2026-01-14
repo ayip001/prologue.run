@@ -24,7 +24,11 @@ console = Console()
 
 @dataclass
 class ImageMetadata:
-    """Metadata extracted from a single image."""
+    """Metadata extracted from a single image.
+
+    Note: heading_degrees is NOT extracted here - it will be calculated
+    separately by correlating with GPX track data.
+    """
 
     position_index: int
     original_filename: str
@@ -32,7 +36,6 @@ class ImageMetadata:
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     altitude_meters: Optional[float] = None
-    heading_degrees: Optional[float] = None
 
 
 @dataclass
@@ -69,14 +72,14 @@ def _extract_exif(image_path: Path) -> dict:
     """
     Extract relevant EXIF data from an image.
 
-    Returns dict with keys: captured_at, latitude, longitude, altitude_meters, heading_degrees
+    Returns dict with keys: captured_at, latitude, longitude, altitude_meters
+    Note: heading is NOT extracted - will be calculated from GPX correlation.
     """
     result = {
         "captured_at": None,
         "latitude": None,
         "longitude": None,
         "altitude_meters": None,
-        "heading_degrees": None,
     }
 
     try:
@@ -122,16 +125,6 @@ def _extract_exif(image_path: Path) -> dict:
                 if alt_ref and str(alt_ref) == "1":
                     alt_val = -alt_val
                 result["altitude_meters"] = round(alt_val, 2)
-            except (AttributeError, IndexError, ZeroDivisionError):
-                pass
-
-        # Extract heading/direction
-        heading = tags.get("GPS GPSImgDirection")
-        if heading:
-            try:
-                result["heading_degrees"] = round(
-                    float(heading.values[0].num) / float(heading.values[0].den), 2
-                )
             except (AttributeError, IndexError, ZeroDivisionError):
                 pass
 
@@ -225,7 +218,6 @@ def run_intake(
             latitude=exif_data["latitude"],
             longitude=exif_data["longitude"],
             altitude_meters=exif_data["altitude_meters"],
-            heading_degrees=exif_data["heading_degrees"],
         )
         image_metadata.append(meta)
 
@@ -255,7 +247,6 @@ def _print_summary(images: list[ImageMetadata]) -> None:
     # Count images with GPS data
     with_gps = sum(1 for img in images if img.latitude is not None)
     with_altitude = sum(1 for img in images if img.altitude_meters is not None)
-    with_heading = sum(1 for img in images if img.heading_degrees is not None)
 
     table = Table(title="EXIF Extraction Summary")
     table.add_column("Metric", style="cyan")
@@ -264,7 +255,6 @@ def _print_summary(images: list[ImageMetadata]) -> None:
     table.add_row("Total images", str(len(images)))
     table.add_row("With GPS coordinates", f"{with_gps} ({100*with_gps//len(images)}%)")
     table.add_row("With altitude", f"{with_altitude} ({100*with_altitude//len(images)}%)")
-    table.add_row("With heading", f"{with_heading} ({100*with_heading//len(images)}%)")
 
     if images:
         first = images[0]

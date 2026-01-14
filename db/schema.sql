@@ -78,7 +78,10 @@ CREATE TABLE images (
 
     -- Capture metadata
     captured_at     TIMESTAMPTZ NOT NULL,
-    heading_degrees DECIMAL(5, 2),                 -- Camera orientation 0-360
+
+    -- Heading/orientation (calculated from GPX track correlation)
+    heading_degrees DECIMAL(5, 2),                 -- Calculated direction of travel 0-360
+    heading_offset_degrees DECIMAL(5, 2) DEFAULT 0, -- Manual adjustment if camera wasn't pointing forward
 
     -- Distance from start (meters) - for progress bar
     distance_from_start INTEGER,
