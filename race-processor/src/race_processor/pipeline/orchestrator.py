@@ -29,6 +29,7 @@ from ..config import (
     BlurConfig,
     CopyrightConfig,
     ImageTiersConfig,
+    R2Config,
     DEFAULT_MODELS_DIR,
 )
 from .intake import run_intake, load_manifest, IntakeManifest
@@ -228,6 +229,8 @@ def run_direct_processing(
     debug_format: str = "jpg",
     single_image: Optional[str] = None,
     copyright_text: Optional[str] = None,
+    r2_config: Optional[R2Config] = None,
+    upload_prefix: Optional[str] = None,
 ) -> None:
     """
     Run direct processing on arbitrary images without the full pipeline structure.
@@ -246,6 +249,8 @@ def run_direct_processing(
         debug_format: Format for debug images
         single_image: Process only this specific filename
         copyright_text: Custom copyright text
+        r2_config: Optional R2 configuration for upload step
+        upload_prefix: Optional override for R2 storage prefix
     """
     # Ensure destination exists
     dst.mkdir(parents=True, exist_ok=True)
@@ -385,15 +390,32 @@ def run_direct_processing(
             )
 
         elif step == PipelineStep.EXPORT:
-            console.print("  [dim]Export requires full pipeline structure[/]")
-            # Copy files to step output
-            for name, path in current_files.items():
-                shutil.copy(path, step_output / name)
-                current_files[name] = step_output / name
+            # For export, we need the quality tiers from resize
+            console.print(f"  Exporting to AVIF/WebP...")
+            # We need to structure the output base for export
+            run_export(step_output.parent, step_output.parent, ImageTiersConfig())
+            
+            # Step output now contains final/ with tiers
+            console.print(f"  [green]Export complete[/]")
 
         elif step == PipelineStep.UPLOAD:
-            console.print("  [dim]Skipping in direct mode (no R2 config)[/]")
-            continue
+            if not r2_config:
+                console.print("  [yellow]Skipping upload: No R2 credentials found in .env.local[/]")
+                continue
+            
+            console.print(f"  Running upload with prefix: {upload_prefix or 'default'}")
+            # run_upload expects output_base which contains final/
+            success = run_upload(
+                dst, 
+                r2_config, 
+                "direct-mode", 
+                skip_upload=False,
+                upload_prefix=upload_prefix
+            )
+            if success:
+                console.print(f"  [green]Upload complete[/]")
+            else:
+                console.print(f"  [red]Upload failed[/]")
 
     # Summary
     console.print(f"\n[bold green]Direct processing complete![/]")

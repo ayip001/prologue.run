@@ -13,9 +13,43 @@ from .config import (
     DebugConfig,
     StepControlConfig,
     CopyrightConfig,
+    R2Config,
 )
 
 console = Console()
+
+
+def load_r2_config() -> R2Config | None:
+    """Load R2 configuration from environment variables."""
+    import os
+    from dotenv import load_dotenv
+
+    # Try to load .env.local first, then .env from workspace root
+    # cli.py is at race-processor/src/race_processor/cli.py
+    # Root is 4 levels up
+    root_dir = Path(__file__).parent.parent.parent.parent
+    env_loaded = False
+
+    for env_file in [".env.local", ".env"]:
+        env_path = root_dir / env_file
+        if env_path.exists():
+            load_dotenv(env_path)
+            env_loaded = True
+            break
+
+    endpoint = os.getenv("R2_ENDPOINT")
+    access_key = os.getenv("R2_ACCESS_KEY_ID")
+    secret_key = os.getenv("R2_SECRET_ACCESS_KEY")
+    bucket = os.getenv("R2_BUCKET_NAME")
+
+    if all([endpoint, access_key, secret_key, bucket]):
+        return R2Config(
+            endpoint=endpoint,  # type: ignore
+            access_key_id=access_key,  # type: ignore
+            secret_access_key=secret_key,  # type: ignore
+            bucket=bucket,  # type: ignore
+        )
+    return None
 
 
 @click.group()
@@ -202,6 +236,9 @@ def process(
 
         from .pipeline.orchestrator import run_direct_processing
 
+        # Try to load R2 config for upload step in direct mode if requested
+        r2_config = load_r2_config() if run_upload else None
+
         run_direct_processing(
             src=src,
             dst=dst,
@@ -213,6 +250,8 @@ def process(
             debug_format=debug_format,
             single_image=single_image,
             copyright_text=copyright_text,
+            r2_config=r2_config,
+            upload_prefix=upload_prefix,
         )
         return
 
@@ -257,6 +296,9 @@ def process(
     if copyright_text:
         copyright_config = CopyrightConfig(text=copyright_text)
 
+    # Load R2 config
+    r2_config = load_r2_config()
+
     config = PipelineConfig(
         input_dir=input_dir,
         output_dir=output_dir,
@@ -268,6 +310,7 @@ def process(
         debug=debug_config,
         step_control=step_control,
         copyright=copyright_config,
+        r2=r2_config,
     )
 
     # Import and run orchestrator
