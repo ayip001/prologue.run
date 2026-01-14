@@ -15,6 +15,22 @@ cd race-processor
 pip install -e .
 ```
 
+### Required Models
+
+Download the following YOLO models and place them in `race-processor/models/`:
+
+| Model | Purpose | Download |
+|-------|---------|----------|
+| `yolov8n.pt` | General detection | [Ultralytics](https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8n.pt) |
+| `yolov8n-pose.pt` | Body pose (head estimation) | [Ultralytics](https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8n-pose.pt) |
+| `yolov8n-plate.pt` | License plate detection | [yasirfaizahmed/license-plate-object-detection](https://huggingface.co/yasirfaizahmed/license-plate-object-detection) |
+| `yolov12m-face.pt` | Face detection | [deepghs/yolov12_face_detection](https://huggingface.co/deepghs/yolov12_face_detection) |
+
+```bash
+mkdir -p race-processor/models
+# Download models manually and place in models/
+```
+
 ## Quick Start
 
 ```bash
@@ -44,11 +60,81 @@ The processor runs a 6-stage pipeline:
 | 5    | Export    | Encode to AVIF/WebP formats                        |
 | 6    | Upload    | Privacy check, upload to R2, generate DB records   |
 
-## Workflow
+## Preview Commands
 
-1. **Export from Insta360 Studio**: Batch export your .insp files to equirectangular JPGs with horizon lock enabled
-2. **Run the processor**: `race-processor process -i ./exported-images -r my-race`
-3. **Review output**: Check `output/my-race/` for processed images and `metadata.json`
+Test individual steps on single images without running the full pipeline:
+
+### `preview-blur` - Test Detection
+
+```bash
+# Show detection boxes with sources color-coded
+race-processor preview-blur image.jpg --conf 0.05 --show-sources
+
+# Apply actual blur effect
+race-processor preview-blur image.jpg --blur --conf 0.1
+
+# Use demo mode (fake detections for testing pipeline)
+race-processor preview-blur image.jpg --mode demo
+```
+
+Options:
+- `--conf FLOAT` - Confidence threshold (default: 0.25, lower = more detections)
+- `--show-sources` - Color-code boxes by detection source
+- `--blur` - Apply actual blur instead of drawing boxes
+- `--mode [full|demo]` - Detection mode (default: full)
+- `-o PATH` - Output file path
+
+### `preview-watermark` - Test Copyright Overlay
+
+```bash
+# Default watermark
+race-processor preview-watermark image.jpg
+
+# Custom text
+race-processor preview-watermark image.jpg --text "© 2026 My Race"
+```
+
+Options:
+- `--text TEXT` - Custom copyright text (use `{year}` for current year)
+- `-o PATH` - Output file path
+
+### `preview-resize` - Test Quality Tiers
+
+```bash
+# Creates: image-thumb.jpg, image-medium.jpg, image-full.jpg
+race-processor preview-resize image.jpg
+
+# Output to specific directory
+race-processor preview-resize image.jpg -o ./output/
+```
+
+Options:
+- `-o PATH` - Output directory
+
+### `preview-export` - Test AVIF/WebP Encoding
+
+```bash
+# Creates: image.avif, image.webp
+race-processor preview-export image.jpg
+
+# Custom quality settings
+race-processor preview-export image.jpg --avif-quality 60 --webp-quality 70
+```
+
+Options:
+- `--avif-quality INT` - AVIF quality 0-100 (default: 75)
+- `--webp-quality INT` - WebP quality 0-100 (default: 80)
+- `-o PATH` - Output directory
+
+### `check-exif` - Verify Privacy
+
+```bash
+# Check single image
+race-processor check-exif image.jpg
+
+# Check entire directory
+race-processor check-exif ./output/final/
+```
 
 ## Commands
 
@@ -74,8 +160,6 @@ The `process` command supports two modes:
 
 #### Direct Mode Options
 
-Direct mode bypasses the standard directory structure and processes arbitrary images.
-
 | Option | Description |
 |--------|-------------|
 | `--src PATH` | Source directory or single image file |
@@ -96,7 +180,7 @@ Direct mode bypasses the standard directory structure and processes arbitrary im
 | `--conf` | `0.25` | Confidence threshold for detections |
 
 Blur modes:
-- `full` - Use YOLO models for real face/plate detection (requires `download-models`)
+- `full` - Use YOLO models for real face/plate detection
 - `demo` - Generate fake detections for testing the pipeline
 - `skip` - Skip blur entirely (same as `--skip-blur`)
 
@@ -130,36 +214,6 @@ race-processor intake PATH [--race-slug TEXT]
 
 Preview how images will be sorted by EXIF timestamp without running the full pipeline.
 
-### `check-exif` - Verify Privacy
-
-```bash
-race-processor check-exif PATH
-```
-
-Check images for GPS/location EXIF data. Useful for verifying privacy before upload.
-
-### `download-models` - Download AI Models
-
-```bash
-race-processor download-models
-```
-
-Downloads YOLO models required for privacy blur detection.
-
-### `preview-blur` - Preview Blur Detection
-
-```bash
-race-processor preview-blur IMAGE_PATH [OPTIONS]
-```
-
-| Option | Description |
-|--------|-------------|
-| `-o, --output PATH` | Output preview image (default: `blur-preview.jpg`) |
-| `--show-sources` | Color-code detections by source |
-| `--blur` | Apply actual blur instead of drawing boxes |
-| `--mode` | Detection mode: `full` or `demo` |
-| `--conf` | Confidence threshold (default: `0.25`) |
-
 ## Examples
 
 ### Basic Processing
@@ -177,15 +231,6 @@ race-processor process -i ./exported-images -r hk-marathon-2026 --debug
 
 # Use PNG format for lossless debug output
 race-processor process -i ./exported-images -r hk-marathon-2026 --debug --debug-format png
-```
-
-Debug output is saved to:
-```
-output/hk-marathon-2026/debug/
-├── step1_intake/         # Renamed images
-├── step2_blur/           # After privacy blur
-├── step3_watermark/      # After copyright watermark
-└── step4_resize/         # After resizing (with tier suffixes)
 ```
 
 ### Step Control
@@ -210,16 +255,6 @@ race-processor process --step 3 --src ./my-image.jpg --dst ./watermark-output
 # Run steps 2-4 on a folder with debug output
 race-processor process --start-step 2 --end-step 4 \
     --src ./equirect-images --dst ./processed --debug
-```
-
-### Privacy Verification
-
-```bash
-# Check if images have GPS data
-race-processor check-exif ./output/my-race/final/
-
-# Preview what the blur step will detect
-race-processor preview-blur ./image.jpg --show-sources
 ```
 
 ## Input Directory Structure
@@ -308,9 +343,9 @@ The `metadata.json` format:
 
 Ensure your input directory contains `.jpg`, `.jpeg`, or `.png` files.
 
-### "YOLO models required"
+### Model not found errors
 
-Run `race-processor download-models` to download the AI models needed for privacy blur.
+Download the required models manually (see [Required Models](#required-models) section) and place them in `race-processor/models/`.
 
 ### "Found GPS data in X files" (during upload)
 
@@ -324,4 +359,7 @@ Check that your source images have valid EXIF timestamps. Use `race-processor in
 
 ### AVIF encoding fails
 
-Ensure `pillow-avif-plugin` is installed. It should be included in the package dependencies.
+Ensure `pillow-avif-plugin` is installed:
+```bash
+pip install pillow-avif-plugin
+```

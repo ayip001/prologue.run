@@ -4,8 +4,8 @@ Command-line interface for the race processor pipeline.
 
 import click
 from pathlib import Path
+from datetime import datetime
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from .config import (
     PipelineConfig,
@@ -171,7 +171,7 @@ def process(
 
     \b
     Blur Modes:
-      --blur-mode full   Use YOLO models (requires download-models)
+      --blur-mode full   Use YOLO models for real detection
       --blur-mode demo   Generate fake detections for testing (default)
       --blur-mode skip   Skip blur entirely
     """
@@ -296,41 +296,6 @@ def intake(input_dir: Path, race_slug: str) -> None:
             console.print("[red]No images found[/]")
 
 
-@main.command("download-models")
-def download_models() -> None:
-    """Download required YOLO model weights."""
-    console.print("[bold]Downloading YOLO models...[/]")
-
-    from .config import DEFAULT_MODELS_DIR
-
-    DEFAULT_MODELS_DIR.mkdir(parents=True, exist_ok=True)
-
-    models = [
-        "yolov8n.pt",
-        "yolov8n-pose.pt",
-    ]
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    ) as progress:
-        for model in models:
-            task = progress.add_task(f"Downloading {model}...", total=None)
-            # Ultralytics auto-downloads models on first use
-            from ultralytics import YOLO
-
-            _ = YOLO(model)
-            progress.update(task, completed=True)
-
-    console.print("[green]Models downloaded successfully![/]")
-    console.print(f"  Location: {DEFAULT_MODELS_DIR}")
-    console.print()
-    console.print("[yellow]Note:[/] Face detection models (yolov8n-face, yolov8m-face)")
-    console.print("      must be downloaded separately from:")
-    console.print("      https://github.com/akanametov/yolov8-face")
-
-
 @main.command("preview-blur")
 @click.argument(
     "image_path",
@@ -340,8 +305,8 @@ def download_models() -> None:
     "--output",
     "-o",
     type=click.Path(dir_okay=False, path_type=Path),
-    default="blur-preview.jpg",
-    help="Output preview image",
+    default=None,
+    help="Output preview image (default: {input}-blur-preview.jpg)",
 )
 @click.option(
     "--show-sources",
@@ -365,13 +330,29 @@ def download_models() -> None:
     default=0.25,
     help="Confidence threshold for detections (default: 0.25)",
 )
-def preview_blur(image_path: Path, output: Path, show_sources: bool, blur: bool, mode: str, conf: float) -> None:
-    """Preview blur detection or the actual blurring effect."""
+def preview_blur(image_path: Path, output: Path | None, show_sources: bool, blur: bool, mode: str, conf: float) -> None:
+    """Preview blur detection on a single image.
+
+    \b
+    Examples:
+      # Show detection boxes
+      race-processor preview-blur image.jpg --conf 0.05 --show-sources
+
+      # Apply actual blur
+      race-processor preview-blur image.jpg --blur --conf 0.1
+
+      # Use demo mode (fake detections for testing)
+      race-processor preview-blur image.jpg --mode demo
+    """
     console.print(f"[bold]Preview blur {'effect' if blur else 'detection'} for:[/] {image_path}")
 
     from .detection.ensemble import PrivacyBlurEnsemble, blur_image
     from .config import DEFAULT_MODELS_DIR, BlurConfig
     import cv2
+
+    # Default output path
+    if output is None:
+        output = image_path.parent / f"{image_path.stem}-blur-preview.jpg"
 
     # Load image
     image = cv2.imread(str(image_path))
@@ -379,11 +360,17 @@ def preview_blur(image_path: Path, output: Path, show_sources: bool, blur: bool,
         console.print("[red]Error: Could not load image[/]")
         return
 
+    console.print(f"  Image size: {image.shape[1]}x{image.shape[0]}")
+
     # Run detection
     ensemble = PrivacyBlurEnsemble(mode=mode, models_dir=DEFAULT_MODELS_DIR, conf_threshold=conf)
     regions = ensemble.detect_all(image)
 
     console.print(f"  Detected {len(regions)} regions (threshold: {conf})")
+
+    # Print detection details
+    for region in regions:
+        console.print(f"    - {region.source.value}: {region.confidence:.3f} at ({region.x}, {region.y}) {region.width}x{region.height}")
 
     if blur:
         # Apply actual blur
@@ -420,6 +407,206 @@ def preview_blur(image_path: Path, output: Path, show_sources: bool, blur: bool,
     console.print(f"[green]Output saved to:[/] {output}")
 
 
+@main.command("preview-watermark")
+@click.argument(
+    "image_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Output preview image (default: {input}-watermark-preview.jpg)",
+)
+@click.option(
+    "--text",
+    "-t",
+    default=None,
+    help="Custom copyright text (default: '© {year} Prologue.run')",
+)
+def preview_watermark(image_path: Path, output: Path | None, text: str | None) -> None:
+    """Preview watermark on a single image.
+
+    \b
+    Examples:
+      # Default watermark
+      race-processor preview-watermark image.jpg
+
+      # Custom text
+      race-processor preview-watermark image.jpg --text "© 2026 My Race"
+    """
+    console.print(f"[bold]Preview watermark for:[/] {image_path}")
+
+    from .pipeline.watermark import process_single_image
+    from .config import CopyrightConfig
+
+    # Default output path
+    if output is None:
+        output = image_path.parent / f"{image_path.stem}-watermark-preview.jpg"
+
+    # Build config
+    config = CopyrightConfig()
+    if text:
+        config = CopyrightConfig(text=text)
+
+    year = datetime.now().year
+    console.print(f"  Text: {config.text.format(year=year)}")
+
+    # Process
+    success = process_single_image(image_path, output, config)
+
+    if success:
+        console.print(f"[green]Output saved to:[/] {output}")
+    else:
+        console.print("[red]Failed to process image[/]")
+
+
+@main.command("preview-resize")
+@click.argument(
+    "image_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--output-dir",
+    "-o",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    help="Output directory (default: same as input)",
+)
+def preview_resize(image_path: Path, output_dir: Path | None) -> None:
+    """Preview resize tiers on a single image.
+
+    Creates three output files: {name}-thumb.jpg, {name}-medium.jpg, {name}-full.jpg
+
+    \b
+    Examples:
+      race-processor preview-resize image.jpg
+      race-processor preview-resize image.jpg -o ./output/
+    """
+    console.print(f"[bold]Preview resize for:[/] {image_path}")
+
+    from .config import ImageTiersConfig
+    import cv2
+
+    # Default output directory
+    if output_dir is None:
+        output_dir = image_path.parent
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load image
+    image = cv2.imread(str(image_path))
+    if image is None:
+        console.print("[red]Error: Could not load image[/]")
+        return
+
+    height, width = image.shape[:2]
+    console.print(f"  Original size: {width}x{height}")
+
+    # Get tier config
+    tier_config = ImageTiersConfig()
+
+    tiers = {
+        "thumb": tier_config.thumbnail,
+        "medium": tier_config.medium,
+        "full": tier_config.full,
+    }
+
+    for tier_name, tier in tiers.items():
+        new_width = tier.width
+        new_height = int(height * (new_width / width))
+
+        resized = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
+
+        output_path = output_dir / f"{image_path.stem}-{tier_name}.jpg"
+        cv2.imwrite(str(output_path), resized)
+
+        console.print(f"  {tier_name}: {new_width}x{new_height} -> {output_path.name}")
+
+    console.print(f"[green]Output saved to:[/] {output_dir}")
+
+
+@main.command("preview-export")
+@click.argument(
+    "image_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--output-dir",
+    "-o",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    help="Output directory (default: same as input)",
+)
+@click.option(
+    "--avif-quality",
+    type=int,
+    default=75,
+    help="AVIF quality (0-100, default: 75)",
+)
+@click.option(
+    "--webp-quality",
+    type=int,
+    default=80,
+    help="WebP quality (0-100, default: 80)",
+)
+def preview_export(image_path: Path, output_dir: Path | None, avif_quality: int, webp_quality: int) -> None:
+    """Preview AVIF/WebP export on a single image.
+
+    Creates two output files: {name}.avif and {name}.webp
+
+    \b
+    Examples:
+      race-processor preview-export image.jpg
+      race-processor preview-export image.jpg --avif-quality 60 --webp-quality 70
+    """
+    console.print(f"[bold]Preview export for:[/] {image_path}")
+
+    from PIL import Image
+    import pillow_avif  # noqa: F401
+
+    # Default output directory
+    if output_dir is None:
+        output_dir = image_path.parent
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load image
+    try:
+        img = Image.open(image_path)
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+    except Exception as e:
+        console.print(f"[red]Error loading image: {e}[/]")
+        return
+
+    console.print(f"  Original size: {img.width}x{img.height}")
+    original_size = image_path.stat().st_size
+
+    # Export AVIF
+    avif_path = output_dir / f"{image_path.stem}.avif"
+    img.save(avif_path, format="AVIF", quality=avif_quality)
+    avif_size = avif_path.stat().st_size
+
+    # Export WebP
+    webp_path = output_dir / f"{image_path.stem}.webp"
+    img.save(webp_path, format="WEBP", quality=webp_quality)
+    webp_size = webp_path.stat().st_size
+
+    # Print results
+    def fmt_size(b: int) -> str:
+        if b >= 1024 * 1024:
+            return f"{b / (1024*1024):.1f} MB"
+        return f"{b / 1024:.1f} KB"
+
+    console.print(f"  Original: {fmt_size(original_size)}")
+    console.print(f"  AVIF (q={avif_quality}): {fmt_size(avif_size)} ({100*avif_size//original_size}%) -> {avif_path.name}")
+    console.print(f"  WebP (q={webp_quality}): {fmt_size(webp_size)} ({100*webp_size//original_size}%) -> {webp_path.name}")
+
+    console.print(f"[green]Output saved to:[/] {output_dir}")
+
+
 @main.command("check-exif")
 @click.argument(
     "path",
@@ -430,6 +617,11 @@ def check_exif(path: Path) -> None:
 
     Reports any GPS/location data found - useful for verifying
     privacy before upload.
+
+    \b
+    Examples:
+      race-processor check-exif image.jpg
+      race-processor check-exif ./output/final/
     """
     console.print(f"[bold]Checking EXIF data in:[/] {path}")
 
