@@ -168,7 +168,7 @@ def save_debug_image_from_array(
     return output_path
 
 
-def print_step_summary(config: PipelineConfig, blur_mode: str = "demo") -> None:
+def print_step_summary(config: PipelineConfig, blur_mode: str = "full") -> None:
     """Print a summary of which steps will run."""
     table = Table(title="Pipeline Steps")
     table.add_column("Step", style="cyan")
@@ -219,8 +219,8 @@ def run_direct_processing(
     dst: Path,
     start_step: int,
     end_step: int,
-    blur_mode: str = "demo",
-    blur_conf: float = 0.25,
+    blur_mode: str = "full",
+    blur_conf: float = 0.12,
     debug: bool = False,
     debug_format: str = "jpg",
     single_image: Optional[str] = None,
@@ -237,7 +237,7 @@ def run_direct_processing(
         dst: Destination directory
         start_step: Starting step number (1-6)
         end_step: Ending step number (1-6)
-        blur_mode: Blur detection mode ("full", "demo", "skip")
+        blur_mode: Blur detection mode ("full", "skip")
         blur_conf: Confidence threshold for blur detection
         debug: Enable debug output
         debug_format: Format for debug images
@@ -407,8 +407,8 @@ def run_direct_processing(
 
 def run_pipeline(
     config: PipelineConfig,
-    blur_mode: Literal["full", "demo", "skip"] = "demo",
-    blur_conf: float = 0.25,
+    blur_mode: Literal["full", "skip"] = "full",
+    blur_conf: float = 0.12,
 ) -> None:
     """
     Run the processing pipeline with step control and debug output.

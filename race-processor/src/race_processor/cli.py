@@ -78,15 +78,15 @@ def main() -> None:
 )
 @click.option(
     "--blur-mode",
-    type=click.Choice(["full", "demo", "skip"]),
-    default="demo",
-    help="Blur detection mode: full (requires models), demo (fake detections), skip (no blur)",
+    type=click.Choice(["full", "skip"]),
+    default="full",
+    help="Blur detection mode: full (requires models), skip (no blur)",
 )
 @click.option(
     "--conf",
     type=float,
-    default=0.25,
-    help="Confidence threshold for blur detection (default: 0.25)",
+    default=0.12,
+    help="Confidence threshold for blur detection (default: 0.12)",
 )
 @click.option(
     "--debug",
@@ -171,8 +171,7 @@ def process(
 
     \b
     Blur Modes:
-      --blur-mode full   Use YOLO models for real detection
-      --blur-mode demo   Generate fake detections for testing (default)
+      --blur-mode full   Use YOLO models for real detection (default)
       --blur-mode skip   Skip blur entirely
     """
     # Direct processing mode (--src/--dst)
@@ -319,18 +318,12 @@ def intake(input_dir: Path, race_slug: str) -> None:
     help="Apply actual blur effect instead of drawing boxes",
 )
 @click.option(
-    "--mode",
-    type=click.Choice(["full", "demo"]),
-    default="full",
-    help="Detection mode (default: full)",
-)
-@click.option(
     "--conf",
     type=float,
-    default=0.25,
-    help="Confidence threshold for detections (default: 0.25)",
+    default=0.12,
+    help="Confidence threshold for detections (default: 0.12)",
 )
-def preview_blur(image_path: Path, output: Path | None, show_sources: bool, blur: bool, mode: str, conf: float) -> None:
+def preview_blur(image_path: Path, output: Path | None, show_sources: bool, blur: bool, conf: float) -> None:
     """Preview blur detection on a single image.
 
     \b
@@ -340,9 +333,6 @@ def preview_blur(image_path: Path, output: Path | None, show_sources: bool, blur
 
       # Apply actual blur
       race-processor preview-blur image.jpg --blur --conf 0.1
-
-      # Use demo mode (fake detections for testing)
-      race-processor preview-blur image.jpg --mode demo
     """
     console.print(f"[bold]Preview blur {'effect' if blur else 'detection'} for:[/] {image_path}")
 
@@ -363,7 +353,7 @@ def preview_blur(image_path: Path, output: Path | None, show_sources: bool, blur
     console.print(f"  Image size: {image.shape[1]}x{image.shape[0]}")
 
     # Run detection
-    ensemble = PrivacyBlurEnsemble(mode=mode, models_dir=DEFAULT_MODELS_DIR, conf_threshold=conf)
+    ensemble = PrivacyBlurEnsemble(models_dir=DEFAULT_MODELS_DIR, conf_threshold=conf)
     regions = ensemble.detect_all(image)
 
     console.print(f"  Detected {len(regions)} regions (threshold: {conf})")

@@ -32,7 +32,6 @@ class DetectionSource(Enum):
     BODY_POSE_HEAD = "body_pose_head"
     LICENSE_PLATE = "plate"
     VEHICLE = "vehicle"
-    DEMO = "demo"
     EDGE_WRAPPED = "edge_wrapped"
 
 
@@ -380,79 +379,6 @@ def blur_image(
     return result
 
 
-def generate_demo_detections(
-    image: np.ndarray,
-    num_regions: int = 3,
-    seed: Optional[int] = None,
-    include_edge_region: bool = True,
-) -> list[BlurRegion]:
-    """
-    Generate demo/mock detections for testing the pipeline.
-
-    Creates random regions in the image to simulate face detections.
-    Optionally includes an edge-spanning region to test edge handling.
-
-    Args:
-        image: OpenCV image (BGR format)
-        num_regions: Number of demo regions to generate
-        seed: Random seed for reproducible results
-        include_edge_region: Whether to include a region spanning the edge
-
-    Returns:
-        List of BlurRegion objects
-    """
-    if seed is not None:
-        np.random.seed(seed)
-
-    height, width = image.shape[:2]
-    regions = []
-
-    for i in range(num_regions):
-        # Generate regions in the middle portion of the image
-        # (where faces are more likely in 360° images)
-        region_width = int(width * np.random.uniform(0.02, 0.05))
-        region_height = int(region_width * np.random.uniform(1.0, 1.4))
-
-        x = int(np.random.uniform(0.1, 0.9) * width)
-        y = int(np.random.uniform(0.3, 0.7) * height)
-
-        regions.append(
-            BlurRegion(
-                x=x,
-                y=y,
-                width=region_width,
-                height=region_height,
-                confidence=np.random.uniform(0.7, 0.95),
-                source=DetectionSource.DEMO,
-                spans_edge=False,
-            )
-        )
-
-    # Add an edge-spanning region for testing
-    if include_edge_region and num_regions > 0:
-        edge_region_width = int(width * np.random.uniform(0.03, 0.06))
-        edge_region_height = int(edge_region_width * np.random.uniform(1.0, 1.4))
-
-        # Place region so it spans the right/left edge
-        # x near 0 means it wraps from right edge
-        edge_x = int(width * 0.02)  # Near left edge
-        edge_y = int(np.random.uniform(0.3, 0.7) * height)
-
-        regions.append(
-            BlurRegion(
-                x=edge_x,
-                y=edge_y,
-                width=edge_region_width,
-                height=edge_region_height,
-                confidence=np.random.uniform(0.7, 0.95),
-                source=DetectionSource.DEMO,
-                spans_edge=True,  # Mark as edge-spanning for demo
-            )
-        )
-
-    return regions
-
-
 class PrivacyBlurEnsemble:
     """
     Runs all detection layers and merges results.
@@ -460,18 +386,17 @@ class PrivacyBlurEnsemble:
     For equirectangular images, runs detection on both the original image
     and an edge-padded version to catch faces split across the seam.
 
-    Supports three modes:
+    Supports two modes:
     - Full mode: Uses YOLO models for face/plate detection (requires models)
-    - Demo mode: Generates fake detections for testing
     - Skip mode: Returns empty list (no blur applied)
     """
 
     def __init__(
         self,
-        mode: Literal["full", "demo", "skip"] = "skip",
+        mode: Literal["full", "skip"] = "full",
         models_dir: Optional[Path] = None,
         edge_aware: bool = True,
-        conf_threshold: float = 0.25,
+        conf_threshold: float = 0.12,
     ) -> None:
         """
         Initialize the ensemble.
@@ -479,7 +404,6 @@ class PrivacyBlurEnsemble:
         Args:
             mode: Detection mode
                 - "full": Use YOLO models (requires downloaded models)
-                - "demo": Generate fake detections for testing
                 - "skip": Return empty list (no detections)
             models_dir: Directory containing YOLO models (required for full mode)
             edge_aware: Whether to run edge-aware detection for equirectangular images
@@ -552,27 +476,18 @@ class PrivacyBlurEnsemble:
     def _run_detection(
         self,
         image: np.ndarray,
-        demo_seed: Optional[int] = None,
     ) -> list[BlurRegion]:
         """
         Run detection on a single image (internal method).
 
         Args:
             image: OpenCV image (BGR format)
-            demo_seed: Random seed for demo mode
 
         Returns:
             List of BlurRegion objects
         """
-        if self.mode == "demo":
-            return generate_demo_detections(
-                image, num_regions=3, seed=demo_seed, include_edge_region=False
-            )
-
         if not self._models_loaded:
-            return generate_demo_detections(
-                image, num_regions=3, seed=demo_seed, include_edge_region=False
-            )
+            return []
 
         all_regions: list[BlurRegion] = []
 
@@ -738,7 +653,6 @@ class PrivacyBlurEnsemble:
     def detect_all(
         self,
         image: np.ndarray,
-        demo_seed: Optional[int] = None,
     ) -> list[BlurRegion]:
         """
         Run all detectors and return merged blur regions.
@@ -748,7 +662,6 @@ class PrivacyBlurEnsemble:
 
         Args:
             image: OpenCV image (BGR format)
-            demo_seed: Random seed for demo mode (for reproducible results)
 
         Returns:
             List of BlurRegion objects to blur
@@ -756,26 +669,18 @@ class PrivacyBlurEnsemble:
         if self.mode == "skip":
             return []
 
-        if self.mode == "demo":
-            # Demo mode: generate fake detections including edge region
-            return generate_demo_detections(
-                image, num_regions=3, seed=demo_seed, include_edge_region=True
-            )
-
         # Full mode with models
         if not self._models_loaded:
             console.print(
-                "  [yellow]Warning: Models not loaded, falling back to demo mode[/]"
+                "  [yellow]Warning: Models not loaded[/]"
             )
-            return generate_demo_detections(
-                image, num_regions=3, seed=demo_seed, include_edge_region=True
-            )
+            return []
 
         all_regions: list[BlurRegion] = []
         height, width = image.shape[:2]
 
         # Run detection on original image
-        original_regions = self._run_detection(image, demo_seed)
+        original_regions = self._run_detection(image)
         all_regions.extend(original_regions)
 
         # Run edge-aware detection
@@ -784,8 +689,7 @@ class PrivacyBlurEnsemble:
             padded_image, pad_width = create_edge_padded_image(image)
 
             # Run detection on padded image
-            edge_seed = demo_seed + 1000 if demo_seed else None
-            padded_regions = self._run_detection(padded_image, edge_seed)
+            padded_regions = self._run_detection(padded_image)
 
             # Filter to only keep detections that involve the edge area
             edge_regions = []
@@ -896,10 +800,10 @@ def process_blur_single(
     input_path: Path,
     output_path: Path,
     config: BlurConfig,
-    mode: Literal["full", "demo", "skip"] = "demo",
+    mode: Literal["full", "skip"] = "full",
     models_dir: Optional[Path] = None,
     edge_aware: bool = True,
-    conf_threshold: float = 0.25,
+    conf_threshold: float = 0.12,
 ) -> bool:
     """
     Apply privacy blur to a single image.
@@ -908,7 +812,7 @@ def process_blur_single(
         input_path: Path to input image
         output_path: Path to save blurred image
         config: Blur configuration
-        mode: Detection mode ("full", "demo", or "skip")
+        mode: Detection mode ("full" or "skip")
         models_dir: Directory containing YOLO models
         edge_aware: Whether to detect faces spanning equirectangular edges
         conf_threshold: Confidence threshold for detections
@@ -955,10 +859,10 @@ def process_blur_batch(
     input_dir: Path,
     output_dir: Path,
     config: BlurConfig,
-    mode: Literal["full", "demo", "skip"] = "demo",
+    mode: Literal["full", "skip"] = "full",
     models_dir: Optional[Path] = None,
     edge_aware: bool = True,
-    conf_threshold: float = 0.25,
+    conf_threshold: float = 0.12,
 ) -> list[Path]:
     """
     Apply privacy blur to all images in a directory.
@@ -1000,9 +904,8 @@ def process_blur_batch(
             console.print(f"  [yellow]Warning: Could not read {input_file.name}[/]")
             continue
 
-        # Detect regions (use filename hash as seed for reproducible demo results)
-        seed = hash(input_file.name) % (2**31) if mode == "demo" else None
-        regions = detector.detect_all(image, demo_seed=seed)
+        # Detect regions
+        regions = detector.detect_all(image)
 
         total_regions += len(regions)
         edge_regions += sum(1 for r in regions if r.spans_edge)

@@ -72,16 +72,12 @@ race-processor preview-blur image.jpg --conf 0.05 --show-sources
 
 # Apply actual blur effect
 race-processor preview-blur image.jpg --blur --conf 0.1
-
-# Use demo mode (fake detections for testing pipeline)
-race-processor preview-blur image.jpg --mode demo
 ```
 
 Options:
-- `--conf FLOAT` - Confidence threshold (default: 0.25, lower = more detections)
+- `--conf FLOAT` - Confidence threshold (default: 0.12, lower = more detections)
 - `--show-sources` - Color-code boxes by detection source
 - `--blur` - Apply actual blur instead of drawing boxes
-- `--mode [full|demo]` - Detection mode (default: full)
 - `-o PATH` - Output file path
 
 ### `preview-watermark` - Test Copyright Overlay
@@ -176,12 +172,11 @@ The `process` command supports two modes:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--blur-mode` | `demo` | Detection mode for blur stage |
-| `--conf` | `0.25` | Confidence threshold for detections |
+| `--blur-mode` | `full` | Detection mode for blur stage |
+| `--conf` | `0.12` | Confidence threshold for detections |
 
 Blur modes:
-- `full` - Use YOLO models for real face/plate detection
-- `demo` - Generate fake detections for testing the pipeline
+- `full` - Use YOLO models for real face/plate detection (default)
 - `skip` - Skip blur entirely (same as `--skip-blur`)
 
 #### Debug Mode
