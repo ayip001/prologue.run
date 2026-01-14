@@ -45,6 +45,53 @@ def get_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     return ImageFont.load_default()
 
 
+import math
+import cv2
+import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+from rich.console import Console
+
+from ..config import CopyrightConfig
+
+console = Console()
+
+# --- Watermark Constants ---
+DEFAULT_FONT_SIZE_RATIO = 0.014  # 1.4% of image height
+DEFAULT_X_PCT = 55.0           # Horizontal center-right
+DEFAULT_Y_PCT = 70.0           # Lower-middle vertical
+DEFAULT_OPACITY = 180          # 0-255
+DEFAULT_SHADOW_OFFSET = 2
+# ---------------------------
+
+
+def get_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    """
+    Get a font for rendering text. Tries to find a good sans-serif font,
+    falls back to default if none available.
+    """
+    # Common sans-serif fonts to try (in order of preference)
+    font_paths = [
+        "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/segoeui.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/System/Library/Fonts/SFNSText.ttf",
+    ]
+
+    for font_path in font_paths:
+        try:
+            return ImageFont.truetype(font_path, size)
+        except (OSError, IOError):
+            continue
+
+    # Fall back to default font (will be small but functional)
+    console.print("  [yellow]Warning: Using default font (no TrueType fonts found)[/]")
+    return ImageFont.load_default()
+
+
 def add_copyright_watermark(
     image: np.ndarray,
     config: CopyrightConfig,
@@ -52,6 +99,8 @@ def add_copyright_watermark(
 ) -> np.ndarray:
     """
     Add a copyright watermark to an equirectangular image.
+    Respects equirectangular projection by applying horizontal stretching
+    based on latitude.
 
     Args:
         image: Input image as numpy array (BGR format from OpenCV)
@@ -73,63 +122,93 @@ def add_copyright_watermark(
     # Calculate font size based on image height
     font_size = max(12, int(height * config.font_size_ratio))
 
-    # Convert from BGR to RGB for PIL
-    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-    # Create PIL Image
-    pil_image = Image.fromarray(image_rgb)
-
-    # Create a transparent overlay for the text
-    overlay = Image.new("RGBA", pil_image.size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(overlay)
-
-    # Get font
-    font = get_font(font_size)
-
-    # Get text bounding box
-    bbox = draw.textbbox((0, 0), text, font=font)
-    text_width = bbox[2] - bbox[0]
-    text_height = bbox[3] - bbox[1]
-
     # Calculate position
-    margin_x = int(width * config.margin_ratio)
-    margin_y = int(height * config.margin_ratio)
+    if config.position == "custom":
+        x_pct, y_pct = config.custom_x_pct, config.custom_y_pct
+    else:
+        # Map named positions to percentages
+        margin_x_pct = config.margin_ratio * 100
+        margin_y_pct = config.margin_ratio * 100
+        
+        if config.position == "bottom-left":
+            x_pct, y_pct = margin_x_pct, 100 - margin_y_pct
+        elif config.position == "bottom-center":
+            x_pct, y_pct = 50.0, 100 - margin_y_pct
+        else:  # bottom-right
+            x_pct, y_pct = 100 - margin_x_pct, 100 - margin_y_pct
 
-    if config.position == "bottom-left":
-        x = margin_x
-        y = height - margin_y - text_height
-    elif config.position == "bottom-center":
-        x = (width - text_width) // 2
-        y = height - margin_y - text_height
-    else:  # bottom-right
-        x = width - margin_x - text_width
-        y = height - margin_y - text_height
+    # Latitude calculation (phi)
+    # y = 0 (top) -> phi = pi/2 (90 deg)
+    # y = 0.5 (middle) -> phi = 0 (0 deg)
+    # y = 1 (bottom) -> phi = -pi/2 (-90 deg)
+    y_norm = y_pct / 100.0
+    phi = (0.5 - y_norm) * math.pi
+    
+    # Horizontal stretch factor for equirectangular projection
+    # stretch = 1 / cos(phi)
+    # We clip cos(phi) to avoid infinite stretch at poles
+    cos_phi = math.cos(phi)
+    stretch_factor = 1.0 / max(0.01, cos_phi)
 
-    # Draw shadow first
-    shadow_offset = config.shadow_offset
-    draw.text(
-        (x + shadow_offset, y + shadow_offset),
-        text,
-        font=font,
-        fill=config.shadow_color,
-    )
-
+    # 1. Render text to a high-res scratch surface first
+    # We use a larger font size for better quality during stretching
+    render_scale = 2
+    temp_font = get_font(font_size * render_scale)
+    
+    # Use a dummy draw to get text size
+    dummy_img = Image.new("RGBA", (1, 1))
+    dummy_draw = ImageDraw.Draw(dummy_img)
+    bbox = dummy_draw.textbbox((0, 0), text, font=temp_font)
+    tw = bbox[2] - bbox[0]
+    th = bbox[3] - bbox[1]
+    pad = 20 * render_scale
+    
+    # Create text surface
+    text_surf = Image.new("RGBA", (tw + pad, th + pad), (0, 0, 0, 0))
+    text_draw = ImageDraw.Draw(text_surf)
+    
+    # Draw shadow
+    so = config.shadow_offset * render_scale
+    text_draw.text((pad//2 + so, pad//2 + so), text, font=temp_font, fill=config.shadow_color)
     # Draw main text
-    draw.text(
-        (x, y),
-        text,
-        font=font,
-        fill=config.font_color,
-    )
-
-    # Composite the overlay onto the image
-    pil_image = pil_image.convert("RGBA")
-    pil_image = Image.alpha_composite(pil_image, overlay)
-
-    # Convert back to RGB then BGR for OpenCV
-    result_rgb = pil_image.convert("RGB")
-    result_bgr = cv2.cvtColor(np.array(result_rgb), cv2.COLOR_RGB2BGR)
-
+    text_draw.text((pad//2, pad//2), text, font=temp_font, fill=config.font_color)
+    
+    # 2. Apply horizontal stretch
+    new_tw = int(text_surf.width * stretch_factor / render_scale)
+    new_th = int(text_surf.height / render_scale)
+    
+    # If the stretch is too large (near poles), we might need to wrap it
+    # but for a watermark we'll just resize it
+    stretched_text = text_surf.resize((new_tw, new_th), Image.Resampling.LANCZOS)
+    
+    # 3. Composite onto main image
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    pil_image = Image.fromarray(image_rgb).convert("RGBA")
+    
+    # Calculate final pixel coordinates
+    # (x_pct, y_pct) is the center of the text
+    pos_x = int((x_pct / 100.0) * width) - (new_tw // 2)
+    pos_y = int((y_pct / 100.0) * height) - (new_th // 2)
+    
+    # Create overlay same size as image
+    overlay = Image.new("RGBA", pil_image.size, (0, 0, 0, 0))
+    
+    # Handle horizontal wrapping if text goes off edge
+    if pos_x < 0:
+        overlay.paste(stretched_text, (pos_x + width, pos_y))
+        overlay.paste(stretched_text, (pos_x, pos_y))
+    elif pos_x + new_tw > width:
+        overlay.paste(stretched_text, (pos_x - width, pos_y))
+        overlay.paste(stretched_text, (pos_x, pos_y))
+    else:
+        overlay.paste(stretched_text, (pos_x, pos_y))
+        
+    # Composite
+    result_pil = Image.alpha_composite(pil_image, overlay)
+    
+    # Convert back to BGR
+    result_bgr = cv2.cvtColor(np.array(result_pil.convert("RGB")), cv2.COLOR_RGB2BGR)
+    
     return result_bgr
 
 

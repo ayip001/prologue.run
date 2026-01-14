@@ -103,7 +103,7 @@ class CopyrightConfig(BaseModel):
         description="Copyright text template. {year} will be replaced with current year",
     )
     font_size_ratio: float = Field(
-        default=0.012,
+        default=0.014,
         description="Font size as ratio of image height",
     )
     font_color: tuple[int, int, int, int] = Field(
@@ -118,13 +118,21 @@ class CopyrightConfig(BaseModel):
         default=2,
         description="Shadow offset in pixels",
     )
-    position: Literal["bottom-left", "bottom-center", "bottom-right"] = Field(
-        default="bottom-left",
+    position: Literal["bottom-left", "bottom-center", "bottom-right", "custom"] = Field(
+        default="custom",
         description="Position of copyright text",
     )
     margin_ratio: float = Field(
         default=0.015,
         description="Margin from edge as ratio of image dimension",
+    )
+    custom_x_pct: float = Field(
+        default=55.0,
+        description="Custom X position as percentage (0-100)",
+    )
+    custom_y_pct: float = Field(
+        default=70.0,
+        description="Custom Y position as percentage (0-100)",
     )
 
 

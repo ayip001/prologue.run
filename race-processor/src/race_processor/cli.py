@@ -470,13 +470,28 @@ def preview_blur(image_path: Path, output: Path | None, show_sources: bool, blur
     default=None,
     help="Custom copyright text (default: '© {year} Prologue.run')",
 )
-def preview_watermark(image_path: Path, output: Path | None, text: str | None) -> None:
+@click.option(
+    "--x-pct",
+    type=float,
+    default=55.0,
+    help="Horizontal position % (0-100, default: 55.0)",
+)
+@click.option(
+    "--y-pct",
+    type=float,
+    default=70.0,
+    help="Vertical position % (0-100, default: 70.0)",
+)
+def preview_watermark(image_path: Path, output: Path | None, text: str | None, x_pct: float, y_pct: float) -> None:
     """Preview watermark on a single image.
 
     \b
     Examples:
-      # Default watermark
+      # Default watermark (center)
       race-processor preview-watermark image.jpg
+
+      # Custom position
+      race-processor preview-watermark image.jpg --x-pct 10 --y-pct 90
 
       # Custom text
       race-processor preview-watermark image.jpg --text "© 2026 My Race"
@@ -491,12 +506,17 @@ def preview_watermark(image_path: Path, output: Path | None, text: str | None) -
         output = image_path.parent / f"{image_path.stem}-watermark-preview.jpg"
 
     # Build config
-    config = CopyrightConfig()
+    config = CopyrightConfig(
+        position="custom",
+        custom_x_pct=x_pct,
+        custom_y_pct=y_pct
+    )
     if text:
-        config = CopyrightConfig(text=text)
+        config.text = text
 
     year = datetime.now().year
     console.print(f"  Text: {config.text.format(year=year)}")
+    console.print(f"  Position: {x_pct}%, {y_pct}%")
 
     # Process
     success = process_single_image(image_path, output, config)

@@ -83,8 +83,11 @@ Options:
 ### `preview-watermark` - Test Copyright Overlay
 
 ```bash
-# Default watermark
+# Default watermark (center of screen)
 race-processor preview-watermark image.jpg
+
+# Custom position (10% from left, 90% from top)
+race-processor preview-watermark image.jpg --x-pct 10 --y-pct 90
 
 # Custom text
 race-processor preview-watermark image.jpg --text "© 2026 My Race"
@@ -92,6 +95,8 @@ race-processor preview-watermark image.jpg --text "© 2026 My Race"
 
 Options:
 - `--text TEXT` - Custom copyright text (use `{year}` for current year)
+- `--x-pct FLOAT` - Horizontal position % (0-100, default: 55.0)
+- `--y-pct FLOAT` - Vertical position % (0-100, default: 70.0)
 - `-o PATH` - Output file path
 
 ### `preview-resize` - Test Quality Tiers
