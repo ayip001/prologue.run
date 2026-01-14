@@ -72,9 +72,16 @@ def main() -> None:
     help="Skip privacy blur stage",
 )
 @click.option(
-    "--skip-upload",
+    "--upload",
+    "run_upload",
     is_flag=True,
-    help="Skip R2 upload stage",
+    default=False,
+    help="Run R2 upload stage (default: skipped)",
+)
+@click.option(
+    "--upload-prefix",
+    default=None,
+    help="R2 storage prefix (default: races/{race_slug})",
 )
 @click.option(
     "--blur-mode",
@@ -135,7 +142,8 @@ def process(
     dst: Path | None,
     workers: int,
     skip_blur: bool,
-    skip_upload: bool,
+    run_upload: bool,
+    upload_prefix: str | None,
     blur_mode: str,
     conf: float,
     debug: bool,
@@ -222,6 +230,9 @@ def process(
     console.print(f"  Workers: {workers}")
     console.print(f"  Blur mode: {blur_mode}")
     console.print(f"  Confidence: {conf}")
+    console.print(f"  Upload: {'[green]Yes[/]' if run_upload else '[yellow]No[/]'}")
+    if upload_prefix:
+        console.print(f"  Upload prefix: {upload_prefix}")
 
     # Handle --step shorthand
     if step is not None:
@@ -252,7 +263,8 @@ def process(
         race_slug=race_slug,
         workers=workers,
         skip_blur=skip_blur,
-        skip_upload=skip_upload,
+        skip_upload=not run_upload,
+        upload_prefix=upload_prefix,
         debug=debug_config,
         step_control=step_control,
         copyright=copyright_config,

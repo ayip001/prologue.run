@@ -166,7 +166,8 @@ The `process` command supports two modes:
 | Option | Description |
 |--------|-------------|
 | `--skip-blur` | Skip privacy blur stage |
-| `--skip-upload` | Skip R2 upload stage |
+| `--upload` | Run R2 upload stage (default: skipped) |
+| `--upload-prefix TEXT` | Override R2 storage prefix (default: `races/{race_slug}`) |
 
 #### Blur Mode
 

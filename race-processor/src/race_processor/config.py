@@ -188,7 +188,11 @@ class PipelineConfig(BaseModel):
     # Processing settings
     workers: int = Field(default=4, description="Number of parallel workers")
     skip_blur: bool = Field(default=False, description="Skip blur stage")
-    skip_upload: bool = Field(default=False, description="Skip R2 upload")
+    skip_upload: bool = Field(default=True, description="Skip R2 upload (default: True)")
+    upload_prefix: str | None = Field(
+        default=None, 
+        description="Override R2 storage prefix (default: races/{race_slug})"
+    )
 
     # Component configs
     face_detection: FaceDetectionConfig = Field(default_factory=FaceDetectionConfig)

@@ -183,8 +183,11 @@ def print_step_summary(config: PipelineConfig, blur_mode: str = "full") -> None:
                     status = "[yellow]Skipped (--skip-blur)[/]"
                 else:
                     status = f"[green]Will run ({blur_mode} mode)[/]"
-            elif step == PipelineStep.UPLOAD and config.skip_upload:
-                status = "[yellow]Skipped (--skip-upload)[/]"
+            elif step == PipelineStep.UPLOAD:
+                if config.skip_upload:
+                    status = "[yellow]Skipped (default)[/]"
+                else:
+                    status = "[green]Will run[/]"
             else:
                 status = "[green]Will run[/]"
         else:
@@ -671,6 +674,7 @@ def run_pipeline(
             config.r2,
             config.race_slug,
             skip_upload=config.skip_upload,
+            upload_prefix=config.upload_prefix,
         )
 
         if success:

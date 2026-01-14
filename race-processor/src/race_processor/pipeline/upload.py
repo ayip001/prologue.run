@@ -291,8 +291,9 @@ def run_upload(
     output_base: Path,
     r2_config: Optional[R2Config],
     race_slug: str,
-    skip_upload: bool = False,
+    skip_upload: bool = True,
     force_upload: bool = False,
+    upload_prefix: Optional[str] = None,
 ) -> bool:
     """
     Run the complete upload step.
@@ -303,6 +304,7 @@ def run_upload(
         race_slug: Race identifier for storage prefix
         skip_upload: Skip R2 upload but still generate DB records
         force_upload: Upload even if privacy check fails
+        upload_prefix: Optional override for R2 storage prefix
 
     Returns:
         True if successful, False otherwise
@@ -329,7 +331,7 @@ def run_upload(
         console.print("  [yellow]Database records will have no GPS metadata[/]")
 
     # Step 3: Generate database records
-    storage_prefix = f"races/{race_slug}"
+    storage_prefix = upload_prefix if upload_prefix else f"races/{race_slug}"
 
     if manifest:
         db_records = generate_db_records(manifest, final_dir, storage_prefix)
@@ -340,7 +342,7 @@ def run_upload(
 
     # Step 4: Upload to R2
     if skip_upload:
-        console.print("  [yellow]Skipping R2 upload (--skip-upload)[/]")
+        console.print("  [yellow]Skipping R2 upload (default behavior, use --upload to run)[/]")
     elif not r2_config:
         console.print("  [yellow]Skipping R2 upload (no R2 config provided)[/]")
     else:
