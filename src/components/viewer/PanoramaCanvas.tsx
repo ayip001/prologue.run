@@ -124,8 +124,8 @@ function PanoramaSphere({
         textureRef.current = loadedTexture;
         setTexture(loadedTexture);
 
-        // Force re-render
-        invalidateFrame();
+        // Note: invalidateFrame is now called in a useEffect after texture state updates
+        // This ensures React has re-rendered the material with the new texture before invalidating
 
         // Log material state after texture is set
         setTimeout(() => {
@@ -169,6 +169,19 @@ function PanoramaSphere({
       }
     };
   }, []);
+
+  // Invalidate frame AFTER texture state updates (not synchronously in the loader callback)
+  // This ensures R3F re-renders after React has updated the material with the new texture
+  useEffect(() => {
+    if (texture) {
+      console.log("[Texture] State updated, invalidating frame for texture:", texture.uuid.slice(0, 8));
+      // Force material to update
+      if (materialRef.current) {
+        materialRef.current.needsUpdate = true;
+      }
+      invalidateFrame();
+    }
+  }, [texture, invalidateFrame]);
 
   // Update camera FOV
   useEffect(() => {
@@ -290,6 +303,7 @@ export function PanoramaCanvas({
   return (
     <div className="absolute inset-0">
       <Canvas
+        frameloop="always"
         camera={{
           fov: camera.fov,
           near: 0.1,
