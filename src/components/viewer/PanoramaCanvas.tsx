@@ -1,239 +1,207 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
-import { Canvas, useThree, useFrame } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
-import * as THREE from "three";
-import type { CameraState } from "@/types";
+import { useRef, useEffect, useCallback } from "react";
+import { ReactPhotoSphereViewer } from "react-photo-sphere-viewer";
+import { MarkersPlugin } from "@photo-sphere-viewer/markers-plugin";
+import type { Viewer } from "@photo-sphere-viewer/core";
 
-// Offset to convert between our heading (0 = forward) and OrbitControls azimuth (0 = -Z axis)
-// Our panoramas expect 0 degrees to point forward (direction of travel)
-const HEADING_OFFSET = 90;
+// SVG arrow pointing forward (up direction in screen space, will be placed looking down at floor)
+const ARROW_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="60" height="60">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <polygon points="50,15 85,85 50,65 15,85" fill="white" stroke="rgba(255,107,107,0.8)" stroke-width="3" filter="url(#glow)"/>
+</svg>`;
+
+// Reverse arrow (pointing backward)
+const ARROW_SVG_BACK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="60" height="60">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <polygon points="50,85 85,15 50,35 15,15" fill="white" stroke="rgba(255,107,107,0.8)" stroke-width="3" filter="url(#glow)"/>
+</svg>`;
 
 interface PanoramaCanvasProps {
   imageUrl: string | null;
-  camera: CameraState;
-  onCameraChange: (camera: Partial<CameraState>) => void;
-  isLoading: boolean;
+  heading: number;
+  nextHeading: number | null;
+  prevHeading: number | null;
+  defaultYaw: number;
+  defaultPitch: number;
+  onCameraChange: (camera: { yaw?: number; pitch?: number }) => void;
+  onNavigate: (direction: "next" | "prev") => void;
+  isLoading?: boolean;
 }
 
-function PanoramaSphere({
-  imageUrl,
-  camera,
-  onCameraChange,
-}: {
-  imageUrl: string | null;
-  camera: CameraState;
-  onCameraChange: (camera: Partial<CameraState>) => void;
-}) {
-  const { camera: threeCamera, invalidate: invalidateFrame } = useThree();
-  const controlsRef = useRef<any>(null);
-  const textureRef = useRef<THREE.Texture | null>(null);
-  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+// Convert degrees to radians
+function degToRad(deg: number): number {
+  return (deg * Math.PI) / 180;
+}
 
-  // Store initial camera values to apply when controls become available
-  const initialCameraRef = useRef({ yaw: camera.yaw, pitch: camera.pitch });
-  // Track if initial camera has been applied to controls
-  const initialCameraAppliedRef = useRef(false);
-  // Flag to suppress onChange during programmatic camera updates
-  const suppressOnChangeRef = useRef(true);
-
-  // DEBUG: Log initial camera values on mount
-  useEffect(() => {
-    console.log("[PanoramaSphere] Mount - initial camera from props:", {
-      yaw: camera.yaw,
-      pitch: camera.pitch,
-      fov: camera.fov,
-    });
-    console.log("[PanoramaSphere] initialCameraRef:", initialCameraRef.current);
-  }, []);
-
-  // Load texture when URL changes
-  useEffect(() => {
-    console.log("[PanoramaSphere] Texture effect - imageUrl:", imageUrl);
-    if (!imageUrl) {
-      console.log("[PanoramaSphere] No imageUrl, skipping texture load");
-      return;
-    }
-
-    const loader = new THREE.TextureLoader();
-    let cancelled = false;
-
-    console.log("[PanoramaSphere] Starting texture load for:", imageUrl);
-    loader.load(
-      imageUrl,
-      (loadedTexture) => {
-        console.log("[PanoramaSphere] Texture loaded, cancelled:", cancelled);
-        if (cancelled) {
-          loadedTexture.dispose();
-          return;
-        }
-        loadedTexture.colorSpace = THREE.SRGBColorSpace;
-        loadedTexture.minFilter = THREE.LinearFilter;
-        loadedTexture.magFilter = THREE.LinearFilter;
-        // Dispose old texture AFTER new one is ready (not in cleanup)
-        if (textureRef.current && textureRef.current !== loadedTexture) {
-          textureRef.current.dispose();
-        }
-        textureRef.current = loadedTexture;
-        setTexture(loadedTexture);
-        console.log("[PanoramaSphere] Texture set, calling invalidateFrame");
-        // Force Three.js to re-render with the new texture
-        invalidateFrame();
-      },
-      undefined,
-      (error) => {
-        console.error("[PanoramaSphere] Error loading panorama texture:", error);
-      }
-    );
-
-    return () => {
-      console.log("[PanoramaSphere] Texture effect cleanup, setting cancelled=true");
-      cancelled = true;
-    };
-  }, [imageUrl, invalidateFrame]);
-
-  // Dispose texture on unmount
-  useEffect(() => {
-    return () => {
-      if (textureRef.current) {
-        textureRef.current.dispose();
-        textureRef.current = null;
-      }
-    };
-  }, []);
-
-  // Update camera FOV
-  useEffect(() => {
-    if (threeCamera instanceof THREE.PerspectiveCamera) {
-      threeCamera.fov = camera.fov;
-      threeCamera.updateProjectionMatrix();
-    }
-  }, [camera.fov, threeCamera]);
-
-  // Apply initial camera heading/pitch to OrbitControls using useFrame
-  // This ensures we wait until the controls ref is available
-  useFrame(() => {
-    if (initialCameraAppliedRef.current) return;
-    if (!controlsRef.current) {
-      // Only log once per second to avoid spam
-      return;
-    }
-
-    const controls = controlsRef.current;
-    const { yaw, pitch } = initialCameraRef.current;
-
-    console.log("[PanoramaSphere] useFrame - Applying initial camera:", { yaw, pitch });
-
-    // Convert our heading to OrbitControls azimuth (add offset)
-    const azimuthRad = THREE.MathUtils.degToRad(yaw + HEADING_OFFSET);
-    // Convert pitch to polar angle (90 - pitch)
-    const polarRad = THREE.MathUtils.degToRad(90 - pitch);
-
-    console.log("[PanoramaSphere] Setting angles - azimuthRad:", azimuthRad, "polarRad:", polarRad);
-
-    controls.setAzimuthalAngle(azimuthRad);
-    controls.setPolarAngle(polarRad);
-    controls.update();
-
-    // Verify the angles were set
-    const verifyAzimuth = controls.getAzimuthalAngle();
-    const verifyPolar = controls.getPolarAngle();
-    console.log("[PanoramaSphere] After setting - azimuth:", verifyAzimuth, "polar:", verifyPolar);
-
-    initialCameraAppliedRef.current = true;
-
-    // Re-enable onChange after the next frame
-    requestAnimationFrame(() => {
-      console.log("[PanoramaSphere] Enabling onChange handler");
-      suppressOnChangeRef.current = false;
-    });
-  });
-
-  // Handle camera changes from controls
-  const handleControlsChange = useCallback(() => {
-    if (!controlsRef.current) return;
-
-    const controls = controlsRef.current;
-    const azimuth = THREE.MathUtils.radToDeg(controls.getAzimuthalAngle());
-    const polar = THREE.MathUtils.radToDeg(controls.getPolarAngle());
-
-    // Convert polar angle to pitch (-90 to 90)
-    const pitch = 90 - polar;
-
-    // Convert azimuth to our heading (subtract offset) and normalize to 0-360
-    const heading = ((azimuth - HEADING_OFFSET) % 360 + 360) % 360;
-
-    // Skip if we're programmatically setting camera angles or haven't applied initial yet
-    if (suppressOnChangeRef.current) {
-      console.log("[PanoramaSphere] onChange SUPPRESSED - raw azimuth:", azimuth, "heading would be:", heading, "pitch:", pitch);
-      return;
-    }
-
-    console.log("[PanoramaSphere] onChange - azimuth:", azimuth, "heading:", heading, "pitch:", pitch);
-    onCameraChange({ yaw: heading, pitch });
-  }, [onCameraChange]);
-
-  return (
-    <>
-      {/* Sky sphere with panorama texture */}
-      <mesh scale={[-1, 1, 1]}>
-        <sphereGeometry args={[500, 64, 32]} />
-        <meshBasicMaterial
-          map={texture}
-          side={THREE.BackSide}
-          toneMapped={false}
-        />
-      </mesh>
-
-      {/* Camera controls */}
-      <OrbitControls
-        ref={controlsRef}
-        enableZoom={true}
-        enablePan={false}
-        rotateSpeed={-0.5}
-        zoomSpeed={0.5}
-        minDistance={0.1}
-        maxDistance={100}
-        minPolarAngle={Math.PI * 0.1}
-        maxPolarAngle={Math.PI * 0.9}
-        onChange={handleControlsChange}
-      />
-    </>
-  );
+// Convert radians to degrees (normalized 0-360)
+function radToDeg(rad: number): number {
+  const deg = (rad * 180) / Math.PI;
+  return ((deg % 360) + 360) % 360;
 }
 
 export function PanoramaCanvas({
   imageUrl,
-  camera,
+  heading,
+  nextHeading,
+  prevHeading,
+  defaultYaw,
+  defaultPitch,
   onCameraChange,
-  isLoading,
+  onNavigate,
+  isLoading = false,
 }: PanoramaCanvasProps) {
-  // DEBUG: Log props on every render
-  console.log("[PanoramaCanvas] Render - imageUrl:", imageUrl, "camera:", camera, "isLoading:", isLoading);
+  const viewerRef = useRef<Viewer | null>(null);
+  const markersPluginRef = useRef<InstanceType<typeof MarkersPlugin> | null>(null);
+  const lastImageUrlRef = useRef<string | null>(null);
+  const isFirstLoadRef = useRef(true);
+  const lastReportedYawRef = useRef<number | null>(null);
+  const lastReportedPitchRef = useRef<number | null>(null);
+
+  // Handle viewer ready
+  const handleReady = useCallback(
+    (instance: Viewer) => {
+      viewerRef.current = instance;
+      markersPluginRef.current = instance.getPlugin(MarkersPlugin) as InstanceType<typeof MarkersPlugin>;
+
+      // Listen for position updates (camera changes)
+      instance.addEventListener("position-updated", (e) => {
+        const yaw = radToDeg(e.position.yaw);
+        const pitch = (e.position.pitch * 180) / Math.PI;
+
+        // Debounce: only report if changed significantly
+        const yawDiff = lastReportedYawRef.current !== null ? Math.abs(yaw - lastReportedYawRef.current) : 999;
+        const pitchDiff = lastReportedPitchRef.current !== null ? Math.abs(pitch - lastReportedPitchRef.current) : 999;
+
+        if (yawDiff > 0.5 || pitchDiff > 0.5) {
+          lastReportedYawRef.current = yaw;
+          lastReportedPitchRef.current = pitch;
+          onCameraChange({ yaw, pitch });
+        }
+      });
+
+      // Listen for marker clicks
+      instance.addEventListener("click", (e) => {
+        if (e.data?.marker) {
+          const markerId = e.data.marker.id;
+          if (markerId === "nav-next") {
+            onNavigate("next");
+          } else if (markerId === "nav-prev") {
+            onNavigate("prev");
+          }
+        }
+      });
+    },
+    [onCameraChange, onNavigate]
+  );
+
+  // Update markers when heading info changes
+  useEffect(() => {
+    const markers = markersPluginRef.current;
+    if (!markers) return;
+
+    // Clear existing markers
+    markers.clearMarkers();
+
+    // Add next arrow marker
+    if (nextHeading !== null) {
+      markers.addMarker({
+        id: "nav-next",
+        position: { yaw: degToRad(nextHeading), pitch: degToRad(-15) },
+        html: ARROW_SVG,
+        anchor: "center center",
+        tooltip: "Go forward",
+        data: { direction: "next" },
+      });
+    }
+
+    // Add prev arrow marker
+    if (prevHeading !== null) {
+      markers.addMarker({
+        id: "nav-prev",
+        position: { yaw: degToRad(prevHeading), pitch: degToRad(-15) },
+        html: ARROW_SVG_BACK,
+        anchor: "center center",
+        tooltip: "Go back",
+        data: { direction: "prev" },
+      });
+    }
+  }, [nextHeading, prevHeading]);
+
+  // Handle image URL changes - update panorama without resetting camera
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || !imageUrl) return;
+
+    // Skip if URL hasn't changed
+    if (imageUrl === lastImageUrlRef.current) return;
+    lastImageUrlRef.current = imageUrl;
+
+    // Update sphere correction for the new image's heading
+    // This ensures yaw: 0 always points North
+    viewer.setOption("sphereCorrection", { pan: degToRad(heading) });
+
+    // If this is not the first load, change panorama while preserving camera position
+    if (!isFirstLoadRef.current) {
+      viewer.setPanorama(imageUrl, {
+        transition: false,
+        showLoader: false,
+      });
+    } else {
+      isFirstLoadRef.current = false;
+    }
+  }, [imageUrl, heading]);
+
+  // Don't render until we have an image URL
+  if (!imageUrl) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-slate-950">
+        <div className="w-8 h-8 border-2 border-coral border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="absolute inset-0">
-      <Canvas
-        camera={{
-          fov: camera.fov,
-          near: 0.1,
-          far: 1000,
-          position: [0, 0, 0.1],
-        }}
-        gl={{
-          antialias: true,
-          alpha: false,
-          powerPreference: "high-performance",
-        }}
-      >
-        <color attach="background" args={["#0a0f1a"]} />
-        <PanoramaSphere
-          imageUrl={imageUrl}
-          camera={camera}
-          onCameraChange={onCameraChange}
-        />
-      </Canvas>
+      <ReactPhotoSphereViewer
+        src={imageUrl}
+        height="100vh"
+        width="100%"
+        container=""
+        onReady={handleReady}
+        defaultYaw={degToRad(defaultYaw)}
+        defaultPitch={degToRad(defaultPitch)}
+        sphereCorrection={{ pan: degToRad(heading) }}
+        navbar={false}
+        plugins={[
+          [
+            MarkersPlugin,
+            {
+              markers: [],
+            },
+          ],
+        ]}
+        loadingTxt=""
+        touchmoveTwoFingers={false}
+        mousewheelCtrlKey={false}
+        moveSpeed={1.5}
+      />
 
       {/* Loading indicator */}
       {isLoading && (

@@ -20,6 +20,9 @@ interface ImageMeta {
   longitude: number | null;
   distanceFromStart: number | null;
   capturedAt: string;
+  headingDegrees: number | null;
+  headingToNext: number | null;
+  headingToPrev: number | null;
 }
 
 interface Waypoint {
@@ -57,9 +60,16 @@ export function RaceViewer({
       images.map((img) => ({
         positionIndex: img.positionIndex,
         distanceFromStart: img.distanceFromStart ?? 0,
+        headingDegrees: img.headingDegrees,
+        headingToNext: img.headingToNext,
+        headingToPrev: img.headingToPrev,
       })),
     [images]
   );
+
+  // Calculate initial yaw: use URL state if provided, otherwise use image's heading
+  const currentImage = images[Math.min(initialPosition, images.length - 1)];
+  const initialYaw = initialHeading !== 0 ? initialHeading : (currentImage?.headingDegrees ?? 0);
 
   // Viewer state
   const { state, actions } = useViewer({
@@ -67,7 +77,7 @@ export function RaceViewer({
     images: mappedImages,
     initialPosition,
     initialCamera: {
-      yaw: initialHeading,
+      yaw: initialYaw,
       pitch: initialPitch,
       fov: initialFov,
     },
@@ -111,8 +121,19 @@ export function RaceViewer({
 
   // Handlers
   const handleCameraChange = useCallback(
-    (camera: Parameters<typeof actions.setCamera>[0]) => {
+    (camera: { yaw?: number; pitch?: number }) => {
       actions.setCamera(camera);
+    },
+    [actions]
+  );
+
+  const handleNavigate = useCallback(
+    (direction: "next" | "prev") => {
+      if (direction === "next") {
+        actions.goNext();
+      } else {
+        actions.goPrevious();
+      }
     },
     [actions]
   );
@@ -129,8 +150,13 @@ export function RaceViewer({
       {/* Panorama Canvas */}
       <PanoramaCanvas
         imageUrl={currentImageUrl}
-        camera={state.camera}
+        heading={images[state.currentIndex]?.headingDegrees ?? 0}
+        nextHeading={images[state.currentIndex]?.headingToNext ?? null}
+        prevHeading={images[state.currentIndex]?.headingToPrev ?? null}
+        defaultYaw={initialYaw}
+        defaultPitch={initialPitch}
         onCameraChange={handleCameraChange}
+        onNavigate={handleNavigate}
         isLoading={isLoading}
       />
 

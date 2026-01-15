@@ -40,6 +40,8 @@ export interface ImageMeta {
   altitudeMeters: number | null;
   capturedAt: string;
   headingDegrees: number | null;
+  headingToNext: number | null;
+  headingToPrev: number | null;
   distanceFromStart: number | null;
   pathThumbnail: string;
   pathMedium: string;
@@ -114,7 +116,7 @@ export interface RaceDetailResponse {
   race: Race;
   images: Pick<
     ImageMeta,
-    "id" | "positionIndex" | "latitude" | "longitude" | "distanceFromStart" | "capturedAt"
+    "id" | "positionIndex" | "latitude" | "longitude" | "distanceFromStart" | "capturedAt" | "headingDegrees" | "headingToNext" | "headingToPrev"
   >[];
   waypoints: Pick<Waypoint, "name" | "distanceMeters" | "endDistanceMeters">[];
 }
