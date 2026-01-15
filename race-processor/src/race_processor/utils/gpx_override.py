@@ -16,7 +16,7 @@ import gpxpy.gpx
 from rich.console import Console
 from rich.table import Table
 
-from .geo import calculate_bearing
+from .geo import calculate_bearing, calculate_image_headings
 
 console = Console()
 
@@ -92,18 +92,21 @@ def find_gpx_point_by_elapsed_time(
     return min_idx, min_diff
 
 
-def calculate_heading_from_points(
+def calculate_heading_from_gpx(
     gpx_points: list[dict],
     current_idx: int,
-    debug: bool = False,
+    target_seconds_ahead: float = 1.0,
 ) -> Optional[float]:
     """
-    Calculate heading by drawing a line from current point to next point.
+    Calculate heading (direction of travel) using fine-grained GPX data.
+
+    Finds the GPX point approximately target_seconds_ahead from the current point
+    and calculates the bearing from current to that point.
 
     Args:
-        gpx_points: List of GPX points
-        current_idx: Index of the current (nearest) point
-        debug: Print debug information
+        gpx_points: List of GPX points with 'time', 'lat', 'lon' keys
+        current_idx: Index of the current GPX point
+        target_seconds_ahead: How many seconds ahead to look for direction (default: 1.0)
 
     Returns:
         Heading in degrees (0-360, where 0 is North), or None if can't calculate
@@ -111,29 +114,45 @@ def calculate_heading_from_points(
     if current_idx is None or not gpx_points:
         return None
 
-    # If we're at the last point, use previous point to current
-    if current_idx >= len(gpx_points) - 1:
+    current_point = gpx_points[current_idx]
+    current_time = current_point["time"]
+
+    # Find the point closest to target_seconds_ahead from current
+    best_idx = None
+    best_diff = float("inf")
+
+    for i in range(current_idx + 1, len(gpx_points)):
+        point_time = gpx_points[i]["time"]
+        time_diff = (point_time - current_time).total_seconds()
+
+        # Find point closest to target seconds ahead
+        diff_from_target = abs(time_diff - target_seconds_ahead)
+        if diff_from_target < best_diff:
+            best_diff = diff_from_target
+            best_idx = i
+
+        # Stop searching if we're past the target
+        if time_diff > target_seconds_ahead * 2:
+            break
+
+    # If no point ahead found, try using a point behind (for last points)
+    if best_idx is None:
         if current_idx == 0:
-            return None  # Only one point, can't calculate heading
+            return None  # Only one point, can't calculate
+
+        # Use previous point to current for direction
         prev_point = gpx_points[current_idx - 1]
-        curr_point = gpx_points[current_idx]
-        heading = calculate_bearing(
+        return round(calculate_bearing(
             prev_point["lat"], prev_point["lon"],
-            curr_point["lat"], curr_point["lon"]
-        )
-    else:
-        # Use current to next point
-        curr_point = gpx_points[current_idx]
-        next_point = gpx_points[current_idx + 1]
-        heading = calculate_bearing(
-            curr_point["lat"], curr_point["lon"],
-            next_point["lat"], next_point["lon"]
-        )
+            current_point["lat"], current_point["lon"]
+        ), 2)
 
-    if debug:
-        console.print(f"    Calculated heading: {heading:.2f} degrees")
-
-    return round(heading, 2)
+    # Calculate bearing from current to future point
+    future_point = gpx_points[best_idx]
+    return round(calculate_bearing(
+        current_point["lat"], current_point["lon"],
+        future_point["lat"], future_point["lon"]
+    ), 2)
 
 
 def override_gps_from_gpx(
@@ -148,6 +167,12 @@ def override_gps_from_gpx(
 
     The first photo is assumed to correspond to the first GPX point. Subsequent
     photos are matched based on elapsed time since the first photo.
+
+    Calculates all heading fields:
+    - heading_degrees: Direction of travel (from current GPX point to next second's
+      GPX point) - uses fine-grained GPX data for accurate direction
+    - heading_to_prev: Bearing from this image to previous image (for back arrow)
+    - heading_to_next: Bearing from this image to next image (for forward arrow)
 
     Args:
         manifest_path: Path to metadata.json (intake manifest)
@@ -229,7 +254,7 @@ def override_gps_from_gpx(
         "total_time_diff": 0.0,
     }
 
-    # Process each image
+    # Process each image - update GPS coordinates
     for img in images:
         captured_at = img.get("captured_at")
         if not captured_at:
@@ -279,18 +304,41 @@ def override_gps_from_gpx(
         img["longitude"] = round(nearest_point["lon"], 8)
         img["altitude_meters"] = round(nearest_point["elevation"], 2)
 
-        # Calculate heading
-        heading = calculate_heading_from_points(gpx_points, nearest_idx, debug)
-        if heading is not None:
-            img["heading_degrees"] = heading
+        # Store GPX index for heading calculation
+        img["_gpx_idx"] = nearest_idx
 
         stats["updated"] += 1
 
         if debug:
             console.print(f"    GPS: ({old_lat}, {old_lon}) -> ({img['latitude']}, {img['longitude']})")
             console.print(f"    Altitude: {img['altitude_meters']}m")
+
+    # Calculate heading_degrees from GPX fine-grained data (direction of travel)
+    # This uses the GPX point ~1 second ahead for accurate direction
+    console.print("\n  Calculating headings...")
+    console.print("    heading_degrees: from GPX (current point → next second)")
+    console.print("    heading_to_prev/next: to adjacent images")
+
+    for img in images:
+        gpx_idx = img.pop("_gpx_idx", None)  # Remove temporary key
+        if gpx_idx is not None:
+            heading = calculate_heading_from_gpx(gpx_points, gpx_idx, target_seconds_ahead=1.0)
             if heading is not None:
-                console.print(f"    Heading: {heading} degrees")
+                img["heading_degrees"] = heading
+
+    # Calculate heading_to_prev and heading_to_next using image positions
+    # (skip_heading_degrees=True since we already calculated it from GPX)
+    calculate_image_headings(images, lat_key="latitude", lon_key="longitude", skip_heading_degrees=True)
+
+    if debug:
+        for img in images:
+            if img.get("heading_degrees") is not None:
+                console.print(
+                    f"  Image {img['position_index']:03d}: "
+                    f"heading={img.get('heading_degrees')}°, "
+                    f"to_prev={img.get('heading_to_prev')}°, "
+                    f"to_next={img.get('heading_to_next')}°"
+                )
 
     # Print summary
     console.print()
@@ -344,6 +392,6 @@ def _print_summary(
     # Show heading range
     headings = [img.get("heading_degrees") for img in images if img.get("heading_degrees") is not None]
     if headings:
-        table.add_row("Heading range", f"{min(headings):.1f} to {max(headings):.1f} degrees")
+        table.add_row("Heading range", f"{min(headings):.1f}° to {max(headings):.1f}°")
 
     console.print(table)

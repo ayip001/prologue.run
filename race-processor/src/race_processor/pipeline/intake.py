@@ -26,8 +26,13 @@ console = Console()
 class ImageMetadata:
     """Metadata extracted from a single image.
 
-    Note: heading_degrees is NOT extracted from EXIF - it is calculated
-    separately by correlating with GPX track data using the override-gps command.
+    Heading fields are calculated from GPS coordinates:
+    - heading_degrees: Direction of travel (bearing from previous to current point)
+    - heading_to_prev: Bearing from this image to the previous image
+    - heading_to_next: Bearing from this image to the next image
+
+    These are used for Street View-like navigation arrows in the UI.
+    If EXIF GPS is unreliable, use override-gps to recalculate from GPX track.
     """
 
     position_index: int
@@ -36,7 +41,9 @@ class ImageMetadata:
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     altitude_meters: Optional[float] = None
-    heading_degrees: Optional[float] = None  # Calculated from GPX via override-gps
+    heading_degrees: Optional[float] = None  # Direction of travel
+    heading_to_prev: Optional[float] = None  # Bearing to previous image (for back arrow)
+    heading_to_next: Optional[float] = None  # Bearing to next image (for forward arrow)
 
 
 @dataclass
