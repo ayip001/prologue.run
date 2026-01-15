@@ -27,9 +27,9 @@ export function useViewer({
     currentIndex: Math.min(initialPosition, totalImages - 1),
     currentDistance: images[initialPosition]?.distanceFromStart ?? 0,
     camera: {
-      yaw: initialCamera?.yaw ?? DEFAULT_VIEW.heading,
-      pitch: initialCamera?.pitch ?? DEFAULT_VIEW.pitch,
-      fov: initialCamera?.fov ?? DEFAULT_VIEW.fov,
+      yaw: normalizeHeading(initialCamera?.yaw ?? DEFAULT_VIEW.heading),
+      pitch: clampPitch(initialCamera?.pitch ?? DEFAULT_VIEW.pitch),
+      fov: clampFov(initialCamera?.fov ?? DEFAULT_VIEW.fov),
     },
     loadedTier: "thumbnail",
     isLoading: true,
@@ -58,7 +58,8 @@ export function useViewer({
     const needsUpdate =
       state.currentIndex !== parsed.position ||
       Math.abs(state.camera.yaw - parsed.heading) > 0.1 ||
-      Math.abs(state.camera.pitch - parsed.pitch) > 0.1;
+      Math.abs(state.camera.pitch - parsed.pitch) > 0.1 ||
+      Math.abs(state.camera.fov - parsed.fov) > 0.1;
 
     if (needsUpdate) {
       const clampedIndex = Math.min(parsed.position, totalImages - 1);

@@ -7,6 +7,7 @@ import { useImageLoader } from "@/hooks/useImageLoader";
 import { useKeyboardNav } from "@/hooks/useKeyboardNav";
 import { useViewStateUrl } from "@/hooks/useViewStateUrl";
 import { parseViewState } from "@/lib/viewState";
+import { DEFAULT_VIEW } from "@/lib/constants";
 import { PanoramaCanvas } from "./PanoramaCanvas";
 import { ViewerHUD } from "./ViewerHUD";
 import { NavigationChevrons } from "./NavigationChevrons";
@@ -47,9 +48,9 @@ export function RaceViewer({
   waypoints,
   elevationProfile,
   initialPosition = 0,
-  initialHeading = 0,
-  initialPitch = 0,
-  initialFov = 75,
+  initialHeading = DEFAULT_VIEW.heading,
+  initialPitch = DEFAULT_VIEW.pitch,
+  initialFov = DEFAULT_VIEW.fov,
   testImageUrl,
 }: RaceViewerProps) {
   // Parse URL directly on client to get correct initial values
