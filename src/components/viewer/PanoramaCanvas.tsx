@@ -19,6 +19,19 @@ interface PanoramaCanvasProps {
   isLoading: boolean;
 }
 
+// Error boundary fallback component
+function CanvasErrorFallback({ error }: { error: string }) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-slate-950 text-white p-4">
+      <div className="text-center max-w-md">
+        <p className="text-red-400 mb-2">Failed to load 3D viewer</p>
+        <p className="text-slate-400 text-sm">{error}</p>
+        <p className="text-slate-500 text-xs mt-2">Try refreshing the page or using a different browser.</p>
+      </div>
+    </div>
+  );
+}
+
 // Component to debug Three.js context state
 function ContextDebugger() {
   return null;
@@ -74,6 +87,11 @@ function PanoramaSphere({
       return;
     }
 
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      console.log("[Texture] iOS - Starting texture load:", imageUrl);
+    }
+
     const loader = new THREE.TextureLoader();
     let cancelled = false;
 
@@ -83,6 +101,14 @@ function PanoramaSphere({
         if (cancelled) {
           loadedTexture.dispose();
           return;
+        }
+
+        if (isIOS) {
+          const img = loadedTexture.image;
+          console.log("[Texture] iOS - Loaded successfully:", {
+            dimensions: img ? `${img.width}x${img.height}` : "unknown",
+            url: imageUrl.split("/").slice(-2).join("/"),
+          });
         }
 
         // Configure texture
@@ -110,6 +136,12 @@ function PanoramaSphere({
       undefined,
       (error) => {
         console.error("[Texture] Load error:", error);
+        if (isIOS) {
+          console.error("[Texture] iOS - Error details:", {
+            url: imageUrl,
+            errorMessage: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
     );
 
@@ -286,18 +318,26 @@ export function PanoramaCanvas({
   onCameraChange,
   isLoading,
 }: PanoramaCanvasProps) {
-  // Only log on mount and when imageUrl changes
-  const prevImageUrlRef = useRef<string | null>(null);
-  const hasMountedRef = useRef(false);
+  const [canvasError, setCanvasError] = useState<string | null>(null);
+  const [canvasReady, setCanvasReady] = useState(false);
 
+  // Log on iOS for debugging
   useEffect(() => {
-    if (imageUrl !== prevImageUrlRef.current) {
-      prevImageUrlRef.current = imageUrl;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      console.log("[PanoramaCanvas] iOS device detected");
+      console.log("[PanoramaCanvas] imageUrl:", imageUrl);
+      console.log("[PanoramaCanvas] WebGL support:", !!document.createElement("canvas").getContext("webgl2"));
     }
   }, [imageUrl]);
 
+  // Show error fallback if Canvas failed
+  if (canvasError) {
+    return <CanvasErrorFallback error={canvasError} />;
+  }
+
   return (
-    <div className="absolute inset-0 overflow-hidden touch-none">
+    <div className="absolute inset-0 overflow-hidden touch-none bg-slate-950">
       <Canvas
         frameloop="always"
         camera={{
@@ -310,6 +350,16 @@ export function PanoramaCanvas({
           antialias: true,
           alpha: false,
           powerPreference: "high-performance",
+          // iOS-specific: ensure we don't exceed device limits
+          preserveDrawingBuffer: true,
+        }}
+        onCreated={({ gl }) => {
+          console.log("[Canvas] Created successfully, max texture size:", gl.capabilities.maxTextureSize);
+          setCanvasReady(true);
+        }}
+        onError={(error) => {
+          console.error("[Canvas] Error:", error);
+          setCanvasError(error?.message || "Unknown error creating WebGL context");
         }}
       >
         <color attach="background" args={["#0a0f1a"]} />

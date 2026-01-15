@@ -38,7 +38,11 @@ export function useImageLoader({
   // Detect AVIF support on mount
   useEffect(() => {
     if (!enabled) return;
+    const isIOS = typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
     supportsAvif().then((supported) => {
+      if (isIOS) {
+        console.log("[useImageLoader] iOS - AVIF supported:", supported);
+      }
       setFormat(supported ? "avif" : "webp");
     });
   }, [enabled]);
@@ -53,17 +57,28 @@ export function useImageLoader({
     setIsLoading(true);
     setLoadedTier("thumbnail");
 
+    const isIOS = typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
+
     const loadSequence = async () => {
       // 1. Load thumbnail first (fast)
       const thumbUrl = getImageUrl(raceSlug, "thumbnail", currentIndex, format);
+      if (isIOS) {
+        console.log("[useImageLoader] iOS - Loading thumbnail:", thumbUrl);
+      }
       try {
         await preloadImage(thumbUrl);
         if (currentIndexRef.current !== currentIndex) return;
+        if (isIOS) {
+          console.log("[useImageLoader] iOS - Thumbnail loaded successfully");
+        }
         setCurrentImageUrl(thumbUrl);
         setLoadedTier("thumbnail");
         setIsLoading(false);
-      } catch {
-        console.error("Failed to load thumbnail:", thumbUrl);
+      } catch (err) {
+        console.error("Failed to load thumbnail:", thumbUrl, err);
+        if (isIOS) {
+          console.error("[useImageLoader] iOS - Thumbnail load error details:", err);
+        }
       }
 
       // 2. Load medium quality after short delay
