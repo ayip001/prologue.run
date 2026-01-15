@@ -893,5 +893,246 @@ def check_exif(path: Path) -> None:
         console.print(f"[green]No GPS data found in {len(files)} files[/]")
 
 
+@main.group()
+def db() -> None:
+    """Database management commands."""
+    pass
+
+
+@db.command("init")
+@click.option(
+    "--schema",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Path to schema.sql (default: db/schema.sql)",
+)
+def db_init(schema: Path | None) -> None:
+    """Initialize database schema.
+
+    \b
+    Examples:
+      race-processor db init
+      race-processor db init --schema ./custom-schema.sql
+    """
+    from .utils.db import init_schema
+
+    success = init_schema(schema)
+    if not success:
+        raise SystemExit(1)
+
+
+@db.command("insert")
+@click.argument(
+    "config_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--update",
+    "update_if_exists",
+    is_flag=True,
+    help="Update race if it already exists",
+)
+def db_insert(config_path: Path, update_if_exists: bool) -> None:
+    """Insert a race from config file (YAML or JSON).
+
+    \b
+    Config file should contain race fields:
+      slug: hk-marathon-2026
+      name: Hong Kong Marathon 2026
+      distance_meters: 42195
+      capture_date: 2026-01-15
+      storage_bucket: my-bucket
+      storage_prefix: races/hk-marathon-2026/
+      ...
+
+    \b
+    Examples:
+      race-processor db insert race-config.yaml
+      race-processor db insert race.json --update
+    """
+    from .utils.db import load_race_config, insert_race
+
+    console.print(f"[bold]Loading config:[/] {config_path}")
+
+    config = load_race_config(config_path)
+    race_id = insert_race(config, update_if_exists)
+
+    if not race_id:
+        raise SystemExit(1)
+
+
+@db.command("list")
+@click.option(
+    "--status",
+    type=click.Choice(["pending", "processing", "ready", "error"]),
+    default=None,
+    help="Filter by status",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Output as JSON",
+)
+def db_list(status: str | None, as_json: bool) -> None:
+    """List all races.
+
+    \b
+    Examples:
+      race-processor db list
+      race-processor db list --status ready
+      race-processor db list --json
+    """
+    from .utils.db import list_races, print_races_table
+    import json as json_lib
+
+    races = list_races(status)
+
+    if as_json:
+        console.print(json_lib.dumps(races, indent=2))
+    else:
+        print_races_table(races)
+
+
+@db.command("get")
+@click.argument("slug_or_id")
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Output as JSON",
+)
+def db_get(slug_or_id: str, as_json: bool) -> None:
+    """Get race details by slug or ID.
+
+    \b
+    Examples:
+      race-processor db get hk-marathon-2026
+      race-processor db get 123e4567-e89b-12d3-a456-426614174000 --json
+    """
+    from .utils.db import get_race, print_race_details
+    import json as json_lib
+
+    race = get_race(slug_or_id)
+
+    if not race:
+        console.print(f"[red]Race not found:[/] {slug_or_id}")
+        raise SystemExit(1)
+
+    if as_json:
+        console.print(json_lib.dumps(race, indent=2, default=str))
+    else:
+        print_race_details(race)
+
+
+@db.command("update")
+@click.argument("slug_or_id")
+@click.argument(
+    "config_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+def db_update(slug_or_id: str, config_path: Path) -> None:
+    """Update race from config file.
+
+    \b
+    Examples:
+      race-processor db update hk-marathon-2026 updated-config.yaml
+    """
+    from .utils.db import load_race_config, get_race, get_connection
+    import json as json_lib
+    from datetime import datetime, date as date_type
+
+    race = get_race(slug_or_id)
+    if not race:
+        console.print(f"[red]Race not found:[/] {slug_or_id}")
+        raise SystemExit(1)
+
+    console.print(f"[bold]Updating race:[/] {race['slug']}")
+
+    config = load_race_config(config_path)
+
+    # Build update query
+    fields = [
+        "name", "description", "flag_emoji", "recorded_year", "recorded_by",
+        "distance_meters", "race_date", "city", "country", "elevation_gain",
+        "elevation_loss", "elevation_bars", "route_svg_path", "card_image_url",
+        "tier", "total_images", "capture_date", "capture_device", "status",
+        "storage_bucket", "storage_prefix"
+    ]
+
+    update_parts = []
+    update_values = []
+
+    for field in fields:
+        if field in config:
+            update_parts.append(f"{field} = %s")
+            value = config[field]
+
+            if field == "elevation_bars" and isinstance(value, list):
+                value = json_lib.dumps(value)
+            elif field in ("race_date", "capture_date") and isinstance(value, str):
+                value = datetime.fromisoformat(value).date() if "T" in value else date_type.fromisoformat(value)
+
+            update_values.append(value)
+
+    if not update_parts:
+        console.print("[yellow]No fields to update in config[/]")
+        return
+
+    update_values.append(race["id"])
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        query = f"UPDATE races SET {', '.join(update_parts)} WHERE id = %s"
+        cur.execute(query, update_values)
+        conn.commit()
+        console.print(f"[green]Race updated:[/] {race['slug']}")
+    except Exception as e:
+        conn.rollback()
+        console.print(f"[red]Failed to update:[/] {e}")
+        raise SystemExit(1)
+    finally:
+        cur.close()
+        conn.close()
+
+
+@db.command("delete")
+@click.argument("slug_or_id")
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    help="Skip confirmation prompt",
+)
+def db_delete(slug_or_id: str, yes: bool) -> None:
+    """Delete a race by slug or ID.
+
+    \b
+    Examples:
+      race-processor db delete hk-marathon-2026
+      race-processor db delete hk-marathon-2026 --yes
+    """
+    from .utils.db import get_race, delete_race
+
+    race = get_race(slug_or_id)
+    if not race:
+        console.print(f"[red]Race not found:[/] {slug_or_id}")
+        raise SystemExit(1)
+
+    if not yes:
+        console.print(f"[yellow]This will delete race:[/] {race['name']} ({race['slug']})")
+        console.print("[yellow]This will also delete all associated images and data.[/]")
+        confirm = click.confirm("Are you sure?")
+        if not confirm:
+            console.print("Aborted.")
+            return
+
+    success = delete_race(slug_or_id)
+    if not success:
+        raise SystemExit(1)
+
+
 if __name__ == "__main__":
     main()
