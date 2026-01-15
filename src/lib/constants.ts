@@ -31,15 +31,16 @@ export const TEST_VIEWER_IMAGE_URL = "https://upload.wikimedia.org/wikipedia/com
 export const DEFAULT_VIEW = {
   heading: 0,
   pitch: 0,
-  fov: 120,
+  fov: 90,
 } as const;
 
 // Camera constraints
 export const CAMERA_CONSTRAINTS = {
-  minFov: 30,
-  maxFov: 120,
+  minFov: 50,
+  maxFov: 90,
   minPitch: -90,
   maxPitch: 90,
+  zoomSensitivity: 0.05,
 } as const;
 
 // Image tiers configuration

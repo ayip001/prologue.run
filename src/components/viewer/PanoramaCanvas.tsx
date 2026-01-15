@@ -5,6 +5,8 @@ import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import type { CameraState } from "@/types";
+import { clampFov } from "@/lib/viewState";
+import { CAMERA_CONSTRAINTS } from "@/lib/constants";
 
 // Offset to convert between our heading (0 = forward) and OrbitControls azimuth (0 = -Z axis)
 const HEADING_OFFSET = 90;
@@ -192,6 +194,25 @@ function PanoramaSphere({
     onCameraChange({ yaw: heading, pitch });
   }, [onCameraChange]);
 
+  // Handle zoom via scroll wheel
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      // Prevent default to stop page scrolling
+      e.preventDefault();
+
+      // Use sensitivity from constants
+      const newFov = clampFov(fov + e.deltaY * CAMERA_CONSTRAINTS.zoomSensitivity);
+
+      if (Math.abs(newFov - fov) > 0.1) {
+        onCameraChange({ fov: newFov });
+      }
+    };
+
+    const element = gl.domElement;
+    element.addEventListener("wheel", handleWheel, { passive: false });
+    return () => element.removeEventListener("wheel", handleWheel);
+  }, [fov, onCameraChange, gl]);
+
   return (
     <>
       <ContextDebugger />
@@ -210,7 +231,7 @@ function PanoramaSphere({
       {/* Camera controls */}
       <OrbitControls
         ref={controlsRef}
-        enableZoom={true}
+        enableZoom={false}
         enablePan={false}
         enableDamping={false}
         rotateSpeed={-0.5}
