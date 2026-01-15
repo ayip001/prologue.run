@@ -213,26 +213,13 @@ function PanoramaSphere({
     return () => element.removeEventListener("wheel", handleWheel);
   }, [fov, onCameraChange, gl]);
 
-  // Handle touch gestures (pinch to zoom and double tap)
+  // Handle touch gestures (double tap)
   useEffect(() => {
     const element = gl.domElement;
-    let initialPinchDistance: number | null = null;
-    let initialFov: number | null = null;
     let lastTapTime = 0;
 
-    const getDistance = (touches: TouchList) => {
-      const dx = touches[0].clientX - touches[1].clientX;
-      const dy = touches[0].clientY - touches[1].clientY;
-      return Math.sqrt(dx * dx + dy * dy);
-    };
-
     const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
-        // Prevent OrbitControls from handling 2-finger gestures
-        e.stopImmediatePropagation();
-        initialPinchDistance = getDistance(e.touches);
-        initialFov = fov;
-      } else if (e.touches.length === 1) {
+      if (e.touches.length === 1) {
         const now = Date.now();
         const timespan = now - lastTapTime;
         if (timespan > 0 && timespan < CAMERA_CONSTRAINTS.doubleTapDelayMs) {
@@ -251,42 +238,11 @@ function PanoramaSphere({
       }
     };
 
-    const handleTouchMove = (e: TouchEvent) => {
-      if (e.touches.length === 2 && initialPinchDistance !== null && initialFov !== null) {
-        e.preventDefault(); // Prevent native zoom
-        e.stopImmediatePropagation(); // Stop OrbitControls from seeing this
-        const currentDistance = getDistance(e.touches);
-        
-        // Apply sensitivity to the pinch ratio
-        const zoomFactor = initialPinchDistance / currentDistance;
-        const adjustedRatio = 1 + (zoomFactor - 1) * CAMERA_CONSTRAINTS.pinchSensitivity;
-        
-        // Map pinch ratio to FOV
-        const newFov = clampFov(initialFov * adjustedRatio);
-        if (Math.abs(newFov - fov) > 0.1) {
-          onCameraChange({ fov: newFov });
-        }
-      }
-    };
-
-    const handleTouchEnd = (e: TouchEvent) => {
-      if (e.touches.length < 2) {
-        initialPinchDistance = null;
-        initialFov = null;
-      }
-    };
-
-    // Use capture: true to intercept events before OrbitControls
+    // Use capture: true to intercept events before OrbitControls for double tap
     element.addEventListener("touchstart", handleTouchStart, { capture: true, passive: false });
-    element.addEventListener("touchmove", handleTouchMove, { capture: true, passive: false });
-    element.addEventListener("touchend", handleTouchEnd, { capture: true });
-    element.addEventListener("touchcancel", handleTouchEnd, { capture: true });
 
     return () => {
       element.removeEventListener("touchstart", handleTouchStart, { capture: true });
-      element.removeEventListener("touchmove", handleTouchMove, { capture: true });
-      element.removeEventListener("touchend", handleTouchEnd, { capture: true });
-      element.removeEventListener("touchcancel", handleTouchEnd, { capture: true });
     };
   }, [fov, onCameraChange, gl]);
 

@@ -41,7 +41,6 @@ export const CAMERA_CONSTRAINTS = {
   minPitch: -90,
   maxPitch: 90,
   zoomSensitivity: 0.05,
-  pinchSensitivity: 1.0,
   doubleTapDelayMs: 300,
 } as const;
 
