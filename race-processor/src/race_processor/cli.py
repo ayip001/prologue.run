@@ -759,6 +759,88 @@ def override_gps(
     save_manifest(updated_manifest, output_path)
 
 
+@main.command("process-gpx")
+@click.argument(
+    "gpx_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Output JSON path (default: {input}-processed.json)",
+)
+@click.option(
+    "--points",
+    "-n",
+    type=int,
+    default=200,
+    help="Target number of points for polyline (default: 200)",
+)
+@click.option(
+    "--elevation-samples",
+    type=int,
+    default=100,
+    help="Number of samples for elevation profile (default: 100)",
+)
+@click.option(
+    "--method",
+    type=click.Choice(["uniform", "rdp"]),
+    default="uniform",
+    help="Simplification method: uniform (distance-based) or rdp (shape-based)",
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Enable debug output",
+)
+def process_gpx_cmd(
+    gpx_path: Path,
+    output: Path | None,
+    points: int,
+    elevation_samples: int,
+    method: str,
+    debug: bool,
+) -> None:
+    """Process GPX file into simplified data for web display.
+
+    Creates JSON output containing:
+    - Simplified polyline (for minimap)
+    - Geographic bounds
+    - Elevation profile (for chart)
+    - Distance and elevation statistics
+
+    \b
+    Examples:
+      # Basic usage (creates track-processed.json)
+      race-processor process-gpx track.gpx
+
+      # Custom output and 300 points
+      race-processor process-gpx track.gpx -o route.json --points 300
+
+      # Use RDP algorithm (preserves shape better for curvy routes)
+      race-processor process-gpx track.gpx --method rdp
+    """
+    from .utils.gpx_process import process_gpx, save_processed_gpx
+
+    # Default output path
+    if output is None:
+        output = gpx_path.parent / f"{gpx_path.stem}-processed.json"
+
+    # Process GPX
+    result = process_gpx(
+        gpx_path=gpx_path,
+        target_points=points,
+        elevation_samples=elevation_samples,
+        simplification_method=method,
+        debug=debug,
+    )
+
+    if result:
+        save_processed_gpx(result, output)
+
+
 @main.command("check-exif")
 @click.argument(
     "path",
