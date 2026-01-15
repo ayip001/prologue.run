@@ -45,12 +45,34 @@ def get_connection():
         psycopg2 connection object
     """
     import psycopg2
+    from urllib.parse import unquote
 
     conn_str = get_connection_string()
     if not conn_str:
         raise RuntimeError(
             "DATABASE_URL not set. Add it to .env.local or environment."
         )
+
+    # For Neon/Postgres URIs, we sometimes need to handle query params manually
+    # especially on Windows with psycopg2 URI parsing issues.
+    if conn_str.startswith("postgres://") or conn_str.startswith("postgresql://"):
+        url = urlparse(conn_str)
+        params = {
+            "database": url.path[1:],
+            "user": url.username,
+            "password": url.password,
+            "host": url.hostname,
+            "port": url.port or 5432,
+        }
+        
+        # Handle query parameters (like sslmode)
+        if url.query:
+            from urllib.parse import parse_qs
+            query_params = parse_qs(url.query)
+            for k, v in query_params.items():
+                params[k] = v[0]
+
+        return psycopg2.connect(**params)
 
     return psycopg2.connect(conn_str)
 
