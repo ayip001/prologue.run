@@ -38,16 +38,32 @@ function PanoramaSphere({
   // Flag to suppress onChange during programmatic camera updates
   const suppressOnChangeRef = useRef(true);
 
+  // DEBUG: Log initial camera values on mount
+  useEffect(() => {
+    console.log("[PanoramaSphere] Mount - initial camera from props:", {
+      yaw: camera.yaw,
+      pitch: camera.pitch,
+      fov: camera.fov,
+    });
+    console.log("[PanoramaSphere] initialCameraRef:", initialCameraRef.current);
+  }, []);
+
   // Load texture when URL changes
   useEffect(() => {
-    if (!imageUrl) return;
+    console.log("[PanoramaSphere] Texture effect - imageUrl:", imageUrl);
+    if (!imageUrl) {
+      console.log("[PanoramaSphere] No imageUrl, skipping texture load");
+      return;
+    }
 
     const loader = new THREE.TextureLoader();
     let cancelled = false;
 
+    console.log("[PanoramaSphere] Starting texture load for:", imageUrl);
     loader.load(
       imageUrl,
       (loadedTexture) => {
+        console.log("[PanoramaSphere] Texture loaded, cancelled:", cancelled);
         if (cancelled) {
           loadedTexture.dispose();
           return;
@@ -61,16 +77,18 @@ function PanoramaSphere({
         }
         textureRef.current = loadedTexture;
         setTexture(loadedTexture);
+        console.log("[PanoramaSphere] Texture set, calling invalidateFrame");
         // Force Three.js to re-render with the new texture
         invalidateFrame();
       },
       undefined,
       (error) => {
-        console.error("Error loading panorama texture:", error);
+        console.error("[PanoramaSphere] Error loading panorama texture:", error);
       }
     );
 
     return () => {
+      console.log("[PanoramaSphere] Texture effect cleanup, setting cancelled=true");
       cancelled = true;
     };
   }, [imageUrl, invalidateFrame]);
@@ -97,24 +115,37 @@ function PanoramaSphere({
   // This ensures we wait until the controls ref is available
   useFrame(() => {
     if (initialCameraAppliedRef.current) return;
-    if (!controlsRef.current) return;
+    if (!controlsRef.current) {
+      // Only log once per second to avoid spam
+      return;
+    }
 
     const controls = controlsRef.current;
     const { yaw, pitch } = initialCameraRef.current;
+
+    console.log("[PanoramaSphere] useFrame - Applying initial camera:", { yaw, pitch });
 
     // Convert our heading to OrbitControls azimuth (add offset)
     const azimuthRad = THREE.MathUtils.degToRad(yaw + HEADING_OFFSET);
     // Convert pitch to polar angle (90 - pitch)
     const polarRad = THREE.MathUtils.degToRad(90 - pitch);
 
+    console.log("[PanoramaSphere] Setting angles - azimuthRad:", azimuthRad, "polarRad:", polarRad);
+
     controls.setAzimuthalAngle(azimuthRad);
     controls.setPolarAngle(polarRad);
     controls.update();
+
+    // Verify the angles were set
+    const verifyAzimuth = controls.getAzimuthalAngle();
+    const verifyPolar = controls.getPolarAngle();
+    console.log("[PanoramaSphere] After setting - azimuth:", verifyAzimuth, "polar:", verifyPolar);
 
     initialCameraAppliedRef.current = true;
 
     // Re-enable onChange after the next frame
     requestAnimationFrame(() => {
+      console.log("[PanoramaSphere] Enabling onChange handler");
       suppressOnChangeRef.current = false;
     });
   });
@@ -122,9 +153,6 @@ function PanoramaSphere({
   // Handle camera changes from controls
   const handleControlsChange = useCallback(() => {
     if (!controlsRef.current) return;
-
-    // Skip if we're programmatically setting camera angles or haven't applied initial yet
-    if (suppressOnChangeRef.current) return;
 
     const controls = controlsRef.current;
     const azimuth = THREE.MathUtils.radToDeg(controls.getAzimuthalAngle());
@@ -136,6 +164,13 @@ function PanoramaSphere({
     // Convert azimuth to our heading (subtract offset) and normalize to 0-360
     const heading = ((azimuth - HEADING_OFFSET) % 360 + 360) % 360;
 
+    // Skip if we're programmatically setting camera angles or haven't applied initial yet
+    if (suppressOnChangeRef.current) {
+      console.log("[PanoramaSphere] onChange SUPPRESSED - raw azimuth:", azimuth, "heading would be:", heading, "pitch:", pitch);
+      return;
+    }
+
+    console.log("[PanoramaSphere] onChange - azimuth:", azimuth, "heading:", heading, "pitch:", pitch);
     onCameraChange({ yaw: heading, pitch });
   }, [onCameraChange]);
 
@@ -174,6 +209,9 @@ export function PanoramaCanvas({
   onCameraChange,
   isLoading,
 }: PanoramaCanvasProps) {
+  // DEBUG: Log props on every render
+  console.log("[PanoramaCanvas] Render - imageUrl:", imageUrl, "camera:", camera, "isLoading:", isLoading);
+
   return (
     <div className="absolute inset-0">
       <Canvas
