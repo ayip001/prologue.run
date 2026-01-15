@@ -34,18 +34,28 @@ function PanoramaSphere({
   const textureRef = useRef<THREE.Texture | null>(null);
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
 
-  // Store initial camera values - use ref to capture only once on first mount
-  const initialCameraRef = useRef<{ yaw: number; pitch: number } | null>(null);
+  // Store initial camera values
+  const initialCameraRef = useRef<{ yaw: number; pitch: number }>({ yaw: initialCamera.yaw, pitch: initialCamera.pitch });
   // Track if initial camera has been applied to controls
   const initialCameraAppliedRef = useRef(false);
   // Flag to suppress onChange during programmatic camera updates
   const suppressOnChangeRef = useRef(true);
+  // Track previous initialCamera prop to detect changes
+  const prevInitialCameraRef = useRef(initialCamera);
 
-  // Capture initial camera only once on first mount (ignore subsequent prop changes)
-  if (initialCameraRef.current === null) {
-    initialCameraRef.current = { yaw: initialCamera.yaw, pitch: initialCamera.pitch };
-    console.log("[PanoramaSphere] Captured initial camera:", initialCameraRef.current);
-  }
+  // Update initialCameraRef when prop changes significantly (e.g., after URL sync)
+  useEffect(() => {
+    const prev = prevInitialCameraRef.current;
+    const changed =
+      Math.abs(prev.yaw - initialCamera.yaw) > 0.1 ||
+      Math.abs(prev.pitch - initialCamera.pitch) > 0.1;
+
+    if (changed && !initialCameraAppliedRef.current) {
+      console.log("[PanoramaSphere] initialCamera prop changed:", initialCamera);
+      initialCameraRef.current = { yaw: initialCamera.yaw, pitch: initialCamera.pitch };
+    }
+    prevInitialCameraRef.current = initialCamera;
+  }, [initialCamera.yaw, initialCamera.pitch]);
 
   // DEBUG: Log initial camera values on mount
   useEffect(() => {

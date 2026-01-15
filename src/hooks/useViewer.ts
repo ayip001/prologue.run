@@ -3,7 +3,7 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import type { CameraState, ViewerState, ViewerActions } from "@/types";
 import { DEFAULT_VIEW, CAMERA_CONSTRAINTS } from "@/lib/constants";
-import { normalizeHeading, clampPitch, clampFov } from "@/lib/viewState";
+import { normalizeHeading, clampPitch, clampFov, parseViewState } from "@/lib/viewState";
 
 interface UseViewerOptions {
   totalImages: number;
@@ -39,6 +39,56 @@ export function useViewer({
 
   // Track if this is the first render
   const isFirstRender = useRef(true);
+  // Track if we've synced with URL
+  const hasSyncedWithUrl = useRef(false);
+
+  // On mount, parse URL and sync state if server props were lost during hydration
+  useEffect(() => {
+    if (hasSyncedWithUrl.current) return;
+    hasSyncedWithUrl.current = true;
+
+    if (typeof window === "undefined") return;
+
+    const pathname = window.location.pathname;
+    console.log("[useViewer] Syncing with URL:", pathname);
+
+    const parsed = parseViewState(pathname);
+    console.log("[useViewer] Parsed view state from URL:", parsed);
+
+    if (!parsed) return;
+
+    // Check if current state differs from URL
+    const needsUpdate =
+      state.currentIndex !== parsed.position ||
+      Math.abs(state.camera.yaw - parsed.heading) > 0.1 ||
+      Math.abs(state.camera.pitch - parsed.pitch) > 0.1;
+
+    if (needsUpdate) {
+      console.log("[useViewer] State differs from URL, updating...");
+      console.log("[useViewer] Current state:", {
+        currentIndex: state.currentIndex,
+        yaw: state.camera.yaw,
+        pitch: state.camera.pitch,
+      });
+      console.log("[useViewer] URL values:", {
+        position: parsed.position,
+        heading: parsed.heading,
+        pitch: parsed.pitch,
+      });
+
+      const clampedIndex = Math.min(parsed.position, totalImages - 1);
+      setState((prev) => ({
+        ...prev,
+        currentIndex: clampedIndex,
+        currentDistance: images[clampedIndex]?.distanceFromStart ?? 0,
+        camera: {
+          yaw: parsed.heading,
+          pitch: parsed.pitch,
+          fov: parsed.fov,
+        },
+      }));
+    }
+  }, []);  // Empty deps - run only on mount
 
   // Update distance when index changes
   useEffect(() => {

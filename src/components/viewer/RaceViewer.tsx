@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useEffect, useState } from "react";
 import type { Race, ElevationProfile as ElevationProfileType } from "@/types";
 import { useViewer } from "@/hooks/useViewer";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { useKeyboardNav } from "@/hooks/useKeyboardNav";
 import { useViewStateUrl } from "@/hooks/useViewStateUrl";
+import { parseViewState } from "@/lib/viewState";
 import { PanoramaCanvas } from "./PanoramaCanvas";
 import { ViewerHUD } from "./ViewerHUD";
 import { NavigationChevrons } from "./NavigationChevrons";
@@ -51,6 +52,48 @@ export function RaceViewer({
   initialFov = 75,
   testImageUrl,
 }: RaceViewerProps) {
+  // DEBUG: Log props received from server component
+  console.log("[RaceViewer] Props received:", {
+    initialPosition,
+    initialHeading,
+    initialPitch,
+    initialFov,
+    imagesCount: images.length,
+  });
+
+  // Parse URL directly on client to get correct initial values
+  // This handles cases where server props are lost during hydration
+  const [initialCameraFromUrl, setInitialCameraFromUrl] = useState(() => {
+    // On server or initial render, use server props
+    if (typeof window === "undefined") {
+      return { yaw: initialHeading, pitch: initialPitch };
+    }
+    // On client, parse URL directly
+    const parsed = parseViewState(window.location.pathname);
+    console.log("[RaceViewer] Initial URL parse:", parsed);
+    return {
+      yaw: parsed?.heading ?? initialHeading,
+      pitch: parsed?.pitch ?? initialPitch,
+    };
+  });
+
+  // DEBUG: Log the actual URL when component mounts
+  useEffect(() => {
+    console.log("[RaceViewer] Current URL on mount:", window.location.href);
+    console.log("[RaceViewer] Pathname:", window.location.pathname);
+
+    // Re-parse URL in case initial parse missed something
+    const parsed = parseViewState(window.location.pathname);
+    console.log("[RaceViewer] URL parsed in effect:", parsed);
+
+    if (parsed) {
+      setInitialCameraFromUrl({
+        yaw: parsed.heading,
+        pitch: parsed.pitch,
+      });
+    }
+  }, []);
+
   // Memoize mapped images to prevent infinite loop
   const mappedImages = useMemo(
     () =>
@@ -60,10 +103,6 @@ export function RaceViewer({
       })),
     [images]
   );
-
-  // Capture initial camera from URL params - only once on mount
-  // This is passed to PanoramaCanvas to set up OrbitControls correctly
-  const initialCameraFromUrlRef = useRef({ yaw: initialHeading, pitch: initialPitch });
 
   // Viewer state
   const { state, actions } = useViewer({
@@ -134,7 +173,7 @@ export function RaceViewer({
       <PanoramaCanvas
         imageUrl={currentImageUrl}
         camera={state.camera}
-        initialCamera={initialCameraFromUrlRef.current}
+        initialCamera={initialCameraFromUrl}
         onCameraChange={handleCameraChange}
         isLoading={isLoading}
       />

@@ -18,9 +18,18 @@ export function useViewStateUrl({
 }: UseViewStateUrlOptions): void {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastPositionRef = useRef(state.currentIndex);
+  // Track if this is the initial mount - skip first URL update to preserve URL params
+  const isInitialMountRef = useRef(true);
 
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;
+
+    // Skip URL update on initial mount to preserve URL parameters
+    if (isInitialMountRef.current) {
+      console.log("[useViewStateUrl] Skipping initial mount URL update");
+      isInitialMountRef.current = false;
+      return;
+    }
 
     // Clear previous timeout
     if (timeoutRef.current) {
@@ -38,6 +47,8 @@ export function useViewStateUrl({
 
       const serialized = serializeViewState(viewState);
       const newUrl = `/race/${raceSlug}/${serialized}`;
+
+      console.log("[useViewStateUrl] Updating URL to:", newUrl);
 
       // Use pushState for position changes, replaceState for camera changes
       const method =
