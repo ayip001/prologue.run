@@ -9,7 +9,6 @@ authors = [{ name = "prologue.run" }]
 dependencies = [
     "click>=8.1",              # CLI framework
     "pillow>=10.0",            # Image manipulation
-    "pillow-avif-plugin>=1.4", # AVIF support for Pillow
     "opencv-python>=4.8",      # Image processing, blur, remapping
     "ultralytics>=8.0",        # YOLOv8 for detection
     "numpy>=1.24",

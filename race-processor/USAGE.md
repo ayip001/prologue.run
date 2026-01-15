@@ -57,7 +57,7 @@ The processor runs a 6-stage pipeline:
 | 2    | Blur      | Apply privacy blurring (faces, license plates)     |
 | 3    | Watermark | Add copyright text overlay                         |
 | 4    | Resize    | Generate quality tiers (512px, 2048px, 4096px)     |
-| 5    | Export    | Encode to AVIF/WebP formats                        |
+| 5    | Export    | Encode to WebP format                              |
 | 6    | Upload    | Privacy check, upload to R2, generate DB records   |
 
 ## Preview Commands
@@ -112,18 +112,17 @@ race-processor preview-resize image.jpg -o ./output/
 Options:
 - `-o PATH` - Output directory
 
-### `preview-export` - Test AVIF/WebP Encoding
+### `preview-export` - Test WebP Encoding
 
 ```bash
-# Creates: image.avif, image.webp
+# Creates: image.webp
 race-processor preview-export image.jpg
 
 # Custom quality settings
-race-processor preview-export image.jpg --avif-quality 60 --webp-quality 70
+race-processor preview-export image.jpg --webp-quality 70
 ```
 
 Options:
-- `--avif-quality INT` - AVIF quality 0-100 (default: 75)
 - `--webp-quality INT` - WebP quality 0-100 (default: 80)
 - `-o PATH` - Output directory
 
@@ -429,13 +428,10 @@ output/hk-marathon-2026/
 │   ├── thumbnail/          # 512px width
 │   ├── medium/             # 2048px width
 │   └── full/               # 4096px width
-├── final/                  # Encoded formats
-│   ├── thumb/              # AVIF thumbnails
-│   ├── thumb_webp/         # WebP fallbacks
-│   ├── medium/
-│   ├── medium_webp/
-│   ├── full/
-│   └── full_webp/
+├── final/                  # Encoded WebP images
+│   ├── thumb/              # WebP thumbnails
+│   ├── medium/             # WebP medium quality
+│   └── full/               # WebP full quality
 ├── db_records.json         # Ready for database insertion
 └── debug/                  # Debug output (when --debug enabled)
 ```
@@ -478,11 +474,11 @@ The `metadata.json` format:
 
 ### Image Tiers
 
-| Tier | Width | AVIF Quality | WebP Quality |
-|------|-------|--------------|--------------|
-| thumbnail | 512px | 60 | 70 |
-| medium | 2048px | 70 | 75 |
-| full | 4096px | 75 | 80 |
+| Tier | Width | WebP Quality |
+|------|-------|--------------|
+| thumbnail | 512px | 70 |
+| medium | 2048px | 75 |
+| full | 4096px | 80 |
 
 ### Copyright Watermark
 
@@ -514,9 +510,9 @@ The privacy sanity check found GPS EXIF data in output images. This should not h
 
 Check that your source images have valid EXIF timestamps. Use `race-processor intake ./path` to preview the ordering.
 
-### AVIF encoding fails
+### WebP encoding fails
 
-Ensure `pillow-avif-plugin` is installed:
+Ensure Pillow is installed with WebP support:
 ```bash
-pip install pillow-avif-plugin
+pip install Pillow
 ```

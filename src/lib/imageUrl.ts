@@ -1,34 +1,6 @@
 import { CDN_BASE_URL } from "./constants";
 import type { ImageTier, ImageUrls } from "@/types";
 
-// Cache for AVIF support detection
-let _supportsAvif: boolean | null = null;
-
-/**
- * Detect if the browser supports AVIF images.
- * Result is cached for subsequent calls.
- */
-export async function supportsAvif(): Promise<boolean> {
-  if (_supportsAvif !== null) return _supportsAvif;
-
-  // Minimal AVIF image encoded in base64
-  const avifData =
-    "data:image/avif;base64,AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUIAAADybWV0YQAAAAAAAAAoaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAGxpYmF2aWYAAAAADnBpdG0AAAAAAAEAAAAeaWxvYwAAAABEAAABAAEAAAABAAABGgAAAB0AAAAoaWluZgAAAAAAAQAAABppbmZlAgAAAAABAABhdjAxQ29sb3IAAAAAamlwcnAAAABLaXBjbwAAABRpc3BlAAAAAAAAAAIAAAACAAAAEHBpeGkAAAAAAwgICAAAAAxhdjFDgQ0MAAAAABNjb2xybmNseAACAAIAAYAAAAAXaXBtYQAAAAAAAAABAAEEAQKDBAAAACVtZGF0EgAKBzgAPtAgIAAAACCQVQAMCAAmAAQGBAQEBAQE";
-
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      _supportsAvif = true;
-      resolve(true);
-    };
-    img.onerror = () => {
-      _supportsAvif = false;
-      resolve(false);
-    };
-    img.src = avifData;
-  });
-}
-
 /**
  * Get the image URL for a specific race, tier, and position.
  */
@@ -36,7 +8,7 @@ export function getImageUrl(
   raceSlug: string,
   tier: ImageTier,
   positionIndex: number,
-  format: "avif" | "webp" = "avif"
+  format: "webp" = "webp"
 ): string {
   // Position index is 0-based, but filenames are 1-based with padding
   const paddedIndex = String(positionIndex + 1).padStart(4, "0");
@@ -46,29 +18,28 @@ export function getImageUrl(
 }
 
 /**
- * Get all image URLs for a specific position (all tiers and formats).
+ * Get all image URLs for a specific position (all tiers).
  */
 export function getAllImageUrls(raceSlug: string, positionIndex: number): ImageUrls {
   return {
-    thumbnail: getImageUrl(raceSlug, "thumbnail", positionIndex, "avif"),
+    thumbnail: getImageUrl(raceSlug, "thumbnail", positionIndex, "webp"),
     thumbnailWebp: getImageUrl(raceSlug, "thumbnail", positionIndex, "webp"),
-    medium: getImageUrl(raceSlug, "medium", positionIndex, "avif"),
+    medium: getImageUrl(raceSlug, "medium", positionIndex, "webp"),
     mediumWebp: getImageUrl(raceSlug, "medium", positionIndex, "webp"),
-    full: getImageUrl(raceSlug, "full", positionIndex, "avif"),
+    full: getImageUrl(raceSlug, "full", positionIndex, "webp"),
     fullWebp: getImageUrl(raceSlug, "full", positionIndex, "webp"),
   };
 }
 
 /**
- * Get the best available image URL based on browser support.
+ * Get the best available image URL (always WebP).
  */
-export async function getBestImageUrl(
+export function getBestImageUrl(
   raceSlug: string,
   tier: ImageTier,
   positionIndex: number
-): Promise<string> {
-  const format = (await supportsAvif()) ? "avif" : "webp";
-  return getImageUrl(raceSlug, tier, positionIndex, format);
+): string {
+  return getImageUrl(raceSlug, tier, positionIndex, "webp");
 }
 
 /**

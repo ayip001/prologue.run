@@ -196,7 +196,7 @@ def process(
       2. Blur      - Apply privacy blurring (faces, plates)
       3. Watermark - Add copyright text overlay
       4. Resize    - Generate quality tiers (thumbnail, medium, full)
-      5. Export    - Encode to AVIF/WebP formats
+      5. Export    - Encode to WebP format
       6. Upload    - Privacy check, upload to R2, generate DB records
 
     \b
@@ -605,31 +605,24 @@ def preview_resize(image_path: Path, output_dir: Path | None) -> None:
     help="Output directory (default: same as input)",
 )
 @click.option(
-    "--avif-quality",
-    type=int,
-    default=75,
-    help="AVIF quality (0-100, default: 75)",
-)
-@click.option(
     "--webp-quality",
     type=int,
     default=80,
     help="WebP quality (0-100, default: 80)",
 )
-def preview_export(image_path: Path, output_dir: Path | None, avif_quality: int, webp_quality: int) -> None:
-    """Preview AVIF/WebP export on a single image.
+def preview_export(image_path: Path, output_dir: Path | None, webp_quality: int) -> None:
+    """Preview WebP export on a single image.
 
-    Creates two output files: {name}.avif and {name}.webp
+    Creates output file: {name}.webp
 
     \b
     Examples:
       race-processor preview-export image.jpg
-      race-processor preview-export image.jpg --avif-quality 60 --webp-quality 70
+      race-processor preview-export image.jpg --webp-quality 70
     """
     console.print(f"[bold]Preview export for:[/] {image_path}")
 
     from PIL import Image
-    import pillow_avif  # noqa: F401
 
     # Default output directory
     if output_dir is None:
@@ -649,11 +642,6 @@ def preview_export(image_path: Path, output_dir: Path | None, avif_quality: int,
     console.print(f"  Original size: {img.width}x{img.height}")
     original_size = image_path.stat().st_size
 
-    # Export AVIF
-    avif_path = output_dir / f"{image_path.stem}.avif"
-    img.save(avif_path, format="AVIF", quality=avif_quality)
-    avif_size = avif_path.stat().st_size
-
     # Export WebP
     webp_path = output_dir / f"{image_path.stem}.webp"
     img.save(webp_path, format="WEBP", quality=webp_quality)
@@ -666,7 +654,6 @@ def preview_export(image_path: Path, output_dir: Path | None, avif_quality: int,
         return f"{b / 1024:.1f} KB"
 
     console.print(f"  Original: {fmt_size(original_size)}")
-    console.print(f"  AVIF (q={avif_quality}): {fmt_size(avif_size)} ({100*avif_size//original_size}%) -> {avif_path.name}")
     console.print(f"  WebP (q={webp_quality}): {fmt_size(webp_size)} ({100*webp_size//original_size}%) -> {webp_path.name}")
 
     console.print(f"[green]Output saved to:[/] {output_dir}")
@@ -864,7 +851,7 @@ def check_exif(path: Path) -> None:
     if path.is_file():
         files = [path]
     else:
-        extensions = {".jpg", ".jpeg", ".png", ".avif", ".webp"}
+        extensions = {".jpg", ".jpeg", ".png", ".webp"}
         files = [f for f in path.rglob("*") if f.suffix.lower() in extensions]
 
     console.print(f"  Scanning {len(files)} files...")

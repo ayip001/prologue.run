@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { ImageTier } from "@/types";
-import { getImageUrl, supportsAvif, preloadImage } from "@/lib/imageUrl";
+import { getImageUrl, preloadImage } from "@/lib/imageUrl";
 import { PRELOAD_SETTINGS } from "@/lib/constants";
 
 interface UseImageLoaderOptions {
@@ -28,24 +28,14 @@ export function useImageLoader({
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const [loadedTier, setLoadedTier] = useState<ImageTier>("thumbnail");
   const [isLoading, setIsLoading] = useState(true);
-  const [format, setFormat] = useState<"avif" | "webp">("avif");
   const [preloadProgress, setPreloadProgress] = useState(0);
+
+  // Always use WebP format
+  const format = "webp";
 
   // Track preloaded images
   const preloadedRef = useRef<Set<string>>(new Set());
   const currentIndexRef = useRef(currentIndex);
-
-  // Detect AVIF support on mount
-  useEffect(() => {
-    if (!enabled) return;
-    const isIOS = typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
-    supportsAvif().then((supported) => {
-      if (isIOS) {
-        console.log("[useImageLoader] iOS - AVIF supported:", supported);
-      }
-      setFormat(supported ? "avif" : "webp");
-    });
-  }, [enabled]);
 
   // Load current image with progressive quality
   useEffect(() => {
