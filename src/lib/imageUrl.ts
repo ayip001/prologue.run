@@ -41,7 +41,8 @@ export function getImageUrl(
   // Position index is 0-based, but filenames are 1-based with padding
   const paddedIndex = String(positionIndex + 1).padStart(4, "0");
   const tierPath = tier === "thumbnail" ? "thumb" : tier;
-  return `${CDN_BASE_URL}/${raceSlug}/${tierPath}/${paddedIndex}.${format}`;
+  // Images in R2 are stored under races/{slug}/...
+  return `${CDN_BASE_URL}/races/${raceSlug}/${tierPath}/${paddedIndex}.${format}`;
 }
 
 /**
@@ -87,7 +88,7 @@ export function preloadImage(url: string): Promise<HTMLImageElement> {
  */
 export function getRouteSvgUrl(raceSlug: string, svgPath: string | null): string | null {
   if (!svgPath) return null;
-  return `${CDN_BASE_URL}/${raceSlug}/assets/${svgPath}`;
+  return `${CDN_BASE_URL}/races/${raceSlug}/assets/${svgPath}`;
 }
 
 /**
@@ -98,5 +99,5 @@ export function getCardImageUrl(raceSlug: string, imageUrl: string | null): stri
   // If it's a full URL, return as-is
   if (imageUrl.startsWith("http")) return imageUrl;
   // Otherwise, treat as relative path
-  return `${CDN_BASE_URL}/${raceSlug}/assets/${imageUrl}`;
+  return `${CDN_BASE_URL}/races/${raceSlug}/assets/${imageUrl}`;
 }
