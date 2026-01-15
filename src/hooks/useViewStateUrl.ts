@@ -26,7 +26,6 @@ export function useViewStateUrl({
 
     // Skip URL update on initial mount to preserve URL parameters
     if (isInitialMountRef.current) {
-      console.log("[useViewStateUrl] Skipping initial mount URL update");
       isInitialMountRef.current = false;
       return;
     }
@@ -47,8 +46,6 @@ export function useViewStateUrl({
 
       const serialized = serializeViewState(viewState);
       const newUrl = `/race/${raceSlug}/${serialized}`;
-
-      console.log("[useViewStateUrl] Updating URL to:", newUrl);
 
       // Use pushState for position changes, replaceState for camera changes
       const method =

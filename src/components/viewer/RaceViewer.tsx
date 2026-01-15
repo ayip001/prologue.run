@@ -52,40 +52,22 @@ export function RaceViewer({
   initialFov = 75,
   testImageUrl,
 }: RaceViewerProps) {
-  // DEBUG: Log props received from server component
-  console.log("[RaceViewer] Props received:", {
-    initialPosition,
-    initialHeading,
-    initialPitch,
-    initialFov,
-    imagesCount: images.length,
-  });
-
   // Parse URL directly on client to get correct initial values
   // This handles cases where server props are lost during hydration
   const [initialCameraFromUrl, setInitialCameraFromUrl] = useState(() => {
-    // On server or initial render, use server props
     if (typeof window === "undefined") {
       return { yaw: initialHeading, pitch: initialPitch };
     }
-    // On client, parse URL directly
     const parsed = parseViewState(window.location.pathname);
-    console.log("[RaceViewer] Initial URL parse:", parsed);
     return {
       yaw: parsed?.heading ?? initialHeading,
       pitch: parsed?.pitch ?? initialPitch,
     };
   });
 
-  // DEBUG: Log the actual URL when component mounts
+  // Re-parse URL on mount in case initial parse missed something
   useEffect(() => {
-    console.log("[RaceViewer] Current URL on mount:", window.location.href);
-    console.log("[RaceViewer] Pathname:", window.location.pathname);
-
-    // Re-parse URL in case initial parse missed something
     const parsed = parseViewState(window.location.pathname);
-    console.log("[RaceViewer] URL parsed in effect:", parsed);
-
     if (parsed) {
       setInitialCameraFromUrl({
         yaw: parsed.heading,

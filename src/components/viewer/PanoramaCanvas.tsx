@@ -7,7 +7,6 @@ import * as THREE from "three";
 import type { CameraState } from "@/types";
 
 // Offset to convert between our heading (0 = forward) and OrbitControls azimuth (0 = -Z axis)
-// Our panoramas expect 0 degrees to point forward (direction of travel)
 const HEADING_OFFSET = 90;
 
 interface PanoramaCanvasProps {
@@ -16,6 +15,27 @@ interface PanoramaCanvasProps {
   initialCamera: { yaw: number; pitch: number };
   onCameraChange: (camera: Partial<CameraState>) => void;
   isLoading: boolean;
+}
+
+// Component to debug Three.js context state
+function ContextDebugger() {
+  const { gl, scene, camera } = useThree();
+  const hasLoggedRef = useRef(false);
+
+  useEffect(() => {
+    if (hasLoggedRef.current) return;
+    hasLoggedRef.current = true;
+
+    console.log("[ContextDebugger] Three.js context ready:", {
+      rendererType: gl.constructor.name,
+      rendererSize: { width: gl.domElement.width, height: gl.domElement.height },
+      pixelRatio: gl.getPixelRatio(),
+      sceneChildren: scene.children.length,
+      cameraType: camera.constructor.name,
+    });
+  }, [gl, scene, camera]);
+
+  return null;
 }
 
 function PanoramaSphere({
@@ -29,21 +49,23 @@ function PanoramaSphere({
   fov: number;
   onCameraChange: (camera: Partial<CameraState>) => void;
 }) {
-  const { camera: threeCamera, invalidate: invalidateFrame } = useThree();
+  const { camera: threeCamera, invalidate: invalidateFrame, gl } = useThree();
   const controlsRef = useRef<any>(null);
   const textureRef = useRef<THREE.Texture | null>(null);
+  const meshRef = useRef<THREE.Mesh>(null);
+  const materialRef = useRef<THREE.MeshBasicMaterial>(null);
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
 
-  // Store initial camera values
+  // Camera state refs
   const initialCameraRef = useRef<{ yaw: number; pitch: number }>({ yaw: initialCamera.yaw, pitch: initialCamera.pitch });
-  // Track if initial camera has been applied to controls
   const initialCameraAppliedRef = useRef(false);
-  // Flag to suppress onChange during programmatic camera updates
   const suppressOnChangeRef = useRef(true);
-  // Track previous initialCamera prop to detect changes
   const prevInitialCameraRef = useRef(initialCamera);
 
-  // Update initialCameraRef when prop changes significantly (e.g., after URL sync)
+  // Track previous imageUrl to only log on changes
+  const prevImageUrlRef = useRef<string | null>(null);
+
+  // Update initialCameraRef when prop changes significantly
   useEffect(() => {
     const prev = prevInitialCameraRef.current;
     const changed =
@@ -51,62 +73,92 @@ function PanoramaSphere({
       Math.abs(prev.pitch - initialCamera.pitch) > 0.1;
 
     if (changed && !initialCameraAppliedRef.current) {
-      console.log("[PanoramaSphere] initialCamera prop changed:", initialCamera);
       initialCameraRef.current = { yaw: initialCamera.yaw, pitch: initialCamera.pitch };
     }
     prevInitialCameraRef.current = initialCamera;
   }, [initialCamera.yaw, initialCamera.pitch]);
 
-  // DEBUG: Log initial camera values on mount
-  useEffect(() => {
-    console.log("[PanoramaSphere] Mount - initial camera from props:", initialCamera);
-    console.log("[PanoramaSphere] initialCameraRef:", initialCameraRef.current);
-  }, []);
-
   // Load texture when URL changes
   useEffect(() => {
-    console.log("[PanoramaSphere] Texture effect - imageUrl:", imageUrl);
+    // Only log when imageUrl actually changes
+    if (imageUrl === prevImageUrlRef.current) return;
+    prevImageUrlRef.current = imageUrl;
+
     if (!imageUrl) {
-      console.log("[PanoramaSphere] No imageUrl, skipping texture load");
+      console.log("[Texture] No imageUrl provided");
       return;
     }
+
+    console.log("[Texture] Loading:", imageUrl);
 
     const loader = new THREE.TextureLoader();
     let cancelled = false;
 
-    console.log("[PanoramaSphere] Starting texture load for:", imageUrl);
     loader.load(
       imageUrl,
       (loadedTexture) => {
-        console.log("[PanoramaSphere] Texture loaded, cancelled:", cancelled);
         if (cancelled) {
+          console.log("[Texture] Load completed but cancelled, disposing");
           loadedTexture.dispose();
           return;
         }
+
+        // Configure texture
         loadedTexture.colorSpace = THREE.SRGBColorSpace;
         loadedTexture.minFilter = THREE.LinearFilter;
         loadedTexture.magFilter = THREE.LinearFilter;
-        // Dispose old texture AFTER new one is ready (not in cleanup)
+
+        // Log detailed texture info
+        const image = loadedTexture.image;
+        console.log("[Texture] Loaded successfully:", {
+          url: imageUrl.split("/").slice(-2).join("/"), // Just show tier/filename
+          dimensions: image ? `${image.width}x${image.height}` : "unknown",
+          needsUpdate: loadedTexture.needsUpdate,
+          uuid: loadedTexture.uuid.slice(0, 8),
+        });
+
+        // Dispose old texture
         if (textureRef.current && textureRef.current !== loadedTexture) {
           textureRef.current.dispose();
         }
         textureRef.current = loadedTexture;
         setTexture(loadedTexture);
-        console.log("[PanoramaSphere] Texture set, calling invalidateFrame");
-        // Force Three.js to re-render with the new texture
+
+        // Force re-render
         invalidateFrame();
+
+        // Log material state after texture is set
+        setTimeout(() => {
+          if (materialRef.current) {
+            const mat = materialRef.current;
+            console.log("[Texture] Material state after load:", {
+              hasMap: !!mat.map,
+              mapUuid: mat.map?.uuid?.slice(0, 8),
+              needsUpdate: mat.needsUpdate,
+              visible: mat.visible,
+            });
+          }
+
+          // Log render state
+          console.log("[Texture] Renderer state:", {
+            domElementSize: `${gl.domElement.width}x${gl.domElement.height}`,
+            renderLists: gl.info.render,
+          });
+        }, 100);
       },
       undefined,
       (error) => {
-        console.error("[PanoramaSphere] Error loading panorama texture:", error);
+        console.error("[Texture] Load error:", error);
       }
     );
 
     return () => {
-      console.log("[PanoramaSphere] Texture effect cleanup, setting cancelled=true");
+      if (!cancelled) {
+        console.log("[Texture] Effect cleanup for:", imageUrl.split("/").slice(-2).join("/"));
+      }
       cancelled = true;
     };
-  }, [imageUrl, invalidateFrame]);
+  }, [imageUrl, invalidateFrame, gl]);
 
   // Dispose texture on unmount
   useEffect(() => {
@@ -126,89 +178,65 @@ function PanoramaSphere({
     }
   }, [fov, threeCamera]);
 
-  // Apply initial camera heading/pitch to OrbitControls using useFrame
-  // This ensures we wait until the controls ref is available
+  // Apply initial camera - only log once
+  const hasLoggedInitialCameraRef = useRef(false);
   useFrame(() => {
     if (initialCameraAppliedRef.current) return;
     if (!controlsRef.current) return;
-    if (!initialCameraRef.current) return;
 
     const controls = controlsRef.current;
     const { yaw, pitch } = initialCameraRef.current;
 
-    console.log("[PanoramaSphere] useFrame - Applying initial camera:", { yaw, pitch });
+    if (!hasLoggedInitialCameraRef.current) {
+      console.log("[Camera] Applying initial position:", { yaw, pitch });
+      hasLoggedInitialCameraRef.current = true;
+    }
 
-    // Convert our heading to OrbitControls azimuth (add offset)
     const azimuthRad = THREE.MathUtils.degToRad(yaw + HEADING_OFFSET);
-    // Convert pitch to polar angle (90 - pitch)
     const polarRad = THREE.MathUtils.degToRad(90 - pitch);
 
-    console.log("[PanoramaSphere] Setting angles - azimuthRad:", azimuthRad, "polarRad:", polarRad);
-
-    // Disable damping temporarily to set position instantly
     const wasDamping = controls.enableDamping;
     controls.enableDamping = false;
-
     controls.setAzimuthalAngle(azimuthRad);
     controls.setPolarAngle(polarRad);
     controls.update();
-
-    // Restore damping setting
     controls.enableDamping = wasDamping;
-
-    // Verify the angles were set
-    const verifyAzimuth = THREE.MathUtils.radToDeg(controls.getAzimuthalAngle());
-    const verifyPolar = THREE.MathUtils.radToDeg(controls.getPolarAngle());
-    console.log("[PanoramaSphere] After setting - azimuth:", verifyAzimuth, "polar:", verifyPolar);
 
     initialCameraAppliedRef.current = true;
 
-    // Re-enable onChange after a short delay to let controls settle
     setTimeout(() => {
-      console.log("[PanoramaSphere] Enabling onChange handler");
       suppressOnChangeRef.current = false;
-      // Trigger a final update to ensure state is synced
       if (controlsRef.current) {
         const currentAzimuth = THREE.MathUtils.radToDeg(controlsRef.current.getAzimuthalAngle());
         const currentPolar = THREE.MathUtils.radToDeg(controlsRef.current.getPolarAngle());
         const heading = ((currentAzimuth - HEADING_OFFSET) % 360 + 360) % 360;
         const finalPitch = 90 - currentPolar;
-        console.log("[PanoramaSphere] Final camera position - heading:", heading, "pitch:", finalPitch);
         onCameraChange({ yaw: heading, pitch: finalPitch });
       }
     }, 50);
   });
 
-  // Handle camera changes from controls
+  // Handle camera changes from controls - no logging
   const handleControlsChange = useCallback(() => {
-    if (!controlsRef.current) return;
+    if (!controlsRef.current || suppressOnChangeRef.current) return;
 
     const controls = controlsRef.current;
     const azimuth = THREE.MathUtils.radToDeg(controls.getAzimuthalAngle());
     const polar = THREE.MathUtils.radToDeg(controls.getPolarAngle());
-
-    // Convert polar angle to pitch (-90 to 90)
     const pitch = 90 - polar;
-
-    // Convert azimuth to our heading (subtract offset) and normalize to 0-360
     const heading = ((azimuth - HEADING_OFFSET) % 360 + 360) % 360;
 
-    // Skip if we're programmatically setting camera angles or haven't applied initial yet
-    if (suppressOnChangeRef.current) {
-      console.log("[PanoramaSphere] onChange SUPPRESSED - raw azimuth:", azimuth, "heading would be:", heading, "pitch:", pitch);
-      return;
-    }
-
-    console.log("[PanoramaSphere] onChange - azimuth:", azimuth, "heading:", heading, "pitch:", pitch);
     onCameraChange({ yaw: heading, pitch });
   }, [onCameraChange]);
 
   return (
     <>
+      <ContextDebugger />
       {/* Sky sphere with panorama texture */}
-      <mesh scale={[-1, 1, 1]}>
+      <mesh ref={meshRef} scale={[-1, 1, 1]}>
         <sphereGeometry args={[500, 64, 32]} />
         <meshBasicMaterial
+          ref={materialRef}
           map={texture}
           color={texture ? 0xffffff : 0x0a0f1a}
           side={THREE.BackSide}
@@ -216,7 +244,7 @@ function PanoramaSphere({
         />
       </mesh>
 
-      {/* Camera controls - damping disabled for precise positioning */}
+      {/* Camera controls */}
       <OrbitControls
         ref={controlsRef}
         enableZoom={true}
@@ -241,8 +269,23 @@ export function PanoramaCanvas({
   onCameraChange,
   isLoading,
 }: PanoramaCanvasProps) {
-  // DEBUG: Log props on every render
-  console.log("[PanoramaCanvas] Render - imageUrl:", imageUrl, "camera:", camera, "initialCamera:", initialCamera, "isLoading:", isLoading);
+  // Only log on mount and when imageUrl changes
+  const prevImageUrlRef = useRef<string | null>(null);
+  const hasMountedRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      console.log("[PanoramaCanvas] Mounted");
+      hasMountedRef.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (imageUrl !== prevImageUrlRef.current) {
+      console.log("[PanoramaCanvas] imageUrl changed:", imageUrl ? imageUrl.split("/").slice(-2).join("/") : "null");
+      prevImageUrlRef.current = imageUrl;
+    }
+  }, [imageUrl]);
 
   return (
     <div className="absolute inset-0">
@@ -257,6 +300,13 @@ export function PanoramaCanvas({
           antialias: true,
           alpha: false,
           powerPreference: "high-performance",
+        }}
+        onCreated={({ gl }) => {
+          console.log("[Canvas] WebGL context created:", {
+            contextType: gl.capabilities.isWebGL2 ? "WebGL2" : "WebGL1",
+            maxTextureSize: gl.capabilities.maxTextureSize,
+            precision: gl.capabilities.precision,
+          });
         }}
       >
         <color attach="background" args={["#0a0f1a"]} />

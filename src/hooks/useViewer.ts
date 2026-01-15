@@ -50,10 +50,7 @@ export function useViewer({
     if (typeof window === "undefined") return;
 
     const pathname = window.location.pathname;
-    console.log("[useViewer] Syncing with URL:", pathname);
-
     const parsed = parseViewState(pathname);
-    console.log("[useViewer] Parsed view state from URL:", parsed);
 
     if (!parsed) return;
 
@@ -64,18 +61,6 @@ export function useViewer({
       Math.abs(state.camera.pitch - parsed.pitch) > 0.1;
 
     if (needsUpdate) {
-      console.log("[useViewer] State differs from URL, updating...");
-      console.log("[useViewer] Current state:", {
-        currentIndex: state.currentIndex,
-        yaw: state.camera.yaw,
-        pitch: state.camera.pitch,
-      });
-      console.log("[useViewer] URL values:", {
-        position: parsed.position,
-        heading: parsed.heading,
-        pitch: parsed.pitch,
-      });
-
       const clampedIndex = Math.min(parsed.position, totalImages - 1);
       setState((prev) => ({
         ...prev,
