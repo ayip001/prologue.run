@@ -272,7 +272,7 @@ def override_gps_from_gpx(
         elapsed_in_gpx = elapsed_from_first_photo + offset_seconds
 
         if debug:
-            console.print(f"\n  [cyan]Image {img['position_index']:03d}:[/] {img.get('original_filename', 'unknown')}")
+            console.print(f"\n  [cyan]Image {img['position_index']:04d}:[/] {img.get('original_filename', 'unknown')}")
             console.print(f"    Photo time: {captured_at}")
             console.print(f"    Elapsed from first photo: {elapsed_from_first_photo:.1f}s")
             console.print(f"    Elapsed in GPX (with offset): {elapsed_in_gpx:.1f}s")
@@ -334,7 +334,7 @@ def override_gps_from_gpx(
         for img in images:
             if img.get("heading_degrees") is not None:
                 console.print(
-                    f"  Image {img['position_index']:03d}: "
+                    f"  Image {img['position_index']:04d}: "
                     f"heading={img.get('heading_degrees')}°, "
                     f"to_prev={img.get('heading_to_prev')}°, "
                     f"to_next={img.get('heading_to_next')}°"

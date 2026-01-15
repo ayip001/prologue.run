@@ -210,7 +210,7 @@ def run_intake(
 
     # Determine padding width based on total count
     padding = len(str(len(images_with_exif)))
-    padding = max(padding, 3)  # Minimum 3 digits (001, 002, ...)
+    padding = max(padding, 4)  # Minimum 4 digits (0001, 0002, ...)
 
     for idx, (src_path, exif_data) in enumerate(images_with_exif):
         # Generate new filename: 001.jpg, 002.jpg, etc.
