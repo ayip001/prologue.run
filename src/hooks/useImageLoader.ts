@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { ImageTier } from "@/types";
 import { getImageUrl, preloadImage } from "@/lib/imageUrl";
 import { PRELOAD_SETTINGS } from "@/lib/constants";
@@ -19,6 +19,9 @@ interface UseImageLoaderReturn {
   preloadProgress: number;
 }
 
+// Track URLs that have been successfully loaded (persists across component re-renders)
+const loadedUrlsCache = new Set<string>();
+
 export function useImageLoader({
   raceSlug,
   currentIndex,
@@ -33,42 +36,66 @@ export function useImageLoader({
   // Always use WebP format
   const format = "webp";
 
-  // Track preloaded images
+  // Track preloaded images for adjacent preloading
   const preloadedRef = useRef<Set<string>>(new Set());
   const currentIndexRef = useRef(currentIndex);
 
-  // Load current image with progressive quality
+  // Load current image with progressive quality (or instant if cached)
   useEffect(() => {
     if (!enabled) {
       setIsLoading(false);
       return;
     }
     currentIndexRef.current = currentIndex;
+
+    const fullUrl = getImageUrl(raceSlug, "full", currentIndex, format);
+    const mediumUrl = getImageUrl(raceSlug, "medium", currentIndex, format);
+    const thumbUrl = getImageUrl(raceSlug, "thumbnail", currentIndex, format);
+
+    // Check if higher quality versions are already cached
+    if (loadedUrlsCache.has(fullUrl)) {
+      // Full image already loaded - use it instantly
+      setCurrentImageUrl(fullUrl);
+      setLoadedTier("full");
+      setIsLoading(false);
+      return;
+    }
+
+    if (loadedUrlsCache.has(mediumUrl)) {
+      // Medium image cached - use it instantly, then upgrade to full
+      setCurrentImageUrl(mediumUrl);
+      setLoadedTier("medium");
+      setIsLoading(false);
+
+      // Try to upgrade to full in background
+      preloadImage(fullUrl)
+        .then(() => {
+          if (currentIndexRef.current !== currentIndex) return;
+          loadedUrlsCache.add(fullUrl);
+          setCurrentImageUrl(fullUrl);
+          setLoadedTier("full");
+        })
+        .catch(() => {
+          // Stay on medium
+        });
+      return;
+    }
+
+    // No cached version - do progressive loading
     setIsLoading(true);
     setLoadedTier("thumbnail");
 
-    const isIOS = typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
-
     const loadSequence = async () => {
       // 1. Load thumbnail first (fast)
-      const thumbUrl = getImageUrl(raceSlug, "thumbnail", currentIndex, format);
-      if (isIOS) {
-        console.log("[useImageLoader] iOS - Loading thumbnail:", thumbUrl);
-      }
       try {
         await preloadImage(thumbUrl);
         if (currentIndexRef.current !== currentIndex) return;
-        if (isIOS) {
-          console.log("[useImageLoader] iOS - Thumbnail loaded successfully");
-        }
+        loadedUrlsCache.add(thumbUrl);
         setCurrentImageUrl(thumbUrl);
         setLoadedTier("thumbnail");
         setIsLoading(false);
       } catch (err) {
         console.error("Failed to load thumbnail:", thumbUrl, err);
-        if (isIOS) {
-          console.error("[useImageLoader] iOS - Thumbnail load error details:", err);
-        }
       }
 
       // 2. Load medium quality after short delay
@@ -77,10 +104,10 @@ export function useImageLoader({
       );
       if (currentIndexRef.current !== currentIndex) return;
 
-      const mediumUrl = getImageUrl(raceSlug, "medium", currentIndex, format);
       try {
         await preloadImage(mediumUrl);
         if (currentIndexRef.current !== currentIndex) return;
+        loadedUrlsCache.add(mediumUrl);
         setCurrentImageUrl(mediumUrl);
         setLoadedTier("medium");
       } catch {
@@ -93,10 +120,10 @@ export function useImageLoader({
       );
       if (currentIndexRef.current !== currentIndex) return;
 
-      const fullUrl = getImageUrl(raceSlug, "full", currentIndex, format);
       try {
         await preloadImage(fullUrl);
         if (currentIndexRef.current !== currentIndex) return;
+        loadedUrlsCache.add(fullUrl);
         setCurrentImageUrl(fullUrl);
         setLoadedTier("full");
       } catch {
@@ -142,6 +169,7 @@ export function useImageLoader({
           try {
             await preloadImage(thumbUrl);
             preloadedRef.current.add(thumbUrl);
+            loadedUrlsCache.add(thumbUrl);
           } catch {
             // Ignore preload errors
           }
