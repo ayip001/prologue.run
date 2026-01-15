@@ -79,8 +79,10 @@ CREATE TABLE images (
     -- Capture metadata
     captured_at     TIMESTAMPTZ NOT NULL,
 
-    -- Heading/orientation (calculated from GPX track correlation)
-    heading_degrees DECIMAL(5, 2),                 -- Calculated direction of travel 0-360
+    -- Heading/orientation fields for Street View-like navigation
+    heading_degrees DECIMAL(5, 2),                 -- Direction of travel (0-360, from GPX)
+    heading_to_prev DECIMAL(5, 2),                 -- Bearing to previous image (for back arrow)
+    heading_to_next DECIMAL(5, 2),                 -- Bearing to next image (for forward arrow)
     heading_offset_degrees DECIMAL(5, 2) DEFAULT 0, -- Manual adjustment if camera wasn't pointing forward
 
     -- Distance from start (meters) - for progress bar

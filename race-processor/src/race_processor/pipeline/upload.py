@@ -257,13 +257,20 @@ def generate_db_records(
             continue
 
         # Build paths relative to storage_prefix
-        # Note: heading_degrees is NOT included - calculated separately from GPX
         record = {
             "position_index": position_index,
             "latitude": meta.latitude,
             "longitude": meta.longitude,
             "altitude_meters": meta.altitude_meters,
             "captured_at": meta.captured_at,
+            # Heading fields for Street View-like navigation
+            # heading_degrees: Direction of travel (calculated from GPX or EXIF)
+            # heading_to_prev: Bearing to previous image (for back arrow)
+            # heading_to_next: Bearing to next image (for forward arrow)
+            "heading_degrees": meta.heading_degrees,
+            "heading_to_prev": meta.heading_to_prev,
+            "heading_to_next": meta.heading_to_next,
+            # Storage paths
             "path_thumbnail": f"thumb/{base_name}.avif",
             "path_medium": f"medium/{base_name}.avif",
             "path_full": f"full/{base_name}.avif",
