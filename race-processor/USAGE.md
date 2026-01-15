@@ -137,6 +137,42 @@ race-processor check-exif image.jpg
 race-processor check-exif ./output/final/
 ```
 
+### `override-gps` - Override GPS from GPX Track
+
+Override image GPS data (latitude, longitude, heading) using an external GPX track file. Useful when the camera's built-in GPS is unreliable but you have accurate GPS data from a separate device.
+
+```bash
+# Basic usage (UTC+8 timezone, default)
+race-processor override-gps ./output/intake/metadata.json ./track.gpx
+
+# Different timezone (UTC+0)
+race-processor override-gps ./metadata.json ./track.gpx --utc-offset 0
+
+# Debug mode to see detailed matching info
+race-processor override-gps ./metadata.json ./track.gpx --debug
+
+# Save to different file instead of overwriting
+race-processor override-gps ./metadata.json ./track.gpx -o ./metadata-updated.json
+```
+
+Options:
+- `--utc-offset INT` - UTC offset for camera's local time (default: 8 for UTC+8)
+- `--max-time-diff FLOAT` - Warning threshold in seconds (default: 60)
+- `--debug` - Enable detailed logging for each image
+- `-o PATH` - Output path (default: overwrites input manifest)
+
+**How it works:**
+1. Parses GPX track points with timestamps (UTC/Zulu time)
+2. Converts EXIF timestamps from local time to UTC using the offset
+3. Matches each image to the nearest GPX point by timestamp
+4. Overrides latitude, longitude, and altitude from GPX
+5. Calculates heading by drawing a line from the matched point to the next point
+
+**Time Zone Handling:**
+- GPX timestamps are in UTC: `2026-01-12T09:12:55.000Z`
+- EXIF timestamps are in local time: `2026-01-12T17:12:22`
+- The `--utc-offset` converts local → UTC by subtracting the offset
+
 ## Commands
 
 ### `process` - Main Processing Pipeline
@@ -312,11 +348,14 @@ The `metadata.json` format:
       "captured_at": "2026-01-12T18:25:29",
       "latitude": 22.2855637,
       "longitude": 114.1576957,
-      "altitude_meters": 15.3
+      "altitude_meters": 15.3,
+      "heading_degrees": 36.51
     }
   ]
 }
 ```
+
+> **Note:** `heading_degrees` is not extracted from EXIF. Use `override-gps` to calculate it from GPX track data.
 
 ## Configuration
 
