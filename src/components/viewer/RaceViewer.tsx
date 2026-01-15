@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import type { Race, ElevationProfile as ElevationProfileType } from "@/types";
 import { useViewer } from "@/hooks/useViewer";
 import { useImageLoader } from "@/hooks/useImageLoader";
@@ -60,6 +60,10 @@ export function RaceViewer({
       })),
     [images]
   );
+
+  // Capture initial camera from URL params - only once on mount
+  // This is passed to PanoramaCanvas to set up OrbitControls correctly
+  const initialCameraFromUrlRef = useRef({ yaw: initialHeading, pitch: initialPitch });
 
   // Viewer state
   const { state, actions } = useViewer({
@@ -130,6 +134,7 @@ export function RaceViewer({
       <PanoramaCanvas
         imageUrl={currentImageUrl}
         camera={state.camera}
+        initialCamera={initialCameraFromUrlRef.current}
         onCameraChange={handleCameraChange}
         isLoading={isLoading}
       />

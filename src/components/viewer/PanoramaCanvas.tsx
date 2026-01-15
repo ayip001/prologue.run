@@ -13,17 +13,20 @@ const HEADING_OFFSET = 90;
 interface PanoramaCanvasProps {
   imageUrl: string | null;
   camera: CameraState;
+  initialCamera: { yaw: number; pitch: number };
   onCameraChange: (camera: Partial<CameraState>) => void;
   isLoading: boolean;
 }
 
 function PanoramaSphere({
   imageUrl,
-  camera,
+  initialCamera,
+  fov,
   onCameraChange,
 }: {
   imageUrl: string | null;
-  camera: CameraState;
+  initialCamera: { yaw: number; pitch: number };
+  fov: number;
   onCameraChange: (camera: Partial<CameraState>) => void;
 }) {
   const { camera: threeCamera, invalidate: invalidateFrame } = useThree();
@@ -31,20 +34,22 @@ function PanoramaSphere({
   const textureRef = useRef<THREE.Texture | null>(null);
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
 
-  // Store initial camera values to apply when controls become available
-  const initialCameraRef = useRef({ yaw: camera.yaw, pitch: camera.pitch });
+  // Store initial camera values - use ref to capture only once on first mount
+  const initialCameraRef = useRef<{ yaw: number; pitch: number } | null>(null);
   // Track if initial camera has been applied to controls
   const initialCameraAppliedRef = useRef(false);
   // Flag to suppress onChange during programmatic camera updates
   const suppressOnChangeRef = useRef(true);
 
+  // Capture initial camera only once on first mount (ignore subsequent prop changes)
+  if (initialCameraRef.current === null) {
+    initialCameraRef.current = { yaw: initialCamera.yaw, pitch: initialCamera.pitch };
+    console.log("[PanoramaSphere] Captured initial camera:", initialCameraRef.current);
+  }
+
   // DEBUG: Log initial camera values on mount
   useEffect(() => {
-    console.log("[PanoramaSphere] Mount - initial camera from props:", {
-      yaw: camera.yaw,
-      pitch: camera.pitch,
-      fov: camera.fov,
-    });
+    console.log("[PanoramaSphere] Mount - initial camera from props:", initialCamera);
     console.log("[PanoramaSphere] initialCameraRef:", initialCameraRef.current);
   }, []);
 
@@ -106,19 +111,17 @@ function PanoramaSphere({
   // Update camera FOV
   useEffect(() => {
     if (threeCamera instanceof THREE.PerspectiveCamera) {
-      threeCamera.fov = camera.fov;
+      threeCamera.fov = fov;
       threeCamera.updateProjectionMatrix();
     }
-  }, [camera.fov, threeCamera]);
+  }, [fov, threeCamera]);
 
   // Apply initial camera heading/pitch to OrbitControls using useFrame
   // This ensures we wait until the controls ref is available
   useFrame(() => {
     if (initialCameraAppliedRef.current) return;
-    if (!controlsRef.current) {
-      // Only log once per second to avoid spam
-      return;
-    }
+    if (!controlsRef.current) return;
+    if (!initialCameraRef.current) return;
 
     const controls = controlsRef.current;
     const { yaw, pitch } = initialCameraRef.current;
@@ -132,22 +135,38 @@ function PanoramaSphere({
 
     console.log("[PanoramaSphere] Setting angles - azimuthRad:", azimuthRad, "polarRad:", polarRad);
 
+    // Disable damping temporarily to set position instantly
+    const wasDamping = controls.enableDamping;
+    controls.enableDamping = false;
+
     controls.setAzimuthalAngle(azimuthRad);
     controls.setPolarAngle(polarRad);
     controls.update();
 
+    // Restore damping setting
+    controls.enableDamping = wasDamping;
+
     // Verify the angles were set
-    const verifyAzimuth = controls.getAzimuthalAngle();
-    const verifyPolar = controls.getPolarAngle();
+    const verifyAzimuth = THREE.MathUtils.radToDeg(controls.getAzimuthalAngle());
+    const verifyPolar = THREE.MathUtils.radToDeg(controls.getPolarAngle());
     console.log("[PanoramaSphere] After setting - azimuth:", verifyAzimuth, "polar:", verifyPolar);
 
     initialCameraAppliedRef.current = true;
 
-    // Re-enable onChange after the next frame
-    requestAnimationFrame(() => {
+    // Re-enable onChange after a short delay to let controls settle
+    setTimeout(() => {
       console.log("[PanoramaSphere] Enabling onChange handler");
       suppressOnChangeRef.current = false;
-    });
+      // Trigger a final update to ensure state is synced
+      if (controlsRef.current) {
+        const currentAzimuth = THREE.MathUtils.radToDeg(controlsRef.current.getAzimuthalAngle());
+        const currentPolar = THREE.MathUtils.radToDeg(controlsRef.current.getPolarAngle());
+        const heading = ((currentAzimuth - HEADING_OFFSET) % 360 + 360) % 360;
+        const finalPitch = 90 - currentPolar;
+        console.log("[PanoramaSphere] Final camera position - heading:", heading, "pitch:", finalPitch);
+        onCameraChange({ yaw: heading, pitch: finalPitch });
+      }
+    }, 50);
   });
 
   // Handle camera changes from controls
@@ -181,16 +200,18 @@ function PanoramaSphere({
         <sphereGeometry args={[500, 64, 32]} />
         <meshBasicMaterial
           map={texture}
+          color={texture ? 0xffffff : 0x0a0f1a}
           side={THREE.BackSide}
           toneMapped={false}
         />
       </mesh>
 
-      {/* Camera controls */}
+      {/* Camera controls - damping disabled for precise positioning */}
       <OrbitControls
         ref={controlsRef}
         enableZoom={true}
         enablePan={false}
+        enableDamping={false}
         rotateSpeed={-0.5}
         zoomSpeed={0.5}
         minDistance={0.1}
@@ -206,11 +227,12 @@ function PanoramaSphere({
 export function PanoramaCanvas({
   imageUrl,
   camera,
+  initialCamera,
   onCameraChange,
   isLoading,
 }: PanoramaCanvasProps) {
   // DEBUG: Log props on every render
-  console.log("[PanoramaCanvas] Render - imageUrl:", imageUrl, "camera:", camera, "isLoading:", isLoading);
+  console.log("[PanoramaCanvas] Render - imageUrl:", imageUrl, "camera:", camera, "initialCamera:", initialCamera, "isLoading:", isLoading);
 
   return (
     <div className="absolute inset-0">
@@ -230,7 +252,8 @@ export function PanoramaCanvas({
         <color attach="background" args={["#0a0f1a"]} />
         <PanoramaSphere
           imageUrl={imageUrl}
-          camera={camera}
+          initialCamera={initialCamera}
+          fov={camera.fov}
           onCameraChange={onCameraChange}
         />
       </Canvas>
