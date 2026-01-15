@@ -19,22 +19,6 @@ interface PanoramaCanvasProps {
 
 // Component to debug Three.js context state
 function ContextDebugger() {
-  const { gl, scene, camera } = useThree();
-  const hasLoggedRef = useRef(false);
-
-  useEffect(() => {
-    if (hasLoggedRef.current) return;
-    hasLoggedRef.current = true;
-
-    console.log("[ContextDebugger] Three.js context ready:", {
-      rendererType: gl.constructor.name,
-      rendererSize: { width: gl.domElement.width, height: gl.domElement.height },
-      pixelRatio: gl.getPixelRatio(),
-      sceneChildren: scene.children.length,
-      cameraType: camera.constructor.name,
-    });
-  }, [gl, scene, camera]);
-
   return null;
 }
 
@@ -85,11 +69,8 @@ function PanoramaSphere({
     prevImageUrlRef.current = imageUrl;
 
     if (!imageUrl) {
-      console.log("[Texture] No imageUrl provided");
       return;
     }
-
-    console.log("[Texture] Loading:", imageUrl);
 
     const loader = new THREE.TextureLoader();
     let cancelled = false;
@@ -98,7 +79,6 @@ function PanoramaSphere({
       imageUrl,
       (loadedTexture) => {
         if (cancelled) {
-          console.log("[Texture] Load completed but cancelled, disposing");
           loadedTexture.dispose();
           return;
         }
@@ -107,15 +87,6 @@ function PanoramaSphere({
         loadedTexture.colorSpace = THREE.SRGBColorSpace;
         loadedTexture.minFilter = THREE.LinearFilter;
         loadedTexture.magFilter = THREE.LinearFilter;
-
-        // Log detailed texture info
-        const image = loadedTexture.image;
-        console.log("[Texture] Loaded successfully:", {
-          url: imageUrl.split("/").slice(-2).join("/"), // Just show tier/filename
-          dimensions: image ? `${image.width}x${image.height}` : "unknown",
-          needsUpdate: loadedTexture.needsUpdate,
-          uuid: loadedTexture.uuid.slice(0, 8),
-        });
 
         // Dispose old texture
         if (textureRef.current && textureRef.current !== loadedTexture) {
@@ -127,23 +98,11 @@ function PanoramaSphere({
         // Note: invalidateFrame is now called in a useEffect after texture state updates
         // This ensures React has re-rendered the material with the new texture before invalidating
 
-        // Log material state after texture is set
+        // Force material update and invalidate
         setTimeout(() => {
           if (materialRef.current) {
-            const mat = materialRef.current;
-            console.log("[Texture] Material state after load:", {
-              hasMap: !!mat.map,
-              mapUuid: mat.map?.uuid?.slice(0, 8),
-              needsUpdate: mat.needsUpdate,
-              visible: mat.visible,
-            });
+            materialRef.current.needsUpdate = true;
           }
-
-          // Log render state
-          console.log("[Texture] Renderer state:", {
-            domElementSize: `${gl.domElement.width}x${gl.domElement.height}`,
-            renderLists: gl.info.render,
-          });
         }, 100);
       },
       undefined,
@@ -153,9 +112,6 @@ function PanoramaSphere({
     );
 
     return () => {
-      if (!cancelled) {
-        console.log("[Texture] Effect cleanup for:", imageUrl.split("/").slice(-2).join("/"));
-      }
       cancelled = true;
     };
   }, [imageUrl, invalidateFrame, gl]);
@@ -174,7 +130,6 @@ function PanoramaSphere({
   // This ensures R3F re-renders after React has updated the material with the new texture
   useEffect(() => {
     if (texture) {
-      console.log("[Texture] State updated, invalidating frame for texture:", texture.uuid.slice(0, 8));
       // Force material to update
       if (materialRef.current) {
         materialRef.current.needsUpdate = true;
@@ -199,11 +154,6 @@ function PanoramaSphere({
 
     const controls = controlsRef.current;
     const { yaw, pitch } = initialCameraRef.current;
-
-    if (!hasLoggedInitialCameraRef.current) {
-      console.log("[Camera] Applying initial position:", { yaw, pitch });
-      hasLoggedInitialCameraRef.current = true;
-    }
 
     const azimuthRad = THREE.MathUtils.degToRad(yaw + HEADING_OFFSET);
     const polarRad = THREE.MathUtils.degToRad(90 - pitch);
@@ -287,15 +237,7 @@ export function PanoramaCanvas({
   const hasMountedRef = useRef(false);
 
   useEffect(() => {
-    if (!hasMountedRef.current) {
-      console.log("[PanoramaCanvas] Mounted");
-      hasMountedRef.current = true;
-    }
-  }, []);
-
-  useEffect(() => {
     if (imageUrl !== prevImageUrlRef.current) {
-      console.log("[PanoramaCanvas] imageUrl changed:", imageUrl ? imageUrl.split("/").slice(-2).join("/") : "null");
       prevImageUrlRef.current = imageUrl;
     }
   }, [imageUrl]);
@@ -314,13 +256,6 @@ export function PanoramaCanvas({
           antialias: true,
           alpha: false,
           powerPreference: "high-performance",
-        }}
-        onCreated={({ gl }) => {
-          console.log("[Canvas] WebGL context created:", {
-            contextType: gl.capabilities.isWebGL2 ? "WebGL2" : "WebGL1",
-            maxTextureSize: gl.capabilities.maxTextureSize,
-            precision: gl.capabilities.precision,
-          });
         }}
       >
         <color attach="background" args={["#0a0f1a"]} />
