@@ -228,6 +228,8 @@ function PanoramaSphere({
 
     const handleTouchStart = (e: TouchEvent) => {
       if (e.touches.length === 2) {
+        // Prevent OrbitControls from handling 2-finger gestures
+        e.stopImmediatePropagation();
         initialPinchDistance = getDistance(e.touches);
         initialFov = fov;
       } else if (e.touches.length === 1) {
@@ -235,6 +237,8 @@ function PanoramaSphere({
         const timespan = now - lastTapTime;
         if (timespan > 0 && timespan < CAMERA_CONSTRAINTS.doubleTapDelayMs) {
           // Double tap detected
+          e.preventDefault();
+          e.stopImmediatePropagation();
           const targetFov =
             Math.abs(fov - CAMERA_CONSTRAINTS.minFov) < 1
               ? CAMERA_CONSTRAINTS.maxFov
@@ -250,6 +254,7 @@ function PanoramaSphere({
     const handleTouchMove = (e: TouchEvent) => {
       if (e.touches.length === 2 && initialPinchDistance !== null && initialFov !== null) {
         e.preventDefault(); // Prevent native zoom
+        e.stopImmediatePropagation(); // Stop OrbitControls from seeing this
         const currentDistance = getDistance(e.touches);
         
         // Apply sensitivity to the pinch ratio
@@ -264,21 +269,24 @@ function PanoramaSphere({
       }
     };
 
-    const handleTouchEnd = () => {
-      initialPinchDistance = null;
-      initialFov = null;
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) {
+        initialPinchDistance = null;
+        initialFov = null;
+      }
     };
 
-    element.addEventListener("touchstart", handleTouchStart, { passive: false });
-    element.addEventListener("touchmove", handleTouchMove, { passive: false });
-    element.addEventListener("touchend", handleTouchEnd);
-    element.addEventListener("touchcancel", handleTouchEnd);
+    // Use capture: true to intercept events before OrbitControls
+    element.addEventListener("touchstart", handleTouchStart, { capture: true, passive: false });
+    element.addEventListener("touchmove", handleTouchMove, { capture: true, passive: false });
+    element.addEventListener("touchend", handleTouchEnd, { capture: true });
+    element.addEventListener("touchcancel", handleTouchEnd, { capture: true });
 
     return () => {
-      element.removeEventListener("touchstart", handleTouchStart);
-      element.removeEventListener("touchmove", handleTouchMove);
-      element.removeEventListener("touchend", handleTouchEnd);
-      element.removeEventListener("touchcancel", handleTouchEnd);
+      element.removeEventListener("touchstart", handleTouchStart, { capture: true });
+      element.removeEventListener("touchmove", handleTouchMove, { capture: true });
+      element.removeEventListener("touchend", handleTouchEnd, { capture: true });
+      element.removeEventListener("touchcancel", handleTouchEnd, { capture: true });
     };
   }, [fov, onCameraChange, gl]);
 
@@ -333,7 +341,7 @@ export function PanoramaCanvas({
   }, [imageUrl]);
 
   return (
-    <div className="absolute inset-0">
+    <div className="absolute inset-0 overflow-hidden touch-none">
       <Canvas
         frameloop="always"
         camera={{
