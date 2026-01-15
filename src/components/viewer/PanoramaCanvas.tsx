@@ -213,6 +213,75 @@ function PanoramaSphere({
     return () => element.removeEventListener("wheel", handleWheel);
   }, [fov, onCameraChange, gl]);
 
+  // Handle touch gestures (pinch to zoom and double tap)
+  useEffect(() => {
+    const element = gl.domElement;
+    let initialPinchDistance: number | null = null;
+    let initialFov: number | null = null;
+    let lastTapTime = 0;
+
+    const getDistance = (touches: TouchList) => {
+      const dx = touches[0].clientX - touches[1].clientX;
+      const dy = touches[0].clientY - touches[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        initialPinchDistance = getDistance(e.touches);
+        initialFov = fov;
+      } else if (e.touches.length === 1) {
+        const now = Date.now();
+        const timespan = now - lastTapTime;
+        if (timespan > 0 && timespan < CAMERA_CONSTRAINTS.doubleTapDelayMs) {
+          // Double tap detected
+          const targetFov =
+            Math.abs(fov - CAMERA_CONSTRAINTS.minFov) < 1
+              ? CAMERA_CONSTRAINTS.maxFov
+              : CAMERA_CONSTRAINTS.minFov;
+          onCameraChange({ fov: targetFov });
+          lastTapTime = 0; // Reset to avoid triple-tap issues
+        } else {
+          lastTapTime = now;
+        }
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && initialPinchDistance !== null && initialFov !== null) {
+        e.preventDefault(); // Prevent native zoom
+        const currentDistance = getDistance(e.touches);
+        
+        // Apply sensitivity to the pinch ratio
+        const zoomFactor = initialPinchDistance / currentDistance;
+        const adjustedRatio = 1 + (zoomFactor - 1) * CAMERA_CONSTRAINTS.pinchSensitivity;
+        
+        // Map pinch ratio to FOV
+        const newFov = clampFov(initialFov * adjustedRatio);
+        if (Math.abs(newFov - fov) > 0.1) {
+          onCameraChange({ fov: newFov });
+        }
+      }
+    };
+
+    const handleTouchEnd = () => {
+      initialPinchDistance = null;
+      initialFov = null;
+    };
+
+    element.addEventListener("touchstart", handleTouchStart, { passive: false });
+    element.addEventListener("touchmove", handleTouchMove, { passive: false });
+    element.addEventListener("touchend", handleTouchEnd);
+    element.addEventListener("touchcancel", handleTouchEnd);
+
+    return () => {
+      element.removeEventListener("touchstart", handleTouchStart);
+      element.removeEventListener("touchmove", handleTouchMove);
+      element.removeEventListener("touchend", handleTouchEnd);
+      element.removeEventListener("touchcancel", handleTouchEnd);
+    };
+  }, [fov, onCameraChange, gl]);
+
   return (
     <>
       <ContextDebugger />
