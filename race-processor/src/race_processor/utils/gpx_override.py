@@ -1,12 +1,12 @@
 """
 GPX Override Utility - Override image GPS data using GPX track data.
 
-This utility correlates images with GPX track points by timestamp to override
-latitude, longitude, and calculate heading direction.
+This utility correlates images with GPX track points using relative time matching:
+- First photo is assumed to correspond to first GPX point (plus optional offset)
+- Subsequent photos are matched based on elapsed time from the first photo
 """
 
 import json
-from dataclasses import asdict
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -21,10 +21,6 @@ from .geo import calculate_bearing
 console = Console()
 
 
-# Default UTC offset (hours ahead of UTC)
-DEFAULT_UTC_OFFSET = 8
-
-
 def parse_gpx_with_time(gpx_path: Path) -> list[dict]:
     """
     Parse GPX file into list of points with timestamp, lat, lon.
@@ -33,7 +29,7 @@ def parse_gpx_with_time(gpx_path: Path) -> list[dict]:
         gpx_path: Path to the GPX file
 
     Returns:
-        List of dicts with keys: time (datetime in UTC), lat, lon, elevation
+        List of dicts with keys: time (datetime), lat, lon, elevation
     """
     with open(gpx_path) as f:
         gpx = gpxpy.parse(f)
@@ -45,7 +41,7 @@ def parse_gpx_with_time(gpx_path: Path) -> list[dict]:
             for point in segment.points:
                 if point.time is not None:
                     points.append({
-                        "time": point.time.replace(tzinfo=None),  # Store as naive UTC
+                        "time": point.time.replace(tzinfo=None),  # Store as naive
                         "lat": point.latitude,
                         "lon": point.longitude,
                         "elevation": point.elevation or 0,
@@ -57,34 +53,19 @@ def parse_gpx_with_time(gpx_path: Path) -> list[dict]:
     return points
 
 
-def exif_time_to_utc(exif_time_str: str, utc_offset: int) -> datetime:
-    """
-    Convert EXIF timestamp (local time) to UTC.
-
-    Args:
-        exif_time_str: ISO format timestamp from EXIF (local time, no timezone)
-        utc_offset: Hours ahead of UTC (e.g., 8 for UTC+8)
-
-    Returns:
-        datetime in UTC (naive, for comparison with GPX)
-    """
-    # Parse the EXIF time (stored as ISO format without timezone)
-    dt = datetime.fromisoformat(exif_time_str)
-    # Subtract UTC offset to get UTC time
-    return dt - timedelta(hours=utc_offset)
-
-
-def find_nearest_gpx_point(
-    target_time: datetime,
+def find_gpx_point_by_elapsed_time(
+    elapsed_seconds: float,
     gpx_points: list[dict],
+    gpx_start_time: datetime,
     debug: bool = False,
 ) -> tuple[Optional[int], Optional[float]]:
     """
-    Find the GPX point with timestamp nearest to target_time.
+    Find the GPX point that matches the target elapsed time from GPX start.
 
     Args:
-        target_time: Target time in UTC
+        elapsed_seconds: Seconds elapsed since start (photo time - first photo time + offset)
         gpx_points: List of GPX points with 'time' key
+        gpx_start_time: Time of the first GPX point
         debug: Print debug information
 
     Returns:
@@ -92,6 +73,8 @@ def find_nearest_gpx_point(
     """
     if not gpx_points:
         return None, None
+
+    target_time = gpx_start_time + timedelta(seconds=elapsed_seconds)
 
     min_diff = float("inf")
     min_idx = 0
@@ -103,6 +86,7 @@ def find_nearest_gpx_point(
             min_idx = idx
 
     if debug:
+        console.print(f"    Target GPX time: {target_time}")
         console.print(f"    Nearest GPX point: index {min_idx}, diff {min_diff:.1f}s")
 
     return min_idx, min_diff
@@ -155,27 +139,32 @@ def calculate_heading_from_points(
 def override_gps_from_gpx(
     manifest_path: Path,
     gpx_path: Path,
-    utc_offset: int = DEFAULT_UTC_OFFSET,
+    offset_seconds: float = 0.0,
     debug: bool = False,
     max_time_diff_seconds: float = 60.0,
 ) -> dict:
     """
-    Override GPS data in manifest using GPX track data.
+    Override GPS data in manifest using GPX track data with relative time matching.
+
+    The first photo is assumed to correspond to the first GPX point. Subsequent
+    photos are matched based on elapsed time since the first photo.
 
     Args:
         manifest_path: Path to metadata.json (intake manifest)
         gpx_path: Path to GPX file
-        utc_offset: Hours ahead of UTC (e.g., 8 for UTC+8)
+        offset_seconds: Time offset in seconds. Positive if camera started after
+                       GPX recording (e.g., +2 means camera was pressed 2 seconds
+                       after starting the GPS watch). Default: 0
         debug: Enable detailed logging
         max_time_diff_seconds: Maximum allowed time difference for matching (warning threshold)
 
     Returns:
         Updated manifest dict with GPS overrides
     """
-    console.print(f"[bold]GPS Override Utility[/]")
+    console.print("[bold]GPS Override Utility[/]")
     console.print(f"  Manifest: {manifest_path}")
     console.print(f"  GPX file: {gpx_path}")
-    console.print(f"  UTC offset: +{utc_offset}")
+    console.print(f"  Offset: {offset_seconds:+.1f}s (camera vs GPX start)")
     console.print()
 
     # Load manifest
@@ -197,11 +186,37 @@ def override_gps_from_gpx(
 
     console.print(f"  Found {len(gpx_points)} track points in GPX")
 
+    # Get reference times
+    gpx_start_time = gpx_points[0]["time"]
+    gpx_end_time = gpx_points[-1]["time"]
+    gpx_duration = (gpx_end_time - gpx_start_time).total_seconds()
+
+    # Find first image with timestamp
+    first_img_time = None
+    for img in images:
+        if img.get("captured_at"):
+            first_img_time = datetime.fromisoformat(img["captured_at"])
+            break
+
+    if first_img_time is None:
+        console.print("[red]No images with timestamps found[/]")
+        return manifest
+
+    # Find last image with timestamp for duration calculation
+    last_img_time = first_img_time
+    for img in reversed(images):
+        if img.get("captured_at"):
+            last_img_time = datetime.fromisoformat(img["captured_at"])
+            break
+
+    photo_duration = (last_img_time - first_img_time).total_seconds()
+
     if debug:
-        console.print(f"  GPX time range: {gpx_points[0]['time']} to {gpx_points[-1]['time']} (UTC)")
-        if images[0].get("captured_at"):
-            first_img_utc = exif_time_to_utc(images[0]["captured_at"], utc_offset)
-            console.print(f"  First image time: {images[0]['captured_at']} (local) -> {first_img_utc} (UTC)")
+        console.print(f"  GPX time range: {gpx_start_time} to {gpx_end_time}")
+        console.print(f"  GPX duration: {gpx_duration:.1f}s ({gpx_duration/60:.1f} min)")
+        console.print(f"  Photo time range: {first_img_time} to {last_img_time}")
+        console.print(f"  Photo duration: {photo_duration:.1f}s ({photo_duration/60:.1f} min)")
+        console.print(f"  Offset applied: {offset_seconds:+.1f}s")
 
     console.print()
     console.print("[bold]Processing images...[/]")
@@ -223,20 +238,28 @@ def override_gps_from_gpx(
                 console.print(f"  [yellow]Image {img.get('position_index', '?')}: No timestamp[/]")
             continue
 
-        # Convert EXIF time to UTC
-        img_time_utc = exif_time_to_utc(captured_at, utc_offset)
+        # Calculate elapsed time since first photo
+        img_time = datetime.fromisoformat(captured_at)
+        elapsed_from_first_photo = (img_time - first_img_time).total_seconds()
+
+        # Apply offset: if camera started 2s after GPX, we add 2s to elapsed time
+        # to find the correct GPX point
+        elapsed_in_gpx = elapsed_from_first_photo + offset_seconds
 
         if debug:
             console.print(f"\n  [cyan]Image {img['position_index']:03d}:[/] {img.get('original_filename', 'unknown')}")
-            console.print(f"    EXIF time: {captured_at} (local)")
-            console.print(f"    UTC time:  {img_time_utc}")
+            console.print(f"    Photo time: {captured_at}")
+            console.print(f"    Elapsed from first photo: {elapsed_from_first_photo:.1f}s")
+            console.print(f"    Elapsed in GPX (with offset): {elapsed_in_gpx:.1f}s")
 
-        # Find nearest GPX point
-        nearest_idx, time_diff = find_nearest_gpx_point(img_time_utc, gpx_points, debug)
+        # Find nearest GPX point by elapsed time
+        nearest_idx, time_diff = find_gpx_point_by_elapsed_time(
+            elapsed_in_gpx, gpx_points, gpx_start_time, debug
+        )
 
         if nearest_idx is None:
             if debug:
-                console.print(f"    [yellow]No matching GPX point found[/]")
+                console.print("    [yellow]No matching GPX point found[/]")
             continue
 
         # Check time difference
@@ -271,7 +294,7 @@ def override_gps_from_gpx(
 
     # Print summary
     console.print()
-    _print_summary(stats, images, gpx_points, utc_offset)
+    _print_summary(stats, images, gpx_points, offset_seconds, gpx_duration, photo_duration)
 
     return manifest
 
@@ -287,7 +310,9 @@ def _print_summary(
     stats: dict,
     images: list[dict],
     gpx_points: list[dict],
-    utc_offset: int,
+    offset_seconds: float,
+    gpx_duration: float,
+    photo_duration: float,
 ) -> None:
     """Print a summary table of the GPS override operation."""
     table = Table(title="GPS Override Summary")
@@ -304,7 +329,9 @@ def _print_summary(
         table.add_row("Avg time diff", f"{avg_diff:.1f}s")
 
     table.add_row("GPX track points", str(len(gpx_points)))
-    table.add_row("UTC offset used", f"+{utc_offset}")
+    table.add_row("GPX duration", f"{gpx_duration:.0f}s ({gpx_duration/60:.1f} min)")
+    table.add_row("Photo duration", f"{photo_duration:.0f}s ({photo_duration/60:.1f} min)")
+    table.add_row("Offset used", f"{offset_seconds:+.1f}s")
 
     # Show coordinate ranges if available
     updated_images = [img for img in images if img.get("latitude") is not None]

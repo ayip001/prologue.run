@@ -139,14 +139,17 @@ race-processor check-exif ./output/final/
 
 ### `override-gps` - Override GPS from GPX Track
 
-Override image GPS data (latitude, longitude, heading) using an external GPX track file. Useful when the camera's built-in GPS is unreliable but you have accurate GPS data from a separate device.
+Override image GPS data (latitude, longitude, heading) using an external GPX track file. Useful when the camera's built-in GPS is unreliable but you have accurate GPS data from a separate device (e.g., GPS watch).
 
 ```bash
-# Basic usage (UTC+8 timezone, default)
+# Basic usage (first photo = first GPX point)
 race-processor override-gps ./output/intake/metadata.json ./track.gpx
 
-# Different timezone (UTC+0)
-race-processor override-gps ./metadata.json ./track.gpx --utc-offset 0
+# Camera started 2 seconds after GPX recording began
+race-processor override-gps ./metadata.json ./track.gpx --offset 2
+
+# Camera started 3 seconds before GPX recording began
+race-processor override-gps ./metadata.json ./track.gpx --offset -3
 
 # Debug mode to see detailed matching info
 race-processor override-gps ./metadata.json ./track.gpx --debug
@@ -156,22 +159,22 @@ race-processor override-gps ./metadata.json ./track.gpx -o ./metadata-updated.js
 ```
 
 Options:
-- `--utc-offset INT` - UTC offset for camera's local time (default: 8 for UTC+8)
+- `--offset FLOAT` - Time offset in seconds between GPX start and first photo (default: 0)
 - `--max-time-diff FLOAT` - Warning threshold in seconds (default: 60)
 - `--debug` - Enable detailed logging for each image
 - `-o PATH` - Output path (default: overwrites input manifest)
 
 **How it works:**
-1. Parses GPX track points with timestamps (UTC/Zulu time)
-2. Converts EXIF timestamps from local time to UTC using the offset
-3. Matches each image to the nearest GPX point by timestamp
+1. Assumes the first photo corresponds to the first GPX point (plus offset)
+2. For each subsequent photo, calculates elapsed time since the first photo
+3. Matches to the GPX point at the same elapsed time from GPX start
 4. Overrides latitude, longitude, and altitude from GPX
 5. Calculates heading by drawing a line from the matched point to the next point
 
-**Time Zone Handling:**
-- GPX timestamps are in UTC: `2026-01-12T09:12:55.000Z`
-- EXIF timestamps are in local time: `2026-01-12T17:12:22`
-- The `--utc-offset` converts local → UTC by subtracting the offset
+**Offset Explanation:**
+- `--offset 0`: First photo taken at same time GPX recording started (default)
+- `--offset 2`: You pressed the GPS watch first, waited 2 seconds, then started camera
+- `--offset -2`: You started camera first, then pressed GPS watch 2 seconds later
 
 ## Commands
 

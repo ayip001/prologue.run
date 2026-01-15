@@ -682,10 +682,10 @@ def preview_export(image_path: Path, output_dir: Path | None, avif_quality: int,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
 )
 @click.option(
-    "--utc-offset",
-    type=int,
-    default=8,
-    help="UTC offset for the camera's local time (default: 8 for UTC+8)",
+    "--offset",
+    type=float,
+    default=0.0,
+    help="Time offset in seconds between GPX start and first photo. Positive if camera started after GPX (default: 0)",
 )
 @click.option(
     "--output",
@@ -708,36 +708,32 @@ def preview_export(image_path: Path, output_dir: Path | None, avif_quality: int,
 def override_gps(
     manifest_path: Path,
     gpx_path: Path,
-    utc_offset: int,
+    offset: float,
     output: Path | None,
     max_time_diff: float,
     debug: bool,
 ) -> None:
     """Override image GPS data using GPX track data.
 
-    This utility correlates images with GPX track points by timestamp to:
-    - Override latitude and longitude from GPX
-    - Override altitude from GPX elevation
+    This utility correlates images with GPX track points using relative time:
+    - First photo is assumed to correspond to first GPX point
+    - Subsequent photos are matched based on elapsed time
+    - Override latitude, longitude, altitude from GPX
     - Calculate heading direction (bearing to next track point)
 
     \b
-    Time Zone Handling:
-    - GPX timestamps are in UTC (Zulu time): 2026-01-12T09:12:55.000Z
-    - EXIF timestamps are in local time: 2026-01-12T17:12:22
-    - Use --utc-offset to specify your local timezone offset from UTC
-
-    \b
-    Heading Calculation:
-    - Assumes you're facing forward (direction of travel)
-    - Calculates bearing from current GPS point to next point on track
+    Offset Explanation:
+    - offset = 0: First photo taken at same time as GPX recording started
+    - offset = +2: Camera started 2 seconds AFTER GPX (you pressed watch, waited, then camera)
+    - offset = -2: Camera started 2 seconds BEFORE GPX
 
     \b
     Examples:
-      # Basic usage (UTC+8 timezone, default)
+      # Basic usage (first photo = first GPX point)
       race-processor override-gps ./output/intake/metadata.json ./track.gpx
 
-      # Different timezone (UTC+0)
-      race-processor override-gps ./metadata.json ./track.gpx --utc-offset 0
+      # Camera started 2 seconds after GPX recording
+      race-processor override-gps ./metadata.json ./track.gpx --offset 2
 
       # Debug mode to see detailed matching info
       race-processor override-gps ./metadata.json ./track.gpx --debug
@@ -751,7 +747,7 @@ def override_gps(
     updated_manifest = override_gps_from_gpx(
         manifest_path=manifest_path,
         gpx_path=gpx_path,
-        utc_offset=utc_offset,
+        offset_seconds=offset,
         debug=debug,
         max_time_diff_seconds=max_time_diff,
     )
