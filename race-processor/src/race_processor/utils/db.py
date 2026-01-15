@@ -124,10 +124,30 @@ def insert_race(config: dict, update_if_exists: bool = False) -> Optional[str]:
     Returns:
         Race ID if successful, None otherwise
     """
-    required_fields = ["slug", "name", "distance_meters", "capture_date", "storage_bucket", "storage_prefix"]
+    # Required fields for the database
+    required_fields = ["slug", "name", "distance_meters", "capture_date", "storage_prefix"]
     for field in required_fields:
         if field not in config:
             console.print(f"[red]Missing required field:[/] {field}")
+            return None
+
+    # Handle storage_bucket: if not in config, try environment variable
+    if "storage_bucket" not in config:
+        from dotenv import load_dotenv
+        # Try to load .env files from workspace root
+        root_dir = Path(__file__).parent.parent.parent.parent.parent
+        for env_file in [".env.local", ".env"]:
+            env_path = root_dir / env_file
+            if env_path.exists():
+                load_dotenv(env_path)
+                break
+        
+        env_bucket = os.getenv("R2_BUCKET_NAME")
+        if env_bucket:
+            config["storage_bucket"] = env_bucket
+            console.print(f"  [dim]Using bucket from environment: {env_bucket}[/]")
+        else:
+            console.print("[red]Missing required field: storage_bucket (and R2_BUCKET_NAME not in environment)[/]")
             return None
 
     conn = get_connection()
@@ -245,6 +265,83 @@ def _update_race(cur, conn, race_id: str, config: dict) -> Optional[str]:
         return None
 
 
+def insert_images(race_id: str, records: list[dict]) -> bool:
+    """
+    Insert image records into the database.
+
+    Args:
+        race_id: UUID of the race these images belong to
+        records: List of image metadata dicts (from db_records.json)
+
+    Returns:
+        True if successful
+    """
+    if not records:
+        console.print("[yellow]No image records to insert[/]")
+        return True
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        console.print(f"[bold]Inserting {len(records)} images for race {race_id}[/]")
+
+        # Prepare the insert query
+        fields = [
+            "race_id", "position_index", "latitude", "longitude", "altitude_meters",
+            "captured_at", "heading_degrees", "heading_to_prev", "heading_to_next",
+            "path_thumbnail", "path_medium", "path_full",
+            "path_thumb_webp", "path_med_webp", "path_full_webp",
+            "has_blur_applied"
+        ]
+
+        placeholders = ", ".join(["%s"] * len(fields))
+        query = f"INSERT INTO images ({', '.join(fields)}) VALUES ({placeholders}) ON CONFLICT (race_id, position_index) DO UPDATE SET "
+        
+        # Build the update part for conflict
+        update_parts = [f"{f} = EXCLUDED.{f}" for f in fields if f not in ("race_id", "position_index")]
+        query += ", ".join(update_parts)
+
+        # Prepare values
+        values = []
+        for rec in records:
+            row = [
+                race_id,
+                rec["position_index"],
+                rec.get("latitude"),
+                rec.get("longitude"),
+                rec.get("altitude_meters"),
+                rec.get("captured_at"),
+                rec.get("heading_degrees"),
+                rec.get("heading_to_prev"),
+                rec.get("heading_to_next"),
+                rec["path_thumbnail"],
+                rec["path_medium"],
+                rec["path_full"],
+                rec["path_thumb_webp"],
+                rec["path_med_webp"],
+                rec["path_full_webp"],
+                rec.get("has_blur_applied", True)
+            ]
+            values.append(tuple(row))
+
+        # Use execute_batch for better performance
+        from psycopg2.extras import execute_batch
+        execute_batch(cur, query, values)
+        
+        conn.commit()
+        console.print(f"[green]Successfully inserted/updated {len(records)} images[/]")
+        return True
+
+    except Exception as e:
+        conn.rollback()
+        console.print(f"[red]Failed to insert images:[/] {e}")
+        return False
+    finally:
+        cur.close()
+        conn.close()
+
+
 def list_races(status: Optional[str] = None) -> list[dict]:
     """
     List all races.
@@ -302,16 +399,16 @@ def get_race(slug_or_id: str) -> Optional[dict]:
     cur = conn.cursor()
 
     try:
-        # Try as UUID first, then as slug
+        # Try as UUID first
         try:
             cur.execute("SELECT * FROM races WHERE id = %s", (slug_or_id,))
+            row = cur.fetchone()
         except Exception:
+            # If UUID fails (e.g. invalid syntax), rollback and try as slug
+            conn.rollback()
             cur.execute("SELECT * FROM races WHERE slug = %s", (slug_or_id,))
+            row = cur.fetchone()
 
-        if cur.rowcount == 0:
-            cur.execute("SELECT * FROM races WHERE slug = %s", (slug_or_id,))
-
-        row = cur.fetchone()
         if not row:
             return None
 

@@ -181,7 +181,7 @@ class R2Config(BaseModel):
     endpoint: str = Field(description="R2 endpoint URL")
     access_key_id: str = Field(description="R2 access key ID")
     secret_access_key: str = Field(description="R2 secret access key")
-    bucket: str = Field(default="race-images", description="R2 bucket name")
+    bucket: str = Field(description="R2 bucket name")
     region: str = Field(default="auto", description="R2 region")
 
 

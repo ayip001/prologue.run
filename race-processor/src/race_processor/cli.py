@@ -961,6 +961,35 @@ def db_insert(config_path: Path, update_if_exists: bool) -> None:
         raise SystemExit(1)
 
 
+@db.command("insert-images")
+@click.argument("slug_or_id")
+@click.argument(
+    "records_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+def db_insert_images(slug_or_id: str, records_path: Path) -> None:
+    """Insert images from db_records.json for a race.
+
+    \b
+    Examples:
+      race-processor db insert-images hk-marathon-2026 ./output/db_records.json
+    """
+    from .utils.db import get_race, insert_images
+    import json
+
+    race = get_race(slug_or_id)
+    if not race:
+        console.print(f"[red]Race not found:[/] {slug_or_id}")
+        raise SystemExit(1)
+
+    with open(records_path) as f:
+        records = json.load(f)
+
+    success = insert_images(race["id"], records)
+    if not success:
+        raise SystemExit(1)
+
+
 @db.command("list")
 @click.option(
     "--status",

@@ -316,7 +316,7 @@ def override_gps_from_gpx(
     # Calculate heading_degrees from GPX fine-grained data (direction of travel)
     # This uses the GPX point ~1 second ahead for accurate direction
     console.print("\n  Calculating headings...")
-    console.print("    heading_degrees: from GPX (current point → next second)")
+    console.print("    heading_degrees: from GPX (current point -> next second)")
     console.print("    heading_to_prev/next: to adjacent images")
 
     for img in images:
