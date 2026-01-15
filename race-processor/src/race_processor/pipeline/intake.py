@@ -19,6 +19,8 @@ import exifread
 from rich.console import Console
 from rich.table import Table
 
+from race_processor.utils.geo import calculate_image_headings
+
 console = Console()
 
 
@@ -229,6 +231,19 @@ def run_intake(
         )
         image_metadata.append(meta)
 
+    # Calculate headings from EXIF GPS coordinates
+    # Note: heading_degrees is calculated from image positions, which is less
+    # accurate than GPX-based calculation. Use override-gps for better accuracy.
+    console.print("  Calculating headings from EXIF GPS...")
+    images_for_headings = [asdict(img) for img in image_metadata]
+    calculate_image_headings(images_for_headings)
+
+    # Update metadata with calculated headings
+    for meta, img_dict in zip(image_metadata, images_for_headings):
+        meta.heading_degrees = img_dict.get("heading_degrees")
+        meta.heading_to_prev = img_dict.get("heading_to_prev")
+        meta.heading_to_next = img_dict.get("heading_to_next")
+
     # Create manifest
     manifest = IntakeManifest(
         race_slug=race_slug,
@@ -255,6 +270,7 @@ def _print_summary(images: list[ImageMetadata]) -> None:
     # Count images with GPS data
     with_gps = sum(1 for img in images if img.latitude is not None)
     with_altitude = sum(1 for img in images if img.altitude_meters is not None)
+    with_heading = sum(1 for img in images if img.heading_degrees is not None)
 
     table = Table(title="EXIF Extraction Summary")
     table.add_column("Metric", style="cyan")
@@ -263,6 +279,7 @@ def _print_summary(images: list[ImageMetadata]) -> None:
     table.add_row("Total images", str(len(images)))
     table.add_row("With GPS coordinates", f"{with_gps} ({100*with_gps//len(images)}%)")
     table.add_row("With altitude", f"{with_altitude} ({100*with_altitude//len(images)}%)")
+    table.add_row("With heading", f"{with_heading} ({100*with_heading//len(images)}%)")
 
     if images:
         first = images[0]
