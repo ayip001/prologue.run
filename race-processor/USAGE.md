@@ -169,12 +169,119 @@ Options:
 2. For each subsequent photo, calculates elapsed time since the first photo
 3. Matches to the GPX point at the same elapsed time from GPX start
 4. Overrides latitude, longitude, and altitude from GPX
-5. Calculates heading by drawing a line from the matched point to the next point
+5. Calculates all heading fields for Street View-like navigation:
+   - `heading_degrees`: Direction of travel (from current GPX point to next second's point)
+   - `heading_to_prev`: Bearing to previous image (for back arrow)
+   - `heading_to_next`: Bearing to next image (for forward arrow)
 
 **Offset Explanation:**
 - `--offset 0`: First photo taken at same time GPX recording started (default)
 - `--offset 2`: You pressed the GPS watch first, waited 2 seconds, then started camera
 - `--offset -2`: You started camera first, then pressed GPS watch 2 seconds later
+
+### `process-gpx` - Simplify GPX for Web Display
+
+Process a GPX track file into simplified data for minimap and elevation display.
+
+```bash
+# Basic usage (creates track-processed.json)
+race-processor process-gpx track.gpx
+
+# Custom output and 300 points
+race-processor process-gpx track.gpx -o route.json --points 300
+
+# Use RDP algorithm (preserves shape better for curvy routes)
+race-processor process-gpx track.gpx --method rdp
+```
+
+Options:
+- `-o PATH` - Output JSON path (default: `{input}-processed.json`)
+- `--points INT` - Target number of points for polyline (default: 200)
+- `--elevation-samples INT` - Number of samples for elevation profile (default: 100)
+- `--method` - Simplification method: `uniform` (distance-based) or `rdp` (shape-based)
+- `--debug` - Enable debug output
+
+**Output format:**
+```json
+{
+  "polyline": [{"lat": 22.285, "lon": 114.157}, ...],
+  "bounds": {"north": 22.3, "south": 22.2, "east": 114.2, "west": 114.1},
+  "elevation_profile": [{"distance_km": 0, "elevation_m": 15.3}, ...],
+  "total_distance_km": 42.19,
+  "stats": {
+    "original_points": 15000,
+    "simplified_points": 200,
+    "total_gain_m": 450,
+    "total_loss_m": 420
+  }
+}
+```
+
+### `db` - Database Management Commands
+
+Manage race data in the PostgreSQL database. Requires `DATABASE_URL` environment variable.
+
+#### `db init` - Initialize Schema
+
+```bash
+race-processor db init
+race-processor db init --schema ./custom-schema.sql
+```
+
+#### `db insert` - Insert Race from Config
+
+```bash
+# Insert from YAML or JSON config file
+race-processor db insert race-config.yaml
+
+# Update if race already exists
+race-processor db insert race.json --update
+```
+
+Example config file (`race-config.yaml`):
+```yaml
+slug: hk-marathon-2026
+name: Hong Kong Marathon 2026
+description: The iconic Hong Kong Marathon route
+distance_meters: 42195
+capture_date: 2026-01-15
+capture_device: Insta360 X4
+recorded_by: Angus Yip
+city: Hong Kong
+country: Hong Kong SAR
+flag_emoji: "\U0001F1ED\U0001F1F0"  # 🇭🇰
+storage_bucket: my-bucket
+storage_prefix: races/hk-marathon-2026/
+status: pending
+```
+
+#### `db list` - List All Races
+
+```bash
+race-processor db list
+race-processor db list --status ready
+race-processor db list --json
+```
+
+#### `db get` - Get Race Details
+
+```bash
+race-processor db get hk-marathon-2026
+race-processor db get <uuid> --json
+```
+
+#### `db update` - Update Race
+
+```bash
+race-processor db update hk-marathon-2026 updated-config.yaml
+```
+
+#### `db delete` - Delete Race
+
+```bash
+race-processor db delete hk-marathon-2026
+race-processor db delete hk-marathon-2026 --yes  # Skip confirmation
+```
 
 ## Commands
 
@@ -352,13 +459,20 @@ The `metadata.json` format:
       "latitude": 22.2855637,
       "longitude": 114.1576957,
       "altitude_meters": 15.3,
-      "heading_degrees": 36.51
+      "heading_degrees": 36.51,
+      "heading_to_prev": 216.51,
+      "heading_to_next": 38.23
     }
   ]
 }
 ```
 
-> **Note:** `heading_degrees` is not extracted from EXIF. Use `override-gps` to calculate it from GPX track data.
+**Heading fields for Street View-like navigation:**
+- `heading_degrees`: Direction of travel (from GPX or EXIF-based calculation)
+- `heading_to_prev`: Bearing to previous image (for back arrow in UI)
+- `heading_to_next`: Bearing to next image (for forward arrow in UI)
+
+> **Note:** During intake, headings are calculated from EXIF GPS (image-to-image). For more accurate direction of travel, use `override-gps` with GPX data (calculates from fine-grained GPS points).
 
 ## Configuration
 
