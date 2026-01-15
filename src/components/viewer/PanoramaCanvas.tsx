@@ -357,10 +357,6 @@ export function PanoramaCanvas({
           console.log("[Canvas] Created successfully, max texture size:", gl.capabilities.maxTextureSize);
           setCanvasReady(true);
         }}
-        onError={(error) => {
-          console.error("[Canvas] Error:", error);
-          setCanvasError(error?.message || "Unknown error creating WebGL context");
-        }}
       >
         <color attach="background" args={["#0a0f1a"]} />
         <PanoramaSphere
