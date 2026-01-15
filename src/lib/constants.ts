@@ -56,6 +56,8 @@ export const PRELOAD_SETTINGS = {
   preloadBehind: 1,
   // Delay before upgrading from thumbnail to medium quality
   upgradeDelayMs: 100,
+  // Delay before upgrading to full high quality
+  fullUpgradeDelayMs: 1500,
 } as const;
 
 // URL update debounce

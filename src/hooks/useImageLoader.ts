@@ -81,6 +81,23 @@ export function useImageLoader({
       } catch {
         console.error("Failed to load medium:", mediumUrl);
       }
+
+      // 3. Load full high quality after longer delay
+      await new Promise((resolve) =>
+        setTimeout(resolve, PRELOAD_SETTINGS.fullUpgradeDelayMs)
+      );
+      if (currentIndexRef.current !== currentIndex) return;
+
+      const fullUrl = getImageUrl(raceSlug, "full", currentIndex, format);
+      try {
+        await preloadImage(fullUrl);
+        if (currentIndexRef.current !== currentIndex) return;
+        setCurrentImageUrl(fullUrl);
+        setLoadedTier("full");
+      } catch {
+        // Fallback to medium is already active, so we just log the error
+        console.warn("Failed to load full resolution image:", fullUrl);
+      }
     };
 
     loadSequence();

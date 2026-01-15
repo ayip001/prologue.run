@@ -281,7 +281,7 @@ def blur_image(
     
     # 1. Create a single mask for all pixels that need blurring
     mask = np.zeros((height, width), dtype=np.uint8)
-    
+
     for region in regions:
         if region.source == DetectionSource.VEHICLE:
             continue
@@ -352,13 +352,13 @@ def blur_image(
         blurred_roi = roi.copy()
         for _ in range(config.iterations):
             blurred_roi = cv2.GaussianBlur(blurred_roi, (kernel_size, kernel_size), 0)
-            
+
         # 3. Create the feathered alpha mask using Distance Transform
         # This makes the interior (original mask) 100% white (1.0) and fades out externally
         # distanceTransform calculates distance to the nearest zero pixel.
         # We invert local_mask so it finds distance from the boundary moving outward.
         dist_outside = cv2.distanceTransform(255 - local_mask, cv2.DIST_L2, 3)
-        
+
         # Normalize distance to 0.0 - 1.0 range based on feather_size
         # Inside mask: distance is 0 -> alpha is 1.0
         # Outside mask: distance increases -> alpha decreases to 0.0
