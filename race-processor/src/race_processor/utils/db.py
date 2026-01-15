@@ -351,6 +351,12 @@ def insert_images(race_id: str, records: list[dict]) -> bool:
         from psycopg2.extras import execute_batch
         execute_batch(cur, query, values)
         
+        # Update the total_images count in the races table
+        cur.execute(
+            "UPDATE races SET total_images = (SELECT COUNT(*) FROM images WHERE race_id = %s) WHERE id = %s",
+            (race_id, race_id)
+        )
+        
         conn.commit()
         console.print(f"[green]Successfully inserted/updated {len(records)} images[/]")
         return True
