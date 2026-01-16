@@ -22,6 +22,9 @@ interface ImageMeta {
   longitude: number | null;
   distanceFromStart: number | null;
   capturedAt: string;
+  headingDegrees: number | null;
+  headingToPrev: number | null;
+  headingToNext: number | null;
 }
 
 interface Waypoint {
@@ -135,6 +138,17 @@ export function RaceViewer({
     return null;
   }, [waypoints, state.currentDistance]);
 
+  // Get current image heading data for ground arrows
+  const currentImageHeading = useMemo(() => {
+    const currentImage = images[state.currentIndex];
+    if (!currentImage) return null;
+    return {
+      headingDegrees: currentImage.headingDegrees,
+      headingToPrev: currentImage.headingToPrev,
+      headingToNext: currentImage.headingToNext,
+    };
+  }, [images, state.currentIndex]);
+
   // Handlers
   const handleCameraChange = useCallback(
     (camera: Parameters<typeof actions.setCamera>[0]) => {
@@ -159,6 +173,9 @@ export function RaceViewer({
         initialCamera={initialCameraFromUrl}
         onCameraChange={handleCameraChange}
         isLoading={isLoading}
+        headingData={currentImageHeading}
+        onNavigateNext={state.currentIndex < images.length - 1 ? actions.goNext : undefined}
+        onNavigatePrev={state.currentIndex > 0 ? actions.goPrevious : undefined}
       />
 
       {/* HUD Overlay */}

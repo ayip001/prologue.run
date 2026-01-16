@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -11,12 +11,21 @@ import { CAMERA_CONSTRAINTS } from "@/lib/constants";
 // Offset to convert between our heading (0 = forward) and OrbitControls azimuth (0 = -Z axis)
 const HEADING_OFFSET = 90;
 
+interface HeadingData {
+  headingDegrees: number | null;
+  headingToPrev: number | null;
+  headingToNext: number | null;
+}
+
 interface PanoramaCanvasProps {
   imageUrl: string | null;
   camera: CameraState;
   initialCamera: { yaw: number; pitch: number };
   onCameraChange: (camera: Partial<CameraState>) => void;
   isLoading: boolean;
+  headingData: HeadingData | null;
+  onNavigateNext?: () => void;
+  onNavigatePrev?: () => void;
 }
 
 // Error boundary fallback component
@@ -37,16 +46,214 @@ function ContextDebugger() {
   return null;
 }
 
+// Calculate arrow position in spherical coordinates
+// Returns the relative heading for the arrow (0-360)
+function calculateArrowHeading(
+  imageHeading: number,
+  targetHeading: number
+): number {
+  // Calculate relative angle: where the target is relative to image's orientation
+  let relativeAngle = targetHeading - imageHeading;
+  // Normalize to 0-360
+  relativeAngle = ((relativeAngle % 360) + 360) % 360;
+  return relativeAngle;
+}
+
+// Convert spherical coordinates to cartesian for positioning in the scene
+function sphericalToCartesian(
+  heading: number, // 0-360, 0 = forward
+  pitch: number, // degrees, negative = down
+  radius: number
+): [number, number, number] {
+  // Convert to radians
+  const headingRad = THREE.MathUtils.degToRad(heading + HEADING_OFFSET);
+  const pitchRad = THREE.MathUtils.degToRad(90 - pitch); // Convert to polar angle
+
+  // Calculate position
+  const x = radius * Math.sin(pitchRad) * Math.sin(headingRad);
+  const y = radius * Math.cos(pitchRad);
+  const z = radius * Math.sin(pitchRad) * Math.cos(headingRad);
+
+  return [x, y, z];
+}
+
+// Ground navigation arrow component
+interface GroundArrowProps {
+  heading: number; // Where to position the arrow (0-360)
+  direction: "next" | "prev";
+  onClick: () => void;
+}
+
+function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const { gl } = useThree();
+
+  // Position arrow on the ground (pitch around -55 degrees)
+  const groundPitch = -55;
+  const distance = 50; // Distance from center (smaller = closer to viewer)
+  const position = sphericalToCartesian(heading, groundPitch, distance);
+
+  // Handle cursor style
+  useEffect(() => {
+    if (isHovered) {
+      gl.domElement.style.cursor = "pointer";
+    } else {
+      gl.domElement.style.cursor = "";
+    }
+    return () => {
+      gl.domElement.style.cursor = "";
+    };
+  }, [isHovered, gl]);
+
+  // Create the arrow texture with canvas
+  const texture = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    const size = 128;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, size, size);
+
+    // Draw circle background (indigo with 90% opacity)
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - 4, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(99, 102, 241, 0.9)"; // Indigo-500 with 90% opacity
+    ctx.fill();
+
+    // Draw border (thin gray)
+    ctx.strokeStyle = "rgba(156, 163, 175, 0.8)"; // Gray-400
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Draw chevron symbol
+    ctx.beginPath();
+    const chevronSize = size * 0.3;
+    const centerX = size / 2;
+    const centerY = size / 2;
+
+    if (direction === "next") {
+      // ">" pointing forward
+      ctx.moveTo(centerX - chevronSize / 3, centerY - chevronSize / 2);
+      ctx.lineTo(centerX + chevronSize / 3, centerY);
+      ctx.lineTo(centerX - chevronSize / 3, centerY + chevronSize / 2);
+    } else {
+      // "<" pointing backward
+      ctx.moveTo(centerX + chevronSize / 3, centerY - chevronSize / 2);
+      ctx.lineTo(centerX - chevronSize / 3, centerY);
+      ctx.lineTo(centerX + chevronSize / 3, centerY + chevronSize / 2);
+    }
+
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 6;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.stroke();
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }, [direction]);
+
+  // Hovered texture (brighter)
+  const hoveredTexture = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    const size = 128;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, size, size);
+
+    // Draw circle background (brighter indigo for hover)
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - 4, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(129, 140, 248, 0.95)"; // Indigo-400 brighter
+    ctx.fill();
+
+    // Draw border (lighter for hover)
+    ctx.strokeStyle = "rgba(209, 213, 219, 0.9)"; // Gray-300
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Draw chevron symbol
+    ctx.beginPath();
+    const chevronSize = size * 0.3;
+    const centerX = size / 2;
+    const centerY = size / 2;
+
+    if (direction === "next") {
+      ctx.moveTo(centerX - chevronSize / 3, centerY - chevronSize / 2);
+      ctx.lineTo(centerX + chevronSize / 3, centerY);
+      ctx.lineTo(centerX - chevronSize / 3, centerY + chevronSize / 2);
+    } else {
+      ctx.moveTo(centerX + chevronSize / 3, centerY - chevronSize / 2);
+      ctx.lineTo(centerX - chevronSize / 3, centerY);
+      ctx.lineTo(centerX + chevronSize / 3, centerY + chevronSize / 2);
+    }
+
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 6;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.stroke();
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }, [direction]);
+
+  if (!texture || !hoveredTexture) return null;
+
+  return (
+    <sprite
+      ref={meshRef as any}
+      position={position}
+      scale={[8, 8, 1]}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        setIsHovered(true);
+      }}
+      onPointerOut={(e) => {
+        e.stopPropagation();
+        setIsHovered(false);
+      }}
+    >
+      <spriteMaterial
+        map={isHovered ? hoveredTexture : texture}
+        transparent={true}
+        depthTest={false}
+        depthWrite={false}
+      />
+    </sprite>
+  );
+}
+
 function PanoramaSphere({
   imageUrl,
   initialCamera,
   fov,
   onCameraChange,
+  headingData,
+  onNavigateNext,
+  onNavigatePrev,
 }: {
   imageUrl: string | null;
   initialCamera: { yaw: number; pitch: number };
   fov: number;
   onCameraChange: (camera: Partial<CameraState>) => void;
+  headingData: HeadingData | null;
+  onNavigateNext?: () => void;
+  onNavigatePrev?: () => void;
 }) {
   const { camera: threeCamera, invalidate: invalidateFrame, gl } = useThree();
   const controlsRef = useRef<any>(null);
@@ -54,6 +261,29 @@ function PanoramaSphere({
   const meshRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.MeshBasicMaterial>(null);
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
+
+  // Calculate arrow headings based on heading data
+  const arrowHeadings = useMemo(() => {
+    if (!headingData || headingData.headingDegrees === null) {
+      return { next: null, prev: null };
+    }
+
+    const imageHeading = headingData.headingDegrees;
+
+    // Calculate next arrow heading
+    let nextHeading: number | null = null;
+    if (headingData.headingToNext !== null && onNavigateNext) {
+      nextHeading = calculateArrowHeading(imageHeading, headingData.headingToNext);
+    }
+
+    // Calculate prev arrow heading
+    let prevHeading: number | null = null;
+    if (headingData.headingToPrev !== null && onNavigatePrev) {
+      prevHeading = calculateArrowHeading(imageHeading, headingData.headingToPrev);
+    }
+
+    return { next: nextHeading, prev: prevHeading };
+  }, [headingData, onNavigateNext, onNavigatePrev]);
 
   // Camera state refs
   const initialCameraRef = useRef<{ yaw: number; pitch: number }>({ yaw: initialCamera.yaw, pitch: initialCamera.pitch });
@@ -295,6 +525,22 @@ function PanoramaSphere({
         />
       </mesh>
 
+      {/* Ground navigation arrows */}
+      {arrowHeadings.next !== null && onNavigateNext && (
+        <GroundArrow
+          heading={arrowHeadings.next}
+          direction="next"
+          onClick={onNavigateNext}
+        />
+      )}
+      {arrowHeadings.prev !== null && onNavigatePrev && (
+        <GroundArrow
+          heading={arrowHeadings.prev}
+          direction="prev"
+          onClick={onNavigatePrev}
+        />
+      )}
+
       {/* Camera controls */}
       <OrbitControls
         ref={controlsRef}
@@ -319,6 +565,9 @@ export function PanoramaCanvas({
   initialCamera,
   onCameraChange,
   isLoading,
+  headingData,
+  onNavigateNext,
+  onNavigatePrev,
 }: PanoramaCanvasProps) {
   const [canvasError, setCanvasError] = useState<string | null>(null);
   const [canvasReady, setCanvasReady] = useState(false);
@@ -366,6 +615,9 @@ export function PanoramaCanvas({
           initialCamera={initialCamera}
           fov={camera.fov}
           onCameraChange={onCameraChange}
+          headingData={headingData}
+          onNavigateNext={onNavigateNext}
+          onNavigatePrev={onNavigatePrev}
         />
       </Canvas>
 
