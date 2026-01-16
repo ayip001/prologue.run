@@ -24,7 +24,7 @@ export function useViewer({
   initialCamera,
 }: UseViewerOptions): UseViewerReturn {
   const [state, setState] = useState<ViewerState>(() => ({
-    currentIndex: Math.min(initialPosition, totalImages - 1),
+    currentIndex: Math.max(0, Math.min(initialPosition, totalImages - 1)),
     currentDistance: images[initialPosition]?.distanceFromStart ?? 0,
     camera: {
       yaw: normalizeHeading(initialCamera?.yaw ?? DEFAULT_VIEW.heading),
@@ -62,7 +62,7 @@ export function useViewer({
       Math.abs(state.camera.fov - parsed.fov) > 0.1;
 
     if (needsUpdate) {
-      const clampedIndex = Math.min(parsed.position, totalImages - 1);
+      const clampedIndex = Math.max(0, Math.min(parsed.position, totalImages - 1));
       setState((prev) => ({
         ...prev,
         currentIndex: clampedIndex,

@@ -42,7 +42,7 @@ export function useImageLoader({
 
   // Load current image with progressive quality (or instant if cached)
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || currentIndex < 0 || currentIndex >= totalImages) {
       setIsLoading(false);
       return;
     }
