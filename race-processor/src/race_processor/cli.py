@@ -168,6 +168,19 @@ def main() -> None:
     default=None,
     help="Custom copyright text (default: '© {year} Prologue.run'). Use {year} for current year.",
 )
+@click.option(
+    "--gpx",
+    "gpx_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Path to GPX track file for GPS override",
+)
+@click.option(
+    "--gpx-offset",
+    type=float,
+    default=0.0,
+    help="Time offset in seconds between GPX start and first photo (default: 0)",
+)
 def process(
     input_dir: Path | None,
     race_slug: str | None,
@@ -187,6 +200,8 @@ def process(
     step: int | None,
     single_image: str | None,
     copyright_text: str | None,
+    gpx_path: Path | None,
+    gpx_offset: float,
 ) -> None:
     """Process equirectangular images through the pipeline.
 
@@ -299,7 +314,7 @@ def process(
     # Load R2 config
     r2_config = load_r2_config()
 
-    config = PipelineConfig(
+        config = PipelineConfig(
         input_dir=input_dir,
         output_dir=output_dir,
         race_slug=race_slug,
@@ -311,6 +326,8 @@ def process(
         step_control=step_control,
         copyright=copyright_config,
         r2=r2_config,
+        gpx_path=gpx_path,
+        gpx_offset=gpx_offset,
     )
 
     # Import and run orchestrator

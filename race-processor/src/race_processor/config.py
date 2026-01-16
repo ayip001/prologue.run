@@ -201,6 +201,10 @@ class PipelineConfig(BaseModel):
         description="Override R2 storage prefix (default: races/{race_slug})"
     )
 
+    # GPX override settings
+    gpx_path: Path | None = Field(default=None, description="Path to GPX track for GPS override")
+    gpx_offset: float = Field(default=0.0, description="Time offset in seconds for GPX matching")
+
     # Component configs
     face_detection: FaceDetectionConfig = Field(default_factory=FaceDetectionConfig)
     body_pose: BodyPoseConfig = Field(default_factory=BodyPoseConfig)

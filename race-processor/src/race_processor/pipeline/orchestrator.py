@@ -36,6 +36,7 @@ from .intake import run_intake, load_manifest, IntakeManifest
 from .watermark import add_copyright_watermark, process_single_image as watermark_single
 from .export import run_export
 from .upload import run_upload, run_privacy_check
+from ..utils.gpx_override import override_gps_from_gpx, save_manifest
 from ..detection.ensemble import (
     PrivacyBlurEnsemble,
     blur_image,
@@ -208,6 +209,14 @@ def print_step_summary(config: PipelineConfig, blur_mode: str = "full") -> None:
         console.print(
             f"\n[bold cyan]Single image mode:[/] {config.step_control.single_image}"
         )
+
+    if config.gpx_path:
+        console.print(
+            f"\n[bold magenta]GPX GPS Override active[/] - "
+            f"Data from {config.gpx_path.name} will be used"
+        )
+        if config.gpx_offset != 0:
+            console.print(f"  Offset: {config.gpx_offset:+.1f}s")
 
     console.print()
 
@@ -508,6 +517,25 @@ def run_pipeline(
         manifest = load_manifest(dirs["intake"])
         if manifest:
             console.print(f"  [dim]Loaded existing manifest: {manifest.total_images} images[/]")
+
+    # =========================================================================
+    # GPX GPS Override
+    # =========================================================================
+    if config.gpx_path:
+        console.print("\n[bold]Applying GPX GPS Override[/]")
+        manifest_path = dirs["intake"] / "metadata.json"
+        if not manifest_path.exists():
+            console.print(f"  [red]Error: Cannot apply GPX override - manifest not found at {manifest_path}[/]")
+        else:
+            updated_manifest = override_gps_from_gpx(
+                manifest_path=manifest_path,
+                gpx_path=config.gpx_path,
+                offset_seconds=config.gpx_offset,
+                debug=config.debug.enabled,
+            )
+            save_manifest(updated_manifest, manifest_path)
+            # Update the in-memory manifest for subsequent steps
+            manifest = load_manifest(dirs["intake"])
 
     # =========================================================================
     # Stage 2: Blur
