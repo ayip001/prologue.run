@@ -53,9 +53,6 @@ interface ImageRow {
   path_thumbnail: string;
   path_medium: string;
   path_full: string;
-  path_thumb_webp: string;
-  path_med_webp: string;
-  path_full_webp: string;
   file_size_thumb: number | null;
   file_size_medium: number | null;
   file_size_full: number | null;
@@ -150,9 +147,6 @@ function transformImage(row: ImageRow): ImageMeta {
     pathThumbnail: row.path_thumbnail,
     pathMedium: row.path_medium,
     pathFull: row.path_full,
-    pathThumbWebp: row.path_thumb_webp,
-    pathMedWebp: row.path_med_webp,
-    pathFullWebp: row.path_full_webp,
     fileSizeThumb: row.file_size_thumb,
     fileSizeMedium: row.file_size_medium,
     fileSizeFull: row.file_size_full,

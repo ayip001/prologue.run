@@ -23,11 +23,8 @@ export function getImageUrl(
 export function getAllImageUrls(raceSlug: string, positionIndex: number): ImageUrls {
   return {
     thumbnail: getImageUrl(raceSlug, "thumbnail", positionIndex, "webp"),
-    thumbnailWebp: getImageUrl(raceSlug, "thumbnail", positionIndex, "webp"),
     medium: getImageUrl(raceSlug, "medium", positionIndex, "webp"),
-    mediumWebp: getImageUrl(raceSlug, "medium", positionIndex, "webp"),
     full: getImageUrl(raceSlug, "full", positionIndex, "webp"),
-    fullWebp: getImageUrl(raceSlug, "full", positionIndex, "webp"),
   };
 }
 

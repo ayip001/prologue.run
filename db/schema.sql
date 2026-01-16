@@ -93,11 +93,6 @@ CREATE TABLE images (
     path_medium     VARCHAR(255) NOT NULL,         -- 'medium/0001.webp'
     path_full       VARCHAR(255) NOT NULL,         -- 'full/0001.webp'
 
-    -- Legacy fallback paths (kept for backwards compatibility)
-    path_thumb_webp VARCHAR(255),
-    path_med_webp   VARCHAR(255),
-    path_full_webp  VARCHAR(255),
-
     -- Processing metadata
     file_size_thumb INTEGER,                       -- bytes
     file_size_medium INTEGER,
