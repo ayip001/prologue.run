@@ -45,6 +45,8 @@ export function getBestImageUrl(
 export function preloadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    // Required for cross-origin images, especially on iOS Safari
+    img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = reject;
     img.src = url;

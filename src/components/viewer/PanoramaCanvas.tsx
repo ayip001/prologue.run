@@ -93,6 +93,8 @@ function PanoramaSphere({
     }
 
     const loader = new THREE.TextureLoader();
+    // Required for cross-origin images, especially on iOS Safari
+    loader.crossOrigin = "anonymous";
     let cancelled = false;
 
     loader.load(
