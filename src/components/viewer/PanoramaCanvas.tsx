@@ -109,28 +109,33 @@ function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
     };
   }, [isHovered, gl]);
 
-  // Calculate rotation: face the camera but tilt to lie on the "ground"
-  const rotation = useMemo(() => {
+  // Apply rotation: face camera, then rotate so "up" points radially outward, then tilt
+  useEffect(() => {
+    if (!meshRef.current) return;
+
+    const mesh = meshRef.current;
+
+    // Step 1: Make the mesh face the origin (camera position)
+    mesh.lookAt(0, 0, 0);
+
+    // Step 2: Rotate around local Z so "up" on texture points radially outward
+    // The heading angle determines where on the sphere we are
+    // We need to rotate by heading so the arrow points away from center
     const headingRad = THREE.MathUtils.degToRad(heading);
-    const pitchRad = THREE.MathUtils.degToRad(groundPitch);
+    mesh.rotateZ(-headingRad);
 
-    // Create euler angles:
-    // 1. Rotate around Y to face the correct heading direction
-    // 2. Tilt forward to simulate lying on the ground
-    // The plane should face outward (toward camera) but tilted
+    // Step 3: Tilt around local X for foreshortening (ground perspective)
+    const tiltAngle = THREE.MathUtils.degToRad(-groundPitch);
+    mesh.rotateX(tiltAngle);
 
-    // Angle from vertical - this creates the foreshortening effect
-    const tiltAngle = Math.PI / 2 + pitchRad; // 90° minus pitch angle
+    // Debug logging for arrow orientation
+    const euler = mesh.rotation;
+    console.log(`[GroundArrow ${direction}] heading=${heading.toFixed(1)}°, pitch=${groundPitch}°`);
+    console.log(`  position: [${position[0].toFixed(2)}, ${position[1].toFixed(2)}, ${position[2].toFixed(2)}]`);
+    console.log(`  rotation (euler): [${THREE.MathUtils.radToDeg(euler.x).toFixed(1)}°, ${THREE.MathUtils.radToDeg(euler.y).toFixed(1)}°, ${THREE.MathUtils.radToDeg(euler.z).toFixed(1)}°]`);
+  }, [heading, groundPitch, direction, position]);
 
-    return new THREE.Euler(
-      tiltAngle,           // Tilt forward (X rotation)
-      -headingRad + Math.PI, // Face outward (Y rotation)
-      0,                   // No roll
-      'YXZ'
-    );
-  }, [heading, groundPitch]);
-
-  // Create the arrow texture with upward-pointing chevron
+  // Create texture: filled tall isosceles triangle for "next", bordered for "prev"
   const texture = useMemo(() => {
     const canvas = document.createElement("canvas");
     const size = 128;
@@ -152,27 +157,35 @@ function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    // Draw upward-pointing chevron (^) - always points outward/forward
+    // Draw tall isosceles triangle pointing up
     ctx.beginPath();
-    const chevronSize = size * 0.35;
+    const triHeight = size * 0.45;
+    const triWidth = size * 0.3;
     const centerX = size / 2;
     const centerY = size / 2;
 
-    // Draw "^" shape pointing up (outward from camera)
-    ctx.moveTo(centerX - chevronSize / 2, centerY + chevronSize / 3);
-    ctx.lineTo(centerX, centerY - chevronSize / 3);
-    ctx.lineTo(centerX + chevronSize / 2, centerY + chevronSize / 3);
+    // Triangle vertices: top point, bottom-left, bottom-right
+    ctx.moveTo(centerX, centerY - triHeight / 2);                    // Top
+    ctx.lineTo(centerX - triWidth / 2, centerY + triHeight / 2);     // Bottom-left
+    ctx.lineTo(centerX + triWidth / 2, centerY + triHeight / 2);     // Bottom-right
+    ctx.closePath();
 
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 6;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.stroke();
+    if (direction === "next") {
+      // Filled triangle for forward
+      ctx.fillStyle = "white";
+      ctx.fill();
+    } else {
+      // Bordered triangle for backward
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 4;
+      ctx.lineJoin = "round";
+      ctx.stroke();
+    }
 
     const tex = new THREE.CanvasTexture(canvas);
     tex.needsUpdate = true;
     return tex;
-  }, []);
+  }, [direction]);
 
   // Hovered texture (brighter)
   const hoveredTexture = useMemo(() => {
@@ -196,26 +209,32 @@ function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    // Draw upward-pointing chevron
+    // Draw tall isosceles triangle pointing up
     ctx.beginPath();
-    const chevronSize = size * 0.35;
+    const triHeight = size * 0.45;
+    const triWidth = size * 0.3;
     const centerX = size / 2;
     const centerY = size / 2;
 
-    ctx.moveTo(centerX - chevronSize / 2, centerY + chevronSize / 3);
-    ctx.lineTo(centerX, centerY - chevronSize / 3);
-    ctx.lineTo(centerX + chevronSize / 2, centerY + chevronSize / 3);
+    ctx.moveTo(centerX, centerY - triHeight / 2);
+    ctx.lineTo(centerX - triWidth / 2, centerY + triHeight / 2);
+    ctx.lineTo(centerX + triWidth / 2, centerY + triHeight / 2);
+    ctx.closePath();
 
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 6;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.stroke();
+    if (direction === "next") {
+      ctx.fillStyle = "white";
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 4;
+      ctx.lineJoin = "round";
+      ctx.stroke();
+    }
 
     const tex = new THREE.CanvasTexture(canvas);
     tex.needsUpdate = true;
     return tex;
-  }, []);
+  }, [direction]);
 
   if (!texture || !hoveredTexture) return null;
 
@@ -223,7 +242,6 @@ function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
     <mesh
       ref={meshRef}
       position={position}
-      rotation={rotation}
       onClick={(e) => {
         e.stopPropagation();
         onClick();
