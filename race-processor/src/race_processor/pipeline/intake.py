@@ -46,6 +46,7 @@ class ImageMetadata:
     heading_degrees: Optional[float] = None  # Direction of travel
     heading_to_prev: Optional[float] = None  # Bearing to previous image (for back arrow)
     heading_to_next: Optional[float] = None  # Bearing to next image (for forward arrow)
+    distance_from_start: Optional[int] = None  # Cumulative distance in meters (from GPX)
 
 
 @dataclass

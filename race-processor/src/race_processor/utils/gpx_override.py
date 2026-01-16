@@ -16,7 +16,7 @@ import gpxpy.gpx
 from rich.console import Console
 from rich.table import Table
 
-from .geo import calculate_bearing, calculate_image_headings
+from .geo import calculate_bearing, calculate_image_headings, haversine_distance
 
 console = Console()
 
@@ -51,6 +51,38 @@ def parse_gpx_with_time(gpx_path: Path) -> list[dict]:
     points.sort(key=lambda p: p["time"])
 
     return points
+
+
+def calculate_cumulative_distances(gpx_points: list[dict]) -> list[int]:
+    """
+    Pre-calculate cumulative distance from start for each GPX point.
+
+    This is done once upfront for efficiency, so each image lookup is O(1)
+    instead of recalculating the sum each time.
+
+    Args:
+        gpx_points: List of GPX points with 'lat', 'lon' keys
+
+    Returns:
+        List of cumulative distances in meters (integer), same length as gpx_points
+    """
+    if not gpx_points:
+        return []
+
+    cumulative = [0]  # First point is at distance 0
+
+    for i in range(1, len(gpx_points)):
+        prev = gpx_points[i - 1]
+        curr = gpx_points[i]
+
+        segment_dist = haversine_distance(
+            prev["lat"], prev["lon"],
+            curr["lat"], curr["lon"]
+        )
+
+        cumulative.append(cumulative[-1] + int(round(segment_dist)))
+
+    return cumulative
 
 
 def find_gpx_point_by_elapsed_time(
@@ -193,6 +225,11 @@ def override_gps_from_gpx(
 
     console.print(f"  Found {len(gpx_points)} track points in GPX")
 
+    # Pre-calculate cumulative distances for all GPX points (O(n) once, O(1) per image lookup)
+    gpx_cumulative_distances = calculate_cumulative_distances(gpx_points)
+    total_gpx_distance = gpx_cumulative_distances[-1] if gpx_cumulative_distances else 0
+    console.print(f"  Total GPX track distance: {total_gpx_distance:,} meters ({total_gpx_distance/1000:.2f} km)")
+
     # Get reference times
     gpx_start_time = gpx_points[0]["time"]
     gpx_end_time = gpx_points[-1]["time"]
@@ -289,11 +326,15 @@ def override_gps_from_gpx(
         # Store GPX index for heading calculation
         img["_gpx_idx"] = nearest_idx
 
+        # Assign cumulative distance from start (pre-calculated for efficiency)
+        img["distance_from_start"] = gpx_cumulative_distances[nearest_idx]
+
         stats["updated"] += 1
 
         if debug:
             console.print(f"    GPS: ({old_lat}, {old_lon}) -> ({img['latitude']}, {img['longitude']})")
             console.print(f"    Altitude: {img['altitude_meters']}m")
+            console.print(f"    Distance from start: {img['distance_from_start']:,}m")
 
     # Calculate heading_degrees from GPX fine-grained data (direction of travel)
     # This uses a 5-point moving average for accurate direction
@@ -375,5 +416,11 @@ def _print_summary(
     headings = [img.get("heading_degrees") for img in images if img.get("heading_degrees") is not None]
     if headings:
         table.add_row("Heading range", f"{min(headings):.1f}° to {max(headings):.1f}°")
+
+    # Show distance range
+    distances = [img.get("distance_from_start") for img in images if img.get("distance_from_start") is not None]
+    if distances:
+        max_dist = max(distances)
+        table.add_row("Distance range", f"0 to {max_dist:,}m ({max_dist/1000:.2f} km)")
 
     console.print(table)

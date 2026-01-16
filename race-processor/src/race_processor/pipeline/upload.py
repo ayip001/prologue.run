@@ -269,6 +269,8 @@ def generate_db_records(
             "heading_degrees": meta.heading_degrees,
             "heading_to_prev": meta.heading_to_prev,
             "heading_to_next": meta.heading_to_next,
+            # Distance from start (calculated from GPX track)
+            "distance_from_start": meta.distance_from_start,
             # Storage paths (WebP only)
             "path_thumbnail": f"thumb/{base_name}.webp",
             "path_medium": f"medium/{base_name}.webp",

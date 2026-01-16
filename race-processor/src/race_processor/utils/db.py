@@ -312,6 +312,7 @@ def insert_images(race_id: str, records: list[dict]) -> bool:
         fields = [
             "race_id", "position_index", "latitude", "longitude", "altitude_meters",
             "captured_at", "heading_degrees", "heading_to_prev", "heading_to_next",
+            "distance_from_start",
             "path_thumbnail", "path_medium", "path_full",
             "has_blur_applied"
         ]
@@ -336,6 +337,7 @@ def insert_images(race_id: str, records: list[dict]) -> bool:
                 rec.get("heading_degrees"),
                 rec.get("heading_to_prev"),
                 rec.get("heading_to_next"),
+                rec.get("distance_from_start"),
                 rec["path_thumbnail"],
                 rec["path_medium"],
                 rec["path_full"],
