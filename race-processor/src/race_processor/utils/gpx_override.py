@@ -95,18 +95,17 @@ def find_gpx_point_by_elapsed_time(
 def calculate_heading_from_gpx(
     gpx_points: list[dict],
     current_idx: int,
-    target_seconds_ahead: float = 1.0,
 ) -> Optional[float]:
     """
     Calculate heading (direction of travel) using fine-grained GPX data.
 
-    Finds the GPX point approximately target_seconds_ahead from the current point
-    and calculates the bearing from current to that point.
+    Calculates heading by drawing an average line using a 5-point window
+    centered on the current position (2 points behind, current point, 2 points ahead).
+    At the start and end of the track, the window is shifted to still use 5 points.
 
     Args:
         gpx_points: List of GPX points with 'time', 'lat', 'lon' keys
         current_idx: Index of the current GPX point
-        target_seconds_ahead: How many seconds ahead to look for direction (default: 1.0)
 
     Returns:
         Heading in degrees (0-360, where 0 is North), or None if can't calculate
@@ -114,44 +113,27 @@ def calculate_heading_from_gpx(
     if current_idx is None or not gpx_points:
         return None
 
-    current_point = gpx_points[current_idx]
-    current_time = current_point["time"]
+    n = len(gpx_points)
+    if n < 2:
+        return None
 
-    # Find the point closest to target_seconds_ahead from current
-    best_idx = None
-    best_diff = float("inf")
+    # We want a 5-point window for smoothing
+    window_size = 5
 
-    for i in range(current_idx + 1, len(gpx_points)):
-        point_time = gpx_points[i]["time"]
-        time_diff = (point_time - current_time).total_seconds()
+    if n < window_size:
+        # Fallback for very short tracks: use first and last points
+        start_idx = 0
+        end_idx = n - 1
+    else:
+        # Center window on current_idx, but shift if at start/end to keep it window_size long
+        # This ensures we always use 5 points even at the edges
+        start_idx = max(0, min(current_idx - 2, n - window_size))
+        end_idx = start_idx + window_size - 1
 
-        # Find point closest to target seconds ahead
-        diff_from_target = abs(time_diff - target_seconds_ahead)
-        if diff_from_target < best_diff:
-            best_diff = diff_from_target
-            best_idx = i
-
-        # Stop searching if we're past the target
-        if time_diff > target_seconds_ahead * 2:
-            break
-
-    # If no point ahead found, try using a point behind (for last points)
-    if best_idx is None:
-        if current_idx == 0:
-            return None  # Only one point, can't calculate
-
-        # Use previous point to current for direction
-        prev_point = gpx_points[current_idx - 1]
-        return round(calculate_bearing(
-            prev_point["lat"], prev_point["lon"],
-            current_point["lat"], current_point["lon"]
-        ), 2)
-
-    # Calculate bearing from current to future point
-    future_point = gpx_points[best_idx]
+    # Calculate bearing from start of window to end of window for a smoothed direction
     return round(calculate_bearing(
-        current_point["lat"], current_point["lon"],
-        future_point["lat"], future_point["lon"]
+        gpx_points[start_idx]["lat"], gpx_points[start_idx]["lon"],
+        gpx_points[end_idx]["lat"], gpx_points[end_idx]["lon"]
     ), 2)
 
 
@@ -314,15 +296,15 @@ def override_gps_from_gpx(
             console.print(f"    Altitude: {img['altitude_meters']}m")
 
     # Calculate heading_degrees from GPX fine-grained data (direction of travel)
-    # This uses the GPX point ~1 second ahead for accurate direction
+    # This uses a 5-point moving average for accurate direction
     console.print("\n  Calculating headings...")
-    console.print("    heading_degrees: from GPX (current point -> next second)")
+    console.print("    heading_degrees: from GPX (5-point moving average)")
     console.print("    heading_to_prev/next: to adjacent images")
 
     for img in images:
         gpx_idx = img.pop("_gpx_idx", None)  # Remove temporary key
         if gpx_idx is not None:
-            heading = calculate_heading_from_gpx(gpx_points, gpx_idx, target_seconds_ahead=1.0)
+            heading = calculate_heading_from_gpx(gpx_points, gpx_idx)
             if heading is not None:
                 img["heading_degrees"] = heading
 

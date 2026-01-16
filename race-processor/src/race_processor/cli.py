@@ -314,7 +314,7 @@ def process(
     # Load R2 config
     r2_config = load_r2_config()
 
-        config = PipelineConfig(
+    config = PipelineConfig(
         input_dir=input_dir,
         output_dir=output_dir,
         race_slug=race_slug,
