@@ -60,24 +60,27 @@ function calculateArrowHeading(
 }
 
 // Convert spherical coordinates to cartesian for positioning in the scene
+// heading: 0-360, 0 = forward (where camera faces at azimuth 90°)
+// pitch: degrees, negative = down
 function sphericalToCartesian(
-  heading: number, // 0-360, 0 = forward
-  pitch: number, // degrees, negative = down
+  heading: number,
+  pitch: number,
   radius: number
 ): [number, number, number] {
-  // Convert to radians
-  const headingRad = THREE.MathUtils.degToRad(heading + HEADING_OFFSET);
-  const pitchRad = THREE.MathUtils.degToRad(90 - pitch); // Convert to polar angle
+  const headingRad = THREE.MathUtils.degToRad(heading);
+  const pitchRad = THREE.MathUtils.degToRad(pitch);
 
-  // Calculate position
-  const x = radius * Math.sin(pitchRad) * Math.sin(headingRad);
-  const y = radius * Math.cos(pitchRad);
-  const z = radius * Math.sin(pitchRad) * Math.cos(headingRad);
+  // At heading 0, we want position along -X (where camera looks at azimuth 90°)
+  // At heading 90, we want position along +Z
+  const horizontalRadius = radius * Math.cos(pitchRad);
+  const x = -horizontalRadius * Math.cos(headingRad);
+  const y = radius * Math.sin(pitchRad);
+  const z = horizontalRadius * Math.sin(headingRad);
 
   return [x, y, z];
 }
 
-// Ground navigation arrow component
+// Ground navigation arrow component using mesh for perspective distortion
 interface GroundArrowProps {
   heading: number; // Where to position the arrow (0-360)
   direction: "next" | "prev";
@@ -89,9 +92,9 @@ function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
   const [isHovered, setIsHovered] = useState(false);
   const { gl } = useThree();
 
-  // Position arrow on the ground (pitch around -55 degrees)
-  const groundPitch = -55;
-  const distance = 50; // Distance from center (smaller = closer to viewer)
+  // Position arrow on the ground (pitch around -35 degrees)
+  const groundPitch = -35;
+  const distance = 50;
   const position = sphericalToCartesian(heading, groundPitch, distance);
 
   // Handle cursor style
@@ -106,7 +109,28 @@ function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
     };
   }, [isHovered, gl]);
 
-  // Create the arrow texture with canvas
+  // Calculate rotation: face the camera but tilt to lie on the "ground"
+  const rotation = useMemo(() => {
+    const headingRad = THREE.MathUtils.degToRad(heading);
+    const pitchRad = THREE.MathUtils.degToRad(groundPitch);
+
+    // Create euler angles:
+    // 1. Rotate around Y to face the correct heading direction
+    // 2. Tilt forward to simulate lying on the ground
+    // The plane should face outward (toward camera) but tilted
+
+    // Angle from vertical - this creates the foreshortening effect
+    const tiltAngle = Math.PI / 2 + pitchRad; // 90° minus pitch angle
+
+    return new THREE.Euler(
+      tiltAngle,           // Tilt forward (X rotation)
+      -headingRad + Math.PI, // Face outward (Y rotation)
+      0,                   // No roll
+      'YXZ'
+    );
+  }, [heading, groundPitch]);
+
+  // Create the arrow texture with upward-pointing chevron
   const texture = useMemo(() => {
     const canvas = document.createElement("canvas");
     const size = 128;
@@ -115,37 +139,29 @@ function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    // Clear canvas
     ctx.clearRect(0, 0, size, size);
 
     // Draw circle background (indigo with 90% opacity)
     ctx.beginPath();
     ctx.arc(size / 2, size / 2, size / 2 - 4, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(99, 102, 241, 0.9)"; // Indigo-500 with 90% opacity
+    ctx.fillStyle = "rgba(99, 102, 241, 0.9)";
     ctx.fill();
 
     // Draw border (thin gray)
-    ctx.strokeStyle = "rgba(156, 163, 175, 0.8)"; // Gray-400
+    ctx.strokeStyle = "rgba(156, 163, 175, 0.8)";
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    // Draw chevron symbol
+    // Draw upward-pointing chevron (^) - always points outward/forward
     ctx.beginPath();
-    const chevronSize = size * 0.3;
+    const chevronSize = size * 0.35;
     const centerX = size / 2;
     const centerY = size / 2;
 
-    if (direction === "next") {
-      // ">" pointing forward
-      ctx.moveTo(centerX - chevronSize / 3, centerY - chevronSize / 2);
-      ctx.lineTo(centerX + chevronSize / 3, centerY);
-      ctx.lineTo(centerX - chevronSize / 3, centerY + chevronSize / 2);
-    } else {
-      // "<" pointing backward
-      ctx.moveTo(centerX + chevronSize / 3, centerY - chevronSize / 2);
-      ctx.lineTo(centerX - chevronSize / 3, centerY);
-      ctx.lineTo(centerX + chevronSize / 3, centerY + chevronSize / 2);
-    }
+    // Draw "^" shape pointing up (outward from camera)
+    ctx.moveTo(centerX - chevronSize / 2, centerY + chevronSize / 3);
+    ctx.lineTo(centerX, centerY - chevronSize / 3);
+    ctx.lineTo(centerX + chevronSize / 2, centerY + chevronSize / 3);
 
     ctx.strokeStyle = "white";
     ctx.lineWidth = 6;
@@ -156,7 +172,7 @@ function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
     const tex = new THREE.CanvasTexture(canvas);
     tex.needsUpdate = true;
     return tex;
-  }, [direction]);
+  }, []);
 
   // Hovered texture (brighter)
   const hoveredTexture = useMemo(() => {
@@ -167,35 +183,28 @@ function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    // Clear canvas
     ctx.clearRect(0, 0, size, size);
 
     // Draw circle background (brighter indigo for hover)
     ctx.beginPath();
     ctx.arc(size / 2, size / 2, size / 2 - 4, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(129, 140, 248, 0.95)"; // Indigo-400 brighter
+    ctx.fillStyle = "rgba(129, 140, 248, 0.95)";
     ctx.fill();
 
     // Draw border (lighter for hover)
-    ctx.strokeStyle = "rgba(209, 213, 219, 0.9)"; // Gray-300
+    ctx.strokeStyle = "rgba(209, 213, 219, 0.9)";
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    // Draw chevron symbol
+    // Draw upward-pointing chevron
     ctx.beginPath();
-    const chevronSize = size * 0.3;
+    const chevronSize = size * 0.35;
     const centerX = size / 2;
     const centerY = size / 2;
 
-    if (direction === "next") {
-      ctx.moveTo(centerX - chevronSize / 3, centerY - chevronSize / 2);
-      ctx.lineTo(centerX + chevronSize / 3, centerY);
-      ctx.lineTo(centerX - chevronSize / 3, centerY + chevronSize / 2);
-    } else {
-      ctx.moveTo(centerX + chevronSize / 3, centerY - chevronSize / 2);
-      ctx.lineTo(centerX - chevronSize / 3, centerY);
-      ctx.lineTo(centerX + chevronSize / 3, centerY + chevronSize / 2);
-    }
+    ctx.moveTo(centerX - chevronSize / 2, centerY + chevronSize / 3);
+    ctx.lineTo(centerX, centerY - chevronSize / 3);
+    ctx.lineTo(centerX + chevronSize / 2, centerY + chevronSize / 3);
 
     ctx.strokeStyle = "white";
     ctx.lineWidth = 6;
@@ -206,15 +215,15 @@ function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
     const tex = new THREE.CanvasTexture(canvas);
     tex.needsUpdate = true;
     return tex;
-  }, [direction]);
+  }, []);
 
   if (!texture || !hoveredTexture) return null;
 
   return (
-    <sprite
-      ref={meshRef as any}
+    <mesh
+      ref={meshRef}
       position={position}
-      scale={[8, 8, 1]}
+      rotation={rotation}
       onClick={(e) => {
         e.stopPropagation();
         onClick();
@@ -228,13 +237,15 @@ function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
         setIsHovered(false);
       }}
     >
-      <spriteMaterial
+      <circleGeometry args={[4, 32]} />
+      <meshBasicMaterial
         map={isHovered ? hoveredTexture : texture}
         transparent={true}
+        side={THREE.DoubleSide}
         depthTest={false}
         depthWrite={false}
       />
-    </sprite>
+    </mesh>
   );
 }
 
