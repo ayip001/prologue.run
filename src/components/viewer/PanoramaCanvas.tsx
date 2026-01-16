@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -11,12 +11,21 @@ import { CAMERA_CONSTRAINTS } from "@/lib/constants";
 // Offset to convert between our heading (0 = forward) and OrbitControls azimuth (0 = -Z axis)
 const HEADING_OFFSET = 90;
 
+interface HeadingData {
+  headingDegrees: number | null;
+  headingToPrev: number | null;
+  headingToNext: number | null;
+}
+
 interface PanoramaCanvasProps {
   imageUrl: string | null;
   camera: CameraState;
   initialCamera: { yaw: number; pitch: number };
   onCameraChange: (camera: Partial<CameraState>) => void;
   isLoading: boolean;
+  headingData: HeadingData | null;
+  onNavigateNext?: () => void;
+  onNavigatePrev?: () => void;
 }
 
 // Error boundary fallback component
@@ -37,16 +46,360 @@ function ContextDebugger() {
   return null;
 }
 
+// Calculate arrow position in spherical coordinates
+// Returns the relative heading for the arrow (0-360)
+function calculateArrowHeading(
+  imageHeading: number,
+  targetHeading: number
+): number {
+  // Calculate relative angle: where the target is relative to image's orientation
+  let relativeAngle = targetHeading - imageHeading;
+  // Normalize to 0-360
+  relativeAngle = ((relativeAngle % 360) + 360) % 360;
+  return relativeAngle;
+}
+
+// Clamp arrow heading to improve UX - keep arrows in expected zones
+// Next arrow: 0-20° or 340-360° (forward area)
+// Prev arrow: 160-200° (backward area)
+function clampArrowHeading(heading: number, direction: "next" | "prev"): number {
+  if (direction === "next") {
+    // Forward zone: 0-20° or 340-360°
+    // Convert to -180 to 180 range for easier comparison
+    let h = heading;
+    if (h > 180) h -= 360; // Now in range -180 to 180, where 0 is forward
+
+    // Clamp to -20 to 20
+    if (h > 20) h = 20;
+    if (h < -20) h = -20;
+
+    // Convert back to 0-360
+    return h < 0 ? h + 360 : h;
+  } else {
+    // Backward zone: 160-200° (centered on 180°)
+    // Clamp to this range
+    if (heading < 160) return 160;
+    if (heading > 200) return 200;
+    return heading;
+  }
+}
+
+// Convert spherical coordinates to cartesian for positioning in the scene
+// heading: 0-360, 0 = forward (where camera faces at azimuth 90°)
+// pitch: degrees, negative = down
+function sphericalToCartesian(
+  heading: number,
+  pitch: number,
+  radius: number
+): [number, number, number] {
+  const headingRad = THREE.MathUtils.degToRad(heading);
+  const pitchRad = THREE.MathUtils.degToRad(pitch);
+
+  // At heading 0, we want position along -X (where camera looks at azimuth 90°)
+  // At heading 90, we want position along +Z
+  const horizontalRadius = radius * Math.cos(pitchRad);
+  const x = -horizontalRadius * Math.cos(headingRad);
+  const y = radius * Math.sin(pitchRad);
+  const z = horizontalRadius * Math.sin(headingRad);
+
+  return [x, y, z];
+}
+
+// Ground navigation arrow component using mesh for perspective distortion
+interface GroundArrowProps {
+  heading: number; // Where to position the arrow (0-360)
+  direction: "next" | "prev";
+  onClick: () => void;
+}
+
+// Track logged headings to avoid duplicate logs
+const loggedArrows = new Set<string>();
+
+// Expose debug functions to window for console access
+if (typeof window !== "undefined") {
+  (window as any).setArrowRotation = (dir: "next" | "prev", x: number, y: number, z: number) => {
+    const mesh = (window as any)[`__arrow_${dir}`] as THREE.Mesh | undefined;
+    if (!mesh) {
+      console.log(`Arrow "${dir}" not found`);
+      return;
+    }
+    mesh.rotation.set(
+      THREE.MathUtils.degToRad(x),
+      THREE.MathUtils.degToRad(y),
+      THREE.MathUtils.degToRad(z)
+    );
+    console.log(`Set ${dir} rotation: [${x}°, ${y}°, ${z}°]`);
+  };
+
+  (window as any).getArrowRotation = (dir: "next" | "prev") => {
+    const mesh = (window as any)[`__arrow_${dir}`] as THREE.Mesh | undefined;
+    if (!mesh) {
+      console.log(`Arrow "${dir}" not found`);
+      return null;
+    }
+    const r = mesh.rotation;
+    const result = {
+      x: Math.round(THREE.MathUtils.radToDeg(r.x) * 10) / 10,
+      y: Math.round(THREE.MathUtils.radToDeg(r.y) * 10) / 10,
+      z: Math.round(THREE.MathUtils.radToDeg(r.z) * 10) / 10
+    };
+    console.log(`${dir} rotation: [${result.x}°, ${result.y}°, ${result.z}°]`);
+    return result;
+  };
+
+  (window as any).getArrowInfo = (dir: "next" | "prev") => {
+    const mesh = (window as any)[`__arrow_${dir}`] as THREE.Mesh | undefined;
+    const heading = (window as any)[`__arrow_${dir}_heading`] as number | undefined;
+    if (!mesh) {
+      console.log(`Arrow "${dir}" not found`);
+      return null;
+    }
+    const p = mesh.position;
+    const r = mesh.rotation;
+    console.log(`${dir} arrow (heading=${heading}°):`);
+    console.log(`  pos: [${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}]`);
+    console.log(`  rot: [${THREE.MathUtils.radToDeg(r.x).toFixed(1)}°, ${THREE.MathUtils.radToDeg(r.y).toFixed(1)}°, ${THREE.MathUtils.radToDeg(r.z).toFixed(1)}°]`);
+    return { position: { x: p.x, y: p.y, z: p.z }, rotation: { x: THREE.MathUtils.radToDeg(r.x), y: THREE.MathUtils.radToDeg(r.y), z: THREE.MathUtils.radToDeg(r.z) }, heading };
+  };
+}
+
+function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const { gl } = useThree();
+
+  // Position arrow on the ground (pitch around -35 degrees)
+  const groundPitch = -35;
+  const distance = 50;
+  const position = sphericalToCartesian(heading, groundPitch, distance);
+
+  // Handle cursor style
+  useEffect(() => {
+    if (isHovered) {
+      gl.domElement.style.cursor = "pointer";
+    } else {
+      gl.domElement.style.cursor = "";
+    }
+    return () => {
+      gl.domElement.style.cursor = "";
+    };
+  }, [isHovered, gl]);
+
+  // Store mesh ref globally for console debugging
+  useEffect(() => {
+    if (meshRef.current && typeof window !== "undefined") {
+      (window as any)[`__arrow_${direction}`] = meshRef.current;
+      (window as any)[`__arrow_${direction}_heading`] = heading;
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        delete (window as any)[`__arrow_${direction}`];
+        delete (window as any)[`__arrow_${direction}_heading`];
+      }
+    };
+  }, [direction, heading]);
+
+  // Apply rotation using matrix-based approach for correct orientation
+  useEffect(() => {
+    if (!meshRef.current) return;
+
+    const mesh = meshRef.current;
+    const pos = new THREE.Vector3(position[0], position[1], position[2]);
+
+    // Direction from arrow toward camera (origin) - this will be plane's -Z
+    const toCamera = pos.clone().negate().normalize();
+
+    // Horizontal radial direction (outward in XZ plane, away from camera)
+    // This is the direction the triangle should point
+    const radialHorizontal = new THREE.Vector3(pos.x, 0, pos.z).normalize();
+
+    // Project radialHorizontal onto the plane perpendicular to toCamera
+    // to get the direction the triangle should point within the visible plane
+    const dot = radialHorizontal.dot(toCamera);
+    const triangleDir = radialHorizontal.clone().sub(toCamera.clone().multiplyScalar(dot));
+
+    // Handle edge case where projection is near zero
+    if (triangleDir.length() < 0.001) {
+      triangleDir.set(0, -1, 0); // Fallback: point downward
+    }
+    triangleDir.normalize();
+
+    // Build orthonormal basis:
+    // +Z points away from camera (so front face is visible)
+    // +Y points in triangle direction (radially outward)
+    // +X is perpendicular
+    const zAxis = toCamera.clone().negate();
+    let yAxis = triangleDir.clone();
+    let xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
+
+    // Recompute Y to ensure perfect orthogonality
+    yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+
+    // Create rotation matrix and apply
+    const rotMatrix = new THREE.Matrix4();
+    rotMatrix.makeBasis(xAxis, yAxis, zAxis);
+    mesh.rotation.setFromRotationMatrix(rotMatrix);
+
+    // Apply tilt for ground perspective (foreshortening effect)
+    mesh.rotateX(THREE.MathUtils.degToRad(-groundPitch));
+
+    // Debug logging - only once per unique heading (dedupe)
+    const logKey = `${direction}-${heading.toFixed(1)}`;
+    if (!loggedArrows.has(logKey)) {
+      loggedArrows.add(logKey);
+      const euler = mesh.rotation;
+      console.log(`[Arrow ${direction}] h=${heading.toFixed(1)}° pos=[${position[0].toFixed(1)}, ${position[1].toFixed(1)}, ${position[2].toFixed(1)}] rot=[${THREE.MathUtils.radToDeg(euler.x).toFixed(1)}°, ${THREE.MathUtils.radToDeg(euler.y).toFixed(1)}°, ${THREE.MathUtils.radToDeg(euler.z).toFixed(1)}°]`);
+    }
+  }, [heading, groundPitch, direction, position]);
+
+  // Create texture: filled tall isosceles triangle for "next", bordered for "prev"
+  const texture = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    const size = 128;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.clearRect(0, 0, size, size);
+
+    // Draw circle background (indigo with 90% opacity)
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - 4, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(99, 102, 241, 0.9)";
+    ctx.fill();
+
+    // Draw border (thin gray)
+    ctx.strokeStyle = "rgba(156, 163, 175, 0.8)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Draw tall isosceles triangle pointing up
+    ctx.beginPath();
+    const triHeight = size * 0.45;
+    const triWidth = size * 0.3;
+    const centerX = size / 2;
+    const centerY = size / 2;
+
+    // Triangle vertices: top point, bottom-left, bottom-right
+    ctx.moveTo(centerX, centerY - triHeight / 2);                    // Top
+    ctx.lineTo(centerX - triWidth / 2, centerY + triHeight / 2);     // Bottom-left
+    ctx.lineTo(centerX + triWidth / 2, centerY + triHeight / 2);     // Bottom-right
+    ctx.closePath();
+
+    if (direction === "next") {
+      // Filled triangle for forward
+      ctx.fillStyle = "white";
+      ctx.fill();
+    } else {
+      // Bordered triangle for backward
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 4;
+      ctx.lineJoin = "round";
+      ctx.stroke();
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }, [direction]);
+
+  // Hovered texture (brighter)
+  const hoveredTexture = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    const size = 128;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.clearRect(0, 0, size, size);
+
+    // Draw circle background (brighter indigo for hover)
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - 4, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(129, 140, 248, 0.95)";
+    ctx.fill();
+
+    // Draw border (lighter for hover)
+    ctx.strokeStyle = "rgba(209, 213, 219, 0.9)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Draw tall isosceles triangle pointing up
+    ctx.beginPath();
+    const triHeight = size * 0.45;
+    const triWidth = size * 0.3;
+    const centerX = size / 2;
+    const centerY = size / 2;
+
+    ctx.moveTo(centerX, centerY - triHeight / 2);
+    ctx.lineTo(centerX - triWidth / 2, centerY + triHeight / 2);
+    ctx.lineTo(centerX + triWidth / 2, centerY + triHeight / 2);
+    ctx.closePath();
+
+    if (direction === "next") {
+      ctx.fillStyle = "white";
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 4;
+      ctx.lineJoin = "round";
+      ctx.stroke();
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }, [direction]);
+
+  if (!texture || !hoveredTexture) return null;
+
+  return (
+    <mesh
+      ref={meshRef}
+      position={position}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        setIsHovered(true);
+      }}
+      onPointerOut={(e) => {
+        e.stopPropagation();
+        setIsHovered(false);
+      }}
+    >
+      <circleGeometry args={[4, 32]} />
+      <meshBasicMaterial
+        map={isHovered ? hoveredTexture : texture}
+        transparent={true}
+        side={THREE.DoubleSide}
+        depthTest={false}
+        depthWrite={false}
+      />
+    </mesh>
+  );
+}
+
 function PanoramaSphere({
   imageUrl,
   initialCamera,
   fov,
   onCameraChange,
+  headingData,
+  onNavigateNext,
+  onNavigatePrev,
 }: {
   imageUrl: string | null;
   initialCamera: { yaw: number; pitch: number };
   fov: number;
   onCameraChange: (camera: Partial<CameraState>) => void;
+  headingData: HeadingData | null;
+  onNavigateNext?: () => void;
+  onNavigatePrev?: () => void;
 }) {
   const { camera: threeCamera, invalidate: invalidateFrame, gl } = useThree();
   const controlsRef = useRef<any>(null);
@@ -54,6 +407,31 @@ function PanoramaSphere({
   const meshRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.MeshBasicMaterial>(null);
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
+
+  // Calculate arrow headings based on heading data
+  const arrowHeadings = useMemo(() => {
+    if (!headingData || headingData.headingDegrees === null) {
+      return { next: null, prev: null };
+    }
+
+    const imageHeading = headingData.headingDegrees;
+
+    // Calculate next arrow heading and clamp to forward zone (0-20° or 340-360°)
+    let nextHeading: number | null = null;
+    if (headingData.headingToNext !== null && onNavigateNext) {
+      const rawHeading = calculateArrowHeading(imageHeading, headingData.headingToNext);
+      nextHeading = clampArrowHeading(rawHeading, "next");
+    }
+
+    // Calculate prev arrow heading and clamp to backward zone (160-200°)
+    let prevHeading: number | null = null;
+    if (headingData.headingToPrev !== null && onNavigatePrev) {
+      const rawHeading = calculateArrowHeading(imageHeading, headingData.headingToPrev);
+      prevHeading = clampArrowHeading(rawHeading, "prev");
+    }
+
+    return { next: nextHeading, prev: prevHeading };
+  }, [headingData, onNavigateNext, onNavigatePrev]);
 
   // Camera state refs
   const initialCameraRef = useRef<{ yaw: number; pitch: number }>({ yaw: initialCamera.yaw, pitch: initialCamera.pitch });
@@ -295,6 +673,22 @@ function PanoramaSphere({
         />
       </mesh>
 
+      {/* Ground navigation arrows */}
+      {arrowHeadings.next !== null && onNavigateNext && (
+        <GroundArrow
+          heading={arrowHeadings.next}
+          direction="next"
+          onClick={onNavigateNext}
+        />
+      )}
+      {arrowHeadings.prev !== null && onNavigatePrev && (
+        <GroundArrow
+          heading={arrowHeadings.prev}
+          direction="prev"
+          onClick={onNavigatePrev}
+        />
+      )}
+
       {/* Camera controls */}
       <OrbitControls
         ref={controlsRef}
@@ -319,6 +713,9 @@ export function PanoramaCanvas({
   initialCamera,
   onCameraChange,
   isLoading,
+  headingData,
+  onNavigateNext,
+  onNavigatePrev,
 }: PanoramaCanvasProps) {
   const [canvasError, setCanvasError] = useState<string | null>(null);
   const [canvasReady, setCanvasReady] = useState(false);
@@ -366,6 +763,9 @@ export function PanoramaCanvas({
           initialCamera={initialCamera}
           fov={camera.fov}
           onCameraChange={onCameraChange}
+          headingData={headingData}
+          onNavigateNext={onNavigateNext}
+          onNavigatePrev={onNavigatePrev}
         />
       </Canvas>
 

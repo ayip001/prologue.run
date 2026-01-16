@@ -50,6 +50,8 @@ interface ImageRow {
   altitude_meters: string | null;
   captured_at: string;
   heading_degrees: string | null;
+  heading_to_prev: string | null;
+  heading_to_next: string | null;
   distance_from_start: number | null;
   path_thumbnail: string;
   path_medium: string;
@@ -144,6 +146,8 @@ function transformImage(row: ImageRow): ImageMeta {
     altitudeMeters: row.altitude_meters ? parseFloat(row.altitude_meters) : null,
     capturedAt: row.captured_at,
     headingDegrees: row.heading_degrees ? parseFloat(row.heading_degrees) : null,
+    headingToPrev: row.heading_to_prev ? parseFloat(row.heading_to_prev) : null,
+    headingToNext: row.heading_to_next ? parseFloat(row.heading_to_next) : null,
     distanceFromStart: row.distance_from_start,
     pathThumbnail: row.path_thumbnail,
     pathMedium: row.path_medium,
@@ -233,9 +237,9 @@ export async function getImagesByRaceId(raceId: string): Promise<ImageMeta[]> {
  */
 export async function getImageMetadataByRaceId(
   raceId: string
-): Promise<Pick<ImageMeta, "id" | "positionIndex" | "latitude" | "longitude" | "distanceFromStart" | "capturedAt">[]> {
+): Promise<Pick<ImageMeta, "id" | "positionIndex" | "latitude" | "longitude" | "distanceFromStart" | "capturedAt" | "headingDegrees" | "headingToPrev" | "headingToNext">[]> {
   const result = await sql<ImageRow>`
-    SELECT id, position_index, latitude, longitude, distance_from_start, captured_at
+    SELECT id, position_index, latitude, longitude, distance_from_start, captured_at, heading_degrees, heading_to_prev, heading_to_next
     FROM images
     WHERE race_id = ${raceId}
     ORDER BY position_index
@@ -248,6 +252,9 @@ export async function getImageMetadataByRaceId(
     longitude: row.longitude ? parseFloat(row.longitude) : null,
     distanceFromStart: row.distance_from_start,
     capturedAt: row.captured_at,
+    headingDegrees: row.heading_degrees ? parseFloat(row.heading_degrees) : null,
+    headingToPrev: row.heading_to_prev ? parseFloat(row.heading_to_prev) : null,
+    headingToNext: row.heading_to_next ? parseFloat(row.heading_to_next) : null,
   }));
 }
 
