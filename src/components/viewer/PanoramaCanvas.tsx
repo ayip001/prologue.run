@@ -174,22 +174,49 @@ function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
     };
   }, [direction, heading]);
 
-  // Apply rotation: face camera, then rotate so "up" points radially outward, then tilt
+  // Apply rotation using matrix-based approach for correct orientation
   useEffect(() => {
     if (!meshRef.current) return;
 
     const mesh = meshRef.current;
+    const pos = new THREE.Vector3(position[0], position[1], position[2]);
 
-    // Step 1: Make the mesh face the origin (camera position)
-    mesh.lookAt(0, 0, 0);
+    // Direction from arrow toward camera (origin) - this will be plane's -Z
+    const toCamera = pos.clone().negate().normalize();
 
-    // Step 2: Rotate around local Z so "up" on texture points radially outward
-    const headingRad = THREE.MathUtils.degToRad(heading);
-    mesh.rotateZ(-headingRad);
+    // Horizontal radial direction (outward in XZ plane, away from camera)
+    // This is the direction the triangle should point
+    const radialHorizontal = new THREE.Vector3(pos.x, 0, pos.z).normalize();
 
-    // Step 3: Tilt around local X for foreshortening (ground perspective)
-    const tiltAngle = THREE.MathUtils.degToRad(-groundPitch);
-    mesh.rotateX(tiltAngle);
+    // Project radialHorizontal onto the plane perpendicular to toCamera
+    // to get the direction the triangle should point within the visible plane
+    const dot = radialHorizontal.dot(toCamera);
+    const triangleDir = radialHorizontal.clone().sub(toCamera.clone().multiplyScalar(dot));
+
+    // Handle edge case where projection is near zero
+    if (triangleDir.length() < 0.001) {
+      triangleDir.set(0, -1, 0); // Fallback: point downward
+    }
+    triangleDir.normalize();
+
+    // Build orthonormal basis:
+    // +Z points away from camera (so front face is visible)
+    // +Y points in triangle direction (radially outward)
+    // +X is perpendicular
+    const zAxis = toCamera.clone().negate();
+    let yAxis = triangleDir.clone();
+    let xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis).normalize();
+
+    // Recompute Y to ensure perfect orthogonality
+    yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis).normalize();
+
+    // Create rotation matrix and apply
+    const rotMatrix = new THREE.Matrix4();
+    rotMatrix.makeBasis(xAxis, yAxis, zAxis);
+    mesh.rotation.setFromRotationMatrix(rotMatrix);
+
+    // Apply tilt for ground perspective (foreshortening effect)
+    mesh.rotateX(THREE.MathUtils.degToRad(-groundPitch));
 
     // Debug logging - only once per unique heading (dedupe)
     const logKey = `${direction}-${heading.toFixed(1)}`;
