@@ -42,7 +42,7 @@ export function useImageLoader({
 
   // Load current image with progressive quality (or instant if cached)
   useEffect(() => {
-    if (!enabled || currentIndex < 0 || currentIndex >= totalImages) {
+    if (!enabled || currentIndex < 0) {
       setIsLoading(false);
       return;
     }
@@ -133,7 +133,7 @@ export function useImageLoader({
     };
 
     loadSequence();
-  }, [raceSlug, currentIndex, totalImages, format, enabled]);
+  }, [raceSlug, currentIndex, format, enabled]);
 
   // Preload adjacent images
   useEffect(() => {
