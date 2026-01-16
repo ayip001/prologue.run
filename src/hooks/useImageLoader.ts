@@ -133,7 +133,7 @@ export function useImageLoader({
     };
 
     loadSequence();
-  }, [raceSlug, currentIndex, format, enabled]);
+  }, [raceSlug, currentIndex, totalImages, format, enabled]);
 
   // Preload adjacent images
   useEffect(() => {
