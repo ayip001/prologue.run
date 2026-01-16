@@ -59,6 +59,31 @@ function calculateArrowHeading(
   return relativeAngle;
 }
 
+// Clamp arrow heading to improve UX - keep arrows in expected zones
+// Next arrow: 0-20° or 340-360° (forward area)
+// Prev arrow: 160-200° (backward area)
+function clampArrowHeading(heading: number, direction: "next" | "prev"): number {
+  if (direction === "next") {
+    // Forward zone: 0-20° or 340-360°
+    // Convert to -180 to 180 range for easier comparison
+    let h = heading;
+    if (h > 180) h -= 360; // Now in range -180 to 180, where 0 is forward
+
+    // Clamp to -20 to 20
+    if (h > 20) h = 20;
+    if (h < -20) h = -20;
+
+    // Convert back to 0-360
+    return h < 0 ? h + 360 : h;
+  } else {
+    // Backward zone: 160-200° (centered on 180°)
+    // Clamp to this range
+    if (heading < 160) return 160;
+    if (heading > 200) return 200;
+    return heading;
+  }
+}
+
 // Convert spherical coordinates to cartesian for positioning in the scene
 // heading: 0-360, 0 = forward (where camera faces at azimuth 90°)
 // pitch: degrees, negative = down
@@ -391,16 +416,18 @@ function PanoramaSphere({
 
     const imageHeading = headingData.headingDegrees;
 
-    // Calculate next arrow heading
+    // Calculate next arrow heading and clamp to forward zone (0-20° or 340-360°)
     let nextHeading: number | null = null;
     if (headingData.headingToNext !== null && onNavigateNext) {
-      nextHeading = calculateArrowHeading(imageHeading, headingData.headingToNext);
+      const rawHeading = calculateArrowHeading(imageHeading, headingData.headingToNext);
+      nextHeading = clampArrowHeading(rawHeading, "next");
     }
 
-    // Calculate prev arrow heading
+    // Calculate prev arrow heading and clamp to backward zone (160-200°)
     let prevHeading: number | null = null;
     if (headingData.headingToPrev !== null && onNavigatePrev) {
-      prevHeading = calculateArrowHeading(imageHeading, headingData.headingToPrev);
+      const rawHeading = calculateArrowHeading(imageHeading, headingData.headingToPrev);
+      prevHeading = clampArrowHeading(rawHeading, "prev");
     }
 
     return { next: nextHeading, prev: prevHeading };
