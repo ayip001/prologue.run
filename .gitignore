@@ -50,3 +50,4 @@ race-processor/__pycache__/
 blur-preview.jpg
 race-processor/*.jpg
 race-processor/*.pt
+race-config.json

@@ -327,8 +327,8 @@ def process(
 @click.option(
     "--race-slug",
     "-r",
-    default="preview",
-    help="Race slug for the manifest",
+    required=True,
+    help="URL-friendly race identifier (e.g., 'hk-marathon-2026')",
 )
 def intake(input_dir: Path, race_slug: str) -> None:
     """Preview intake step: extract EXIF and show image ordering.
@@ -1159,6 +1159,55 @@ def db_delete(slug_or_id: str, yes: bool) -> None:
             return
 
     success = delete_race(slug_or_id)
+    if not success:
+        raise SystemExit(1)
+
+
+@main.group()
+def r2() -> None:
+    """R2 storage management commands."""
+    pass
+
+
+@r2.command("delete")
+@click.argument("race_slug")
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    help="Skip confirmation prompt",
+)
+@click.option(
+    "--prefix",
+    type=str,
+    default=None,
+    help="Override storage prefix (default: races/{race_slug})",
+)
+def r2_delete(race_slug: str, yes: bool, prefix: str | None) -> None:
+    """Delete all images for a race from R2.
+
+    \b
+    Examples:
+      race-processor r2 delete hk-marathon-2026
+      race-processor r2 delete hk-marathon-2026 --yes
+    """
+    from .pipeline.upload import delete_from_r2
+
+    r2_config = load_r2_config()
+    if not r2_config:
+        console.print("[red]Error: R2 credentials not found in environment or .env.local[/]")
+        raise SystemExit(1)
+
+    storage_prefix = prefix if prefix else f"races/{race_slug}"
+
+    if not yes:
+        console.print(f"[yellow]This will delete all objects in R2 under:[/] {storage_prefix}")
+        confirm = click.confirm("Are you sure?")
+        if not confirm:
+            console.print("Aborted.")
+            return
+
+    success = delete_from_r2(r2_config, storage_prefix)
     if not success:
         raise SystemExit(1)
 

@@ -283,6 +283,27 @@ race-processor db delete hk-marathon-2026
 race-processor db delete hk-marathon-2026 --yes  # Skip confirmation
 ```
 
+### `r2` - R2 Storage Management Commands
+
+#### `r2 delete` - Delete Images from R2
+
+Delete all images associated with a race from Cloudflare R2.
+
+```bash
+# Basic usage
+race-processor r2 delete hk-marathon-2026
+
+# Skip confirmation
+race-processor r2 delete hk-marathon-2026 --yes
+
+# Custom storage prefix
+race-processor r2 delete hk-marathon-2026 --prefix custom/path/
+```
+
+Options:
+- `--yes, -y` - Skip confirmation prompt
+- `--prefix TEXT` - Override storage prefix (default: `races/{race_slug}`)
+
 ## Commands
 
 ### `process` - Main Processing Pipeline

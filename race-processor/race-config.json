@@ -1,8 +1,0 @@
-{
-  "slug": "testing-route-short",
-  "name": "Testing Route Short",
-  "distance_meters": 5000,
-  "capture_date": "2026-01-12",
-  "storage_prefix": "races/testing-route-short/",
-  "status": "ready"
-}
