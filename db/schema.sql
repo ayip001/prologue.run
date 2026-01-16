@@ -88,15 +88,10 @@ CREATE TABLE images (
     -- Distance from start (meters) - for progress bar
     distance_from_start INTEGER,
 
-    -- Storage paths (relative to race storage_prefix)
-    path_thumbnail  VARCHAR(255) NOT NULL,         -- 'thumb/0001.avif'
-    path_medium     VARCHAR(255) NOT NULL,         -- 'medium/0001.avif'
-    path_full       VARCHAR(255) NOT NULL,         -- 'full/0001.avif'
-
-    -- Fallback paths (WebP)
-    path_thumb_webp VARCHAR(255) NOT NULL,
-    path_med_webp   VARCHAR(255) NOT NULL,
-    path_full_webp  VARCHAR(255) NOT NULL,
+    -- Storage paths (relative to race storage_prefix, WebP format)
+    path_thumbnail  VARCHAR(255) NOT NULL,         -- 'thumb/0001.webp'
+    path_medium     VARCHAR(255) NOT NULL,         -- 'medium/0001.webp'
+    path_full       VARCHAR(255) NOT NULL,         -- 'full/0001.webp'
 
     -- Processing metadata
     file_size_thumb INTEGER,                       -- bytes

@@ -75,7 +75,7 @@ def run_privacy_check(final_dir: Path) -> tuple[bool, int, int]:
             continue
 
         for img_path in tier_dir.iterdir():
-            if img_path.suffix.lower() not in {".avif", ".webp", ".jpg", ".jpeg", ".png"}:
+            if img_path.suffix.lower() not in {".webp", ".jpg", ".jpeg", ".png"}:
                 continue
 
             total_checked += 1
@@ -116,7 +116,6 @@ def get_content_type(path: Path) -> str:
     """Get the appropriate content-type for an image file."""
     suffix = path.suffix.lower()
     content_types = {
-        ".avif": "image/avif",
         ".webp": "image/webp",
         ".jpg": "image/jpeg",
         ".jpeg": "image/jpeg",
@@ -158,7 +157,7 @@ def upload_to_r2(
 
         tier_name = tier_dir.name
         for img_path in sorted(tier_dir.iterdir()):
-            if img_path.suffix.lower() not in {".avif", ".webp"}:
+            if img_path.suffix.lower() != ".webp":
                 continue
 
             # Build R2 key: {storage_prefix}/{tier}/{filename}
@@ -241,10 +240,10 @@ def generate_db_records(
         return records
 
     # Get list of base names from thumbnail directory
-    avif_files = sorted(thumb_dir.glob("*.avif"))
+    webp_files = sorted(thumb_dir.glob("*.webp"))
 
-    for avif_path in avif_files:
-        base_name = avif_path.stem  # e.g., "001"
+    for webp_path in webp_files:
+        base_name = webp_path.stem  # e.g., "001"
 
         try:
             position_index = int(base_name) - 1  # Convert to 0-indexed
@@ -270,13 +269,10 @@ def generate_db_records(
             "heading_degrees": meta.heading_degrees,
             "heading_to_prev": meta.heading_to_prev,
             "heading_to_next": meta.heading_to_next,
-            # Storage paths
-            "path_thumbnail": f"thumb/{base_name}.avif",
-            "path_medium": f"medium/{base_name}.avif",
-            "path_full": f"full/{base_name}.avif",
-            "path_thumb_webp": f"thumb_webp/{base_name}.webp",
-            "path_med_webp": f"medium_webp/{base_name}.webp",
-            "path_full_webp": f"full_webp/{base_name}.webp",
+            # Storage paths (WebP only)
+            "path_thumbnail": f"thumb/{base_name}.webp",
+            "path_medium": f"medium/{base_name}.webp",
+            "path_full": f"full/{base_name}.webp",
             "has_blur_applied": True,  # We always apply blur
         }
         records.append(record)

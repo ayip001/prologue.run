@@ -3,7 +3,7 @@
 import { useCallback, useState, useEffect, useRef } from "react";
 import type { CameraState, ViewerState, ViewerActions } from "@/types";
 import { DEFAULT_VIEW, CAMERA_CONSTRAINTS } from "@/lib/constants";
-import { normalizeHeading, clampPitch, clampFov } from "@/lib/viewState";
+import { normalizeHeading, clampPitch, clampFov, parseViewState } from "@/lib/viewState";
 
 interface UseViewerOptions {
   totalImages: number;
@@ -24,12 +24,12 @@ export function useViewer({
   initialCamera,
 }: UseViewerOptions): UseViewerReturn {
   const [state, setState] = useState<ViewerState>(() => ({
-    currentIndex: Math.min(initialPosition, totalImages - 1),
+    currentIndex: Math.max(0, Math.min(initialPosition, totalImages - 1)),
     currentDistance: images[initialPosition]?.distanceFromStart ?? 0,
     camera: {
-      yaw: initialCamera?.yaw ?? DEFAULT_VIEW.heading,
-      pitch: initialCamera?.pitch ?? DEFAULT_VIEW.pitch,
-      fov: initialCamera?.fov ?? DEFAULT_VIEW.fov,
+      yaw: normalizeHeading(initialCamera?.yaw ?? DEFAULT_VIEW.heading),
+      pitch: clampPitch(initialCamera?.pitch ?? DEFAULT_VIEW.pitch),
+      fov: clampFov(initialCamera?.fov ?? DEFAULT_VIEW.fov),
     },
     loadedTier: "thumbnail",
     isLoading: true,
@@ -39,6 +39,42 @@ export function useViewer({
 
   // Track if this is the first render
   const isFirstRender = useRef(true);
+  // Track if we've synced with URL
+  const hasSyncedWithUrl = useRef(false);
+
+  // On mount, parse URL and sync state if server props were lost during hydration
+  useEffect(() => {
+    if (hasSyncedWithUrl.current) return;
+    hasSyncedWithUrl.current = true;
+
+    if (typeof window === "undefined") return;
+
+    const pathname = window.location.pathname;
+    const parsed = parseViewState(pathname);
+
+    if (!parsed) return;
+
+    // Check if current state differs from URL
+    const needsUpdate =
+      state.currentIndex !== parsed.position ||
+      Math.abs(state.camera.yaw - parsed.heading) > 0.1 ||
+      Math.abs(state.camera.pitch - parsed.pitch) > 0.1 ||
+      Math.abs(state.camera.fov - parsed.fov) > 0.1;
+
+    if (needsUpdate) {
+      const clampedIndex = Math.max(0, Math.min(parsed.position, totalImages - 1));
+      setState((prev) => ({
+        ...prev,
+        currentIndex: clampedIndex,
+        currentDistance: images[clampedIndex]?.distanceFromStart ?? 0,
+        camera: {
+          yaw: parsed.heading,
+          pitch: parsed.pitch,
+          fov: parsed.fov,
+        },
+      }));
+    }
+  }, []);  // Empty deps - run only on mount
 
   // Update distance when index changes
   useEffect(() => {

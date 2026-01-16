@@ -77,7 +77,6 @@ class ImageTierConfig(BaseModel):
     """Configuration for an image quality tier."""
 
     width: int
-    avif_quality: int
     webp_quality: int
 
 
@@ -85,13 +84,13 @@ class ImageTiersConfig(BaseModel):
     """Configuration for all image quality tiers."""
 
     thumbnail: ImageTierConfig = Field(
-        default=ImageTierConfig(width=512, avif_quality=60, webp_quality=70)
+        default=ImageTierConfig(width=512, webp_quality=70)
     )
     medium: ImageTierConfig = Field(
-        default=ImageTierConfig(width=2048, avif_quality=70, webp_quality=75)
+        default=ImageTierConfig(width=2048, webp_quality=75)
     )
     full: ImageTierConfig = Field(
-        default=ImageTierConfig(width=4096, avif_quality=75, webp_quality=80)
+        default=ImageTierConfig(width=4096, webp_quality=80)
     )
 
 

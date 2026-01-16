@@ -18,9 +18,17 @@ export function useViewStateUrl({
 }: UseViewStateUrlOptions): void {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastPositionRef = useRef(state.currentIndex);
+  // Track if this is the initial mount - skip first URL update to preserve URL params
+  const isInitialMountRef = useRef(true);
 
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;
+
+    // Skip URL update on initial mount to preserve URL parameters
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+      return;
+    }
 
     // Clear previous timeout
     if (timeoutRef.current) {

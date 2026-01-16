@@ -1,5 +1,5 @@
 import type { ViewState } from "@/types";
-import { DEFAULT_VIEW } from "./constants";
+import { DEFAULT_VIEW, CAMERA_CONSTRAINTS } from "./constants";
 
 /**
  * Parse view state from URL pathname.
@@ -19,9 +19,9 @@ export function parseViewState(pathname: string): ViewState | null {
 
   return {
     position: parseInt(match[1], 10),
-    heading: match[2] ? parseFloat(match[2]) : DEFAULT_VIEW.heading,
-    pitch: match[3] ? parseFloat(match[3]) : DEFAULT_VIEW.pitch,
-    fov: match[4] ? parseFloat(match[4]) : DEFAULT_VIEW.fov,
+    heading: normalizeHeading(match[2] ? parseFloat(match[2]) : DEFAULT_VIEW.heading),
+    pitch: clampPitch(match[3] ? parseFloat(match[3]) : DEFAULT_VIEW.pitch),
+    fov: clampFov(match[4] ? parseFloat(match[4]) : DEFAULT_VIEW.fov),
   };
 }
 
@@ -74,17 +74,17 @@ export function normalizeHeading(heading: number): number {
 }
 
 /**
- * Clamp pitch to valid range (-90 to 90).
+ * Clamp pitch to valid range from constants.
  */
 export function clampPitch(pitch: number): number {
-  return Math.max(-90, Math.min(90, pitch));
+  return Math.max(CAMERA_CONSTRAINTS.minPitch, Math.min(CAMERA_CONSTRAINTS.maxPitch, pitch));
 }
 
 /**
- * Clamp FOV to valid range (30 to 120).
+ * Clamp FOV to valid range from constants.
  */
 export function clampFov(fov: number): number {
-  return Math.max(30, Math.min(120, fov));
+  return Math.max(CAMERA_CONSTRAINTS.minFov, Math.min(CAMERA_CONSTRAINTS.maxFov, fov));
 }
 
 /**

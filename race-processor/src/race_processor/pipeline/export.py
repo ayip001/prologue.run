@@ -1,9 +1,7 @@
 """
-Step 5: Export - Encode resized images to AVIF and WebP formats.
+Step 5: Export - Encode resized images to WebP format.
 
-This step takes the resized image tiers and encodes them to:
-- AVIF (primary format, best compression)
-- WebP (fallback for older browsers)
+This step takes the resized image tiers and encodes them to WebP.
 """
 
 from pathlib import Path
@@ -13,9 +11,6 @@ from PIL import Image
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 
-# Import AVIF plugin
-import pillow_avif  # noqa: F401 - registers AVIF support
-
 from ..config import ImageTiersConfig
 
 console = Console()
@@ -23,43 +18,35 @@ console = Console()
 
 def encode_image(
     source_path: Path,
-    avif_path: Path,
     webp_path: Path,
-    avif_quality: int,
     webp_quality: int,
-) -> tuple[Optional[int], Optional[int]]:
+) -> Optional[int]:
     """
-    Encode a single image to AVIF and WebP formats.
+    Encode a single image to WebP format.
 
     Args:
         source_path: Path to source image (JPG/PNG)
-        avif_path: Output path for AVIF
         webp_path: Output path for WebP
-        avif_quality: AVIF quality (0-100)
         webp_quality: WebP quality (0-100)
 
     Returns:
-        Tuple of (avif_size, webp_size) in bytes, or None if encoding failed
+        WebP size in bytes, or None if encoding failed
     """
     try:
         with Image.open(source_path) as img:
-            # Convert to RGB if necessary (AVIF doesn't support all modes)
+            # Convert to RGB if necessary
             if img.mode in ("RGBA", "P"):
                 img = img.convert("RGB")
-
-            # Save AVIF
-            img.save(avif_path, format="AVIF", quality=avif_quality)
-            avif_size = avif_path.stat().st_size
 
             # Save WebP
             img.save(webp_path, format="WEBP", quality=webp_quality)
             webp_size = webp_path.stat().st_size
 
-            return avif_size, webp_size
+            return webp_size
 
     except Exception as e:
         console.print(f"  [red]Error encoding {source_path.name}: {e}[/]")
-        return None, None
+        return None
 
 
 def run_export(
@@ -68,7 +55,7 @@ def run_export(
     tier_config: Optional[ImageTiersConfig] = None,
 ) -> dict[str, list[Path]]:
     """
-    Export all resized images to AVIF and WebP formats.
+    Export all resized images to WebP format.
 
     Args:
         input_dir: Directory containing resized/ subdirectory with tier folders
@@ -92,15 +79,11 @@ def run_export(
     }
 
     output_paths: dict[str, list[Path]] = {
-        "thumb_avif": [],
-        "thumb_webp": [],
-        "medium_avif": [],
-        "medium_webp": [],
-        "full_avif": [],
-        "full_webp": [],
+        "thumb": [],
+        "medium": [],
+        "full": [],
     }
 
-    total_avif_size = 0
     total_webp_size = 0
     total_source_size = 0
 
@@ -110,10 +93,8 @@ def run_export(
             console.print(f"  [yellow]Skipping {tier_name}: directory not found[/]")
             continue
 
-        # Create output directories
-        avif_dir = final_dir / output_name
-        webp_dir = final_dir / f"{output_name}_webp"
-        avif_dir.mkdir(parents=True, exist_ok=True)
+        # Create output directory
+        webp_dir = final_dir / output_name
         webp_dir.mkdir(parents=True, exist_ok=True)
 
         # Get source images
@@ -139,28 +120,22 @@ def run_export(
             task = progress.add_task(f"  {tier_name}", total=len(source_images))
 
             for source_path in source_images:
-                # Generate output filenames (change extension)
+                # Generate output filename (change extension)
                 base_name = source_path.stem
-                avif_path = avif_dir / f"{base_name}.avif"
                 webp_path = webp_dir / f"{base_name}.webp"
 
                 # Track source size
                 total_source_size += source_path.stat().st_size
 
                 # Encode
-                avif_size, webp_size = encode_image(
+                webp_size = encode_image(
                     source_path,
-                    avif_path,
                     webp_path,
-                    avif_quality=tier_cfg.avif_quality,
                     webp_quality=tier_cfg.webp_quality,
                 )
 
-                if avif_size:
-                    output_paths[f"{output_name}_avif"].append(avif_path)
-                    total_avif_size += avif_size
                 if webp_size:
-                    output_paths[f"{output_name}_webp"].append(webp_path)
+                    output_paths[output_name].append(webp_path)
                     total_webp_size += webp_size
 
                 progress.advance(task)
@@ -175,7 +150,6 @@ def run_export(
 
     console.print(f"\n  [bold]Export Summary:[/]")
     console.print(f"    Source size:  {format_size(total_source_size)}")
-    console.print(f"    AVIF size:    {format_size(total_avif_size)} ({100*total_avif_size//max(total_source_size,1)}%)")
     console.print(f"    WebP size:    {format_size(total_webp_size)} ({100*total_webp_size//max(total_source_size,1)}%)")
 
     total_files = sum(len(paths) for paths in output_paths.values())

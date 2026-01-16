@@ -4,7 +4,7 @@ import { getRaceBySlug, getImageMetadataByRaceId, getWaypointsByRaceId, getEleva
 import { parseViewState } from "@/lib/viewState";
 import { RaceViewer } from "@/components/viewer/RaceViewer";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ENABLE_TESTING_CARD, TEST_CARD_DATA, TEST_VIEWER_IMAGE_URL } from "@/lib/constants";
+import { ENABLE_TESTING_CARD, TEST_CARD_DATA, TEST_VIEWER_IMAGE_URL, DEFAULT_VIEW } from "@/lib/constants";
 import type { Race } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -67,9 +67,9 @@ export default async function RaceViewerPage({ params }: PageProps) {
           waypoints={[]}
           elevationProfile={null}
           initialPosition={parsedViewState?.position ?? 0}
-          initialHeading={parsedViewState?.heading ?? 0}
-          initialPitch={parsedViewState?.pitch ?? 0}
-          initialFov={parsedViewState?.fov ?? 75}
+          initialHeading={parsedViewState?.heading ?? DEFAULT_VIEW.heading}
+          initialPitch={parsedViewState?.pitch ?? DEFAULT_VIEW.pitch}
+          initialFov={parsedViewState?.fov ?? DEFAULT_VIEW.fov}
           testImageUrl={TEST_VIEWER_IMAGE_URL}
         />
       </Suspense>
@@ -125,9 +125,9 @@ export default async function RaceViewerPage({ params }: PageProps) {
         }))}
         elevationProfile={elevationProfile}
         initialPosition={parsedViewState?.position ?? 0}
-        initialHeading={parsedViewState?.heading ?? 0}
-        initialPitch={parsedViewState?.pitch ?? 0}
-        initialFov={parsedViewState?.fov ?? 75}
+        initialHeading={parsedViewState?.heading ?? DEFAULT_VIEW.heading}
+        initialPitch={parsedViewState?.pitch ?? DEFAULT_VIEW.pitch}
+        initialFov={parsedViewState?.fov ?? DEFAULT_VIEW.fov}
       />
     </Suspense>
   );

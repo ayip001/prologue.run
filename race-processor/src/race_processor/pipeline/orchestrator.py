@@ -6,7 +6,7 @@ Simplified Pipeline Steps:
     2. Blur      - Apply privacy blurring (faces, plates)
     3. Watermark - Add copyright text overlay
     4. Resize    - Generate quality tiers (thumbnail, medium, full)
-    5. Export    - Encode to AVIF/WebP formats
+    5. Export    - Encode to WebP format
     6. Upload    - Privacy check, upload to R2, generate DB records
 
 Debug mode saves intermediate images after each step for inspection.
@@ -391,7 +391,7 @@ def run_direct_processing(
 
         elif step == PipelineStep.EXPORT:
             # For export, we need the quality tiers from resize
-            console.print(f"  Exporting to AVIF/WebP...")
+            console.print(f"  Exporting to WebP...")
             # We need to structure the output base for export
             run_export(step_output.parent, step_output.parent, ImageTiersConfig())
             
@@ -443,7 +443,7 @@ def run_pipeline(
     2. Blur - Apply privacy blurring
     3. Watermark - Add copyright text
     4. Resize - Generate quality tiers
-    5. Export - Encode to AVIF/WebP
+    5. Export - Encode to WebP
     6. Upload - Privacy check, upload to R2, generate DB records
     """
     console.print("[bold blue]Starting pipeline...[/]")

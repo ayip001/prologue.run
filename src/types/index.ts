@@ -44,9 +44,6 @@ export interface ImageMeta {
   pathThumbnail: string;
   pathMedium: string;
   pathFull: string;
-  pathThumbWebp: string;
-  pathMedWebp: string;
-  pathFullWebp: string;
   fileSizeThumb: number | null;
   fileSizeMedium: number | null;
   fileSizeFull: number | null;
@@ -205,9 +202,6 @@ export type ImageTier = "thumbnail" | "medium" | "full";
 
 export interface ImageUrls {
   thumbnail: string;
-  thumbnailWebp: string;
   medium: string;
-  mediumWebp: string;
   full: string;
-  fullWebp: string;
 }

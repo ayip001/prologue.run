@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef, useEffect, useState } from "react";
 import type { Race, ElevationProfile as ElevationProfileType } from "@/types";
 import { useViewer } from "@/hooks/useViewer";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { useKeyboardNav } from "@/hooks/useKeyboardNav";
 import { useViewStateUrl } from "@/hooks/useViewStateUrl";
+import { parseViewState } from "@/lib/viewState";
+import { DEFAULT_VIEW } from "@/lib/constants";
 import { PanoramaCanvas } from "./PanoramaCanvas";
 import { ViewerHUD } from "./ViewerHUD";
 import { NavigationChevrons } from "./NavigationChevrons";
@@ -46,11 +48,35 @@ export function RaceViewer({
   waypoints,
   elevationProfile,
   initialPosition = 0,
-  initialHeading = 0,
-  initialPitch = 0,
-  initialFov = 75,
+  initialHeading = DEFAULT_VIEW.heading,
+  initialPitch = DEFAULT_VIEW.pitch,
+  initialFov = DEFAULT_VIEW.fov,
   testImageUrl,
 }: RaceViewerProps) {
+  // Parse URL directly on client to get correct initial values
+  // This handles cases where server props are lost during hydration
+  const [initialCameraFromUrl, setInitialCameraFromUrl] = useState(() => {
+    if (typeof window === "undefined") {
+      return { yaw: initialHeading, pitch: initialPitch };
+    }
+    const parsed = parseViewState(window.location.pathname);
+    return {
+      yaw: parsed?.heading ?? initialHeading,
+      pitch: parsed?.pitch ?? initialPitch,
+    };
+  });
+
+  // Re-parse URL on mount in case initial parse missed something
+  useEffect(() => {
+    const parsed = parseViewState(window.location.pathname);
+    if (parsed) {
+      setInitialCameraFromUrl({
+        yaw: parsed.heading,
+        pitch: parsed.pitch,
+      });
+    }
+  }, []);
+
   // Memoize mapped images to prevent infinite loop
   const mappedImages = useMemo(
     () =>
@@ -130,6 +156,7 @@ export function RaceViewer({
       <PanoramaCanvas
         imageUrl={currentImageUrl}
         camera={state.camera}
+        initialCamera={initialCameraFromUrl}
         onCameraChange={handleCameraChange}
         isLoading={isLoading}
       />

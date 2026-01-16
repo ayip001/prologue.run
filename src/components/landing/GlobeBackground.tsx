@@ -352,7 +352,7 @@ export function GlobeBackground({
     cont2.rotation.x = -0.25;
 
     const onMouseMove = (e: MouseEvent) => {
-      if (!mouseControls) return;
+      if (!mouseControls || window.innerWidth < 720) return;
 
       const rect = container.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -513,3 +513,4 @@ export function GlobeBackground({
     />
   );
 }
+

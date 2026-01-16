@@ -313,7 +313,6 @@ def insert_images(race_id: str, records: list[dict]) -> bool:
             "race_id", "position_index", "latitude", "longitude", "altitude_meters",
             "captured_at", "heading_degrees", "heading_to_prev", "heading_to_next",
             "path_thumbnail", "path_medium", "path_full",
-            "path_thumb_webp", "path_med_webp", "path_full_webp",
             "has_blur_applied"
         ]
 
@@ -340,9 +339,6 @@ def insert_images(race_id: str, records: list[dict]) -> bool:
                 rec["path_thumbnail"],
                 rec["path_medium"],
                 rec["path_full"],
-                rec["path_thumb_webp"],
-                rec["path_med_webp"],
-                rec["path_full_webp"],
                 rec.get("has_blur_applied", True)
             ]
             values.append(tuple(row))
