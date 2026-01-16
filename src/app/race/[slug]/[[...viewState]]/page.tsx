@@ -31,6 +31,9 @@ const TEST_IMAGES = [{
   longitude: 0,
   distanceFromStart: 0,
   capturedAt: "2024-01-01T00:00:00Z",
+  headingDegrees: 0,
+  headingToPrev: null,
+  headingToNext: null,
 }];
 
 interface PageProps {

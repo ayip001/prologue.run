@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
@@ -11,12 +11,125 @@ import { CAMERA_CONSTRAINTS } from "@/lib/constants";
 // Offset to convert between our heading (0 = forward) and OrbitControls azimuth (0 = -Z axis)
 const HEADING_OFFSET = 90;
 
+interface NavigationArrowsProps {
+  prevYaw: number | null;
+  nextYaw: number | null;
+  hasPrevious: boolean;
+  hasNext: boolean;
+  onPrevious: () => void;
+  onNext: () => void;
+}
+
 interface PanoramaCanvasProps {
   imageUrl: string | null;
   camera: CameraState;
   initialCamera: { yaw: number; pitch: number };
   onCameraChange: (camera: Partial<CameraState>) => void;
   isLoading: boolean;
+  navigationArrows?: NavigationArrowsProps;
+}
+
+// Ground navigation arrow component
+function NavigationArrow3D({
+  yaw,
+  direction,
+  onClick,
+}: {
+  yaw: number;
+  direction: "next" | "prev";
+  onClick: () => void;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const [hovered, setHovered] = useState(false);
+  const { gl } = useThree();
+
+  // Position arrow on ground at the given yaw angle
+  // yaw 0 = forward, convert to scene coordinates
+  const distance = 50; // Distance from center
+  const pitchAngle = -60; // Degrees below horizon (looking down at ground)
+
+  // Convert yaw to radians and calculate position
+  const yawRad = THREE.MathUtils.degToRad(yaw + HEADING_OFFSET);
+  const pitchRad = THREE.MathUtils.degToRad(pitchAngle);
+
+  // Spherical to Cartesian conversion
+  const x = distance * Math.cos(pitchRad) * Math.sin(yawRad);
+  const y = distance * Math.sin(pitchRad);
+  const z = -distance * Math.cos(pitchRad) * Math.cos(yawRad);
+
+  // Update cursor on hover
+  useEffect(() => {
+    gl.domElement.style.cursor = hovered ? "pointer" : "";
+    return () => {
+      gl.domElement.style.cursor = "";
+    };
+  }, [hovered, gl]);
+
+  // Rotate arrow to face camera and point in direction
+  const rotation = useMemo(() => {
+    // Arrow should face the camera (billboard style but fixed to sphere)
+    // The arrow symbol ">" should point toward the destination
+    const arrowRotation = direction === "next" ? 0 : Math.PI;
+    return new THREE.Euler(
+      -pitchRad, // Tilt to face ground plane
+      -yawRad + Math.PI, // Face toward center
+      arrowRotation // Rotate the ">" symbol
+    );
+  }, [yawRad, pitchRad, direction]);
+
+  return (
+    <group position={[x, y, z]} rotation={rotation}>
+      <mesh
+        ref={meshRef}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          setHovered(true);
+        }}
+        onPointerOut={() => setHovered(false)}
+      >
+        {/* Circle background */}
+        <circleGeometry args={[3, 32]} />
+        <meshBasicMaterial
+          color={hovered ? "#6366f1" : "#4f46e5"}
+          transparent
+          opacity={hovered ? 1 : 0.9}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* Border ring */}
+      <mesh position={[0, 0, 0.01]}>
+        <ringGeometry args={[2.8, 3, 32]} />
+        <meshBasicMaterial
+          color={hovered ? "#a5b4fc" : "#6b7280"}
+          transparent
+          opacity={0.8}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* Chevron ">" symbol using a simple triangle */}
+      <mesh position={[0.3, 0, 0.02]}>
+        <shapeGeometry
+          args={[
+            (() => {
+              const shape = new THREE.Shape();
+              // Draw a ">" chevron
+              shape.moveTo(-1, 1.2);
+              shape.lineTo(0.8, 0);
+              shape.lineTo(-1, -1.2);
+              shape.lineTo(-0.5, 0);
+              shape.closePath();
+              return shape;
+            })(),
+          ]}
+        />
+        <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} />
+      </mesh>
+    </group>
+  );
 }
 
 // Error boundary fallback component
@@ -32,21 +145,18 @@ function CanvasErrorFallback({ error }: { error: string }) {
   );
 }
 
-// Component to debug Three.js context state
-function ContextDebugger() {
-  return null;
-}
-
 function PanoramaSphere({
   imageUrl,
   initialCamera,
   fov,
   onCameraChange,
+  navigationArrows,
 }: {
   imageUrl: string | null;
   initialCamera: { yaw: number; pitch: number };
   fov: number;
   onCameraChange: (camera: Partial<CameraState>) => void;
+  navigationArrows?: NavigationArrowsProps;
 }) {
   const { camera: threeCamera, invalidate: invalidateFrame, gl } = useThree();
   const controlsRef = useRef<any>(null);
@@ -87,11 +197,6 @@ function PanoramaSphere({
       return;
     }
 
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    if (isIOS) {
-      console.log("[Texture] iOS - Starting texture load:", imageUrl);
-    }
-
     const loader = new THREE.TextureLoader();
     // Required for cross-origin images, especially on iOS Safari
     loader.crossOrigin = "anonymous";
@@ -103,14 +208,6 @@ function PanoramaSphere({
         if (cancelled) {
           loadedTexture.dispose();
           return;
-        }
-
-        if (isIOS) {
-          const img = loadedTexture.image;
-          console.log("[Texture] iOS - Loaded successfully:", {
-            dimensions: img ? `${img.width}x${img.height}` : "unknown",
-            url: imageUrl.split("/").slice(-2).join("/"),
-          });
         }
 
         // Configure texture
@@ -138,12 +235,6 @@ function PanoramaSphere({
       undefined,
       (error) => {
         console.error("[Texture] Load error:", error);
-        if (isIOS) {
-          console.error("[Texture] iOS - Error details:", {
-            url: imageUrl,
-            errorMessage: error instanceof Error ? error.message : String(error),
-          });
-        }
       }
     );
 
@@ -282,7 +373,6 @@ function PanoramaSphere({
 
   return (
     <>
-      <ContextDebugger />
       {/* Sky sphere with panorama texture */}
       <mesh ref={meshRef} scale={[-1, 1, 1]}>
         <sphereGeometry args={[500, 64, 32]} />
@@ -309,6 +399,22 @@ function PanoramaSphere({
         maxPolarAngle={Math.PI * 0.9}
         onChange={handleControlsChange}
       />
+
+      {/* Ground navigation arrows */}
+      {navigationArrows?.hasNext && navigationArrows.nextYaw !== null && (
+        <NavigationArrow3D
+          yaw={navigationArrows.nextYaw}
+          direction="next"
+          onClick={navigationArrows.onNext}
+        />
+      )}
+      {navigationArrows?.hasPrevious && navigationArrows.prevYaw !== null && (
+        <NavigationArrow3D
+          yaw={navigationArrows.prevYaw}
+          direction="prev"
+          onClick={navigationArrows.onPrevious}
+        />
+      )}
     </>
   );
 }
@@ -319,19 +425,9 @@ export function PanoramaCanvas({
   initialCamera,
   onCameraChange,
   isLoading,
+  navigationArrows,
 }: PanoramaCanvasProps) {
   const [canvasError, setCanvasError] = useState<string | null>(null);
-  const [canvasReady, setCanvasReady] = useState(false);
-
-  // Log on iOS for debugging
-  useEffect(() => {
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    if (isIOS) {
-      console.log("[PanoramaCanvas] iOS device detected");
-      console.log("[PanoramaCanvas] imageUrl:", imageUrl);
-      console.log("[PanoramaCanvas] WebGL support:", !!document.createElement("canvas").getContext("webgl2"));
-    }
-  }, [imageUrl]);
 
   // Show error fallback if Canvas failed
   if (canvasError) {
@@ -355,10 +451,6 @@ export function PanoramaCanvas({
           // iOS-specific: ensure we don't exceed device limits
           preserveDrawingBuffer: true,
         }}
-        onCreated={({ gl }) => {
-          console.log("[Canvas] Created successfully, max texture size:", gl.capabilities.maxTextureSize);
-          setCanvasReady(true);
-        }}
       >
         <color attach="background" args={["#0a0f1a"]} />
         <PanoramaSphere
@@ -366,6 +458,7 @@ export function PanoramaCanvas({
           initialCamera={initialCamera}
           fov={camera.fov}
           onCameraChange={onCameraChange}
+          navigationArrows={navigationArrows}
         />
       </Canvas>
 

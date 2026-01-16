@@ -22,6 +22,9 @@ interface ImageMeta {
   longitude: number | null;
   distanceFromStart: number | null;
   capturedAt: string;
+  headingDegrees: number | null;
+  headingToPrev: number | null;
+  headingToNext: number | null;
 }
 
 interface Waypoint {
@@ -135,6 +138,23 @@ export function RaceViewer({
     return null;
   }, [waypoints, state.currentDistance]);
 
+  // Get current image heading data for navigation arrows
+  const currentImage = images[state.currentIndex];
+  const navigationHeadings = useMemo(() => {
+    if (!currentImage) return null;
+    const { headingDegrees, headingToPrev, headingToNext } = currentImage;
+    if (headingDegrees === null) return null;
+
+    // Calculate relative yaw for arrows
+    // Arrow position = headingDegrees - headingToX (normalized to 0-360)
+    const normalizeAngle = (angle: number) => ((angle % 360) + 360) % 360;
+
+    return {
+      prevYaw: headingToPrev !== null ? normalizeAngle(headingDegrees - headingToPrev) : null,
+      nextYaw: headingToNext !== null ? normalizeAngle(headingDegrees - headingToNext) : null,
+    };
+  }, [currentImage]);
+
   // Handlers
   const handleCameraChange = useCallback(
     (camera: Parameters<typeof actions.setCamera>[0]) => {
@@ -159,6 +179,18 @@ export function RaceViewer({
         initialCamera={initialCameraFromUrl}
         onCameraChange={handleCameraChange}
         isLoading={isLoading}
+        navigationArrows={
+          navigationHeadings
+            ? {
+                prevYaw: navigationHeadings.prevYaw,
+                nextYaw: navigationHeadings.nextYaw,
+                hasPrevious: state.currentIndex > 0,
+                hasNext: state.currentIndex < images.length - 1,
+                onPrevious: actions.goPrevious,
+                onNext: actions.goNext,
+              }
+            : undefined
+        }
       />
 
       {/* HUD Overlay */}
