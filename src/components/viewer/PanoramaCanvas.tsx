@@ -87,6 +87,57 @@ interface GroundArrowProps {
   onClick: () => void;
 }
 
+// Track logged headings to avoid duplicate logs
+const loggedArrows = new Set<string>();
+
+// Expose debug functions to window for console access
+if (typeof window !== "undefined") {
+  (window as any).setArrowRotation = (dir: "next" | "prev", x: number, y: number, z: number) => {
+    const mesh = (window as any)[`__arrow_${dir}`] as THREE.Mesh | undefined;
+    if (!mesh) {
+      console.log(`Arrow "${dir}" not found`);
+      return;
+    }
+    mesh.rotation.set(
+      THREE.MathUtils.degToRad(x),
+      THREE.MathUtils.degToRad(y),
+      THREE.MathUtils.degToRad(z)
+    );
+    console.log(`Set ${dir} rotation: [${x}°, ${y}°, ${z}°]`);
+  };
+
+  (window as any).getArrowRotation = (dir: "next" | "prev") => {
+    const mesh = (window as any)[`__arrow_${dir}`] as THREE.Mesh | undefined;
+    if (!mesh) {
+      console.log(`Arrow "${dir}" not found`);
+      return null;
+    }
+    const r = mesh.rotation;
+    const result = {
+      x: Math.round(THREE.MathUtils.radToDeg(r.x) * 10) / 10,
+      y: Math.round(THREE.MathUtils.radToDeg(r.y) * 10) / 10,
+      z: Math.round(THREE.MathUtils.radToDeg(r.z) * 10) / 10
+    };
+    console.log(`${dir} rotation: [${result.x}°, ${result.y}°, ${result.z}°]`);
+    return result;
+  };
+
+  (window as any).getArrowInfo = (dir: "next" | "prev") => {
+    const mesh = (window as any)[`__arrow_${dir}`] as THREE.Mesh | undefined;
+    const heading = (window as any)[`__arrow_${dir}_heading`] as number | undefined;
+    if (!mesh) {
+      console.log(`Arrow "${dir}" not found`);
+      return null;
+    }
+    const p = mesh.position;
+    const r = mesh.rotation;
+    console.log(`${dir} arrow (heading=${heading}°):`);
+    console.log(`  pos: [${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}]`);
+    console.log(`  rot: [${THREE.MathUtils.radToDeg(r.x).toFixed(1)}°, ${THREE.MathUtils.radToDeg(r.y).toFixed(1)}°, ${THREE.MathUtils.radToDeg(r.z).toFixed(1)}°]`);
+    return { position: { x: p.x, y: p.y, z: p.z }, rotation: { x: THREE.MathUtils.radToDeg(r.x), y: THREE.MathUtils.radToDeg(r.y), z: THREE.MathUtils.radToDeg(r.z) }, heading };
+  };
+}
+
 function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -109,6 +160,20 @@ function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
     };
   }, [isHovered, gl]);
 
+  // Store mesh ref globally for console debugging
+  useEffect(() => {
+    if (meshRef.current && typeof window !== "undefined") {
+      (window as any)[`__arrow_${direction}`] = meshRef.current;
+      (window as any)[`__arrow_${direction}_heading`] = heading;
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        delete (window as any)[`__arrow_${direction}`];
+        delete (window as any)[`__arrow_${direction}_heading`];
+      }
+    };
+  }, [direction, heading]);
+
   // Apply rotation: face camera, then rotate so "up" points radially outward, then tilt
   useEffect(() => {
     if (!meshRef.current) return;
@@ -119,8 +184,6 @@ function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
     mesh.lookAt(0, 0, 0);
 
     // Step 2: Rotate around local Z so "up" on texture points radially outward
-    // The heading angle determines where on the sphere we are
-    // We need to rotate by heading so the arrow points away from center
     const headingRad = THREE.MathUtils.degToRad(heading);
     mesh.rotateZ(-headingRad);
 
@@ -128,11 +191,13 @@ function GroundArrow({ heading, direction, onClick }: GroundArrowProps) {
     const tiltAngle = THREE.MathUtils.degToRad(-groundPitch);
     mesh.rotateX(tiltAngle);
 
-    // Debug logging for arrow orientation
-    const euler = mesh.rotation;
-    console.log(`[GroundArrow ${direction}] heading=${heading.toFixed(1)}°, pitch=${groundPitch}°`);
-    console.log(`  position: [${position[0].toFixed(2)}, ${position[1].toFixed(2)}, ${position[2].toFixed(2)}]`);
-    console.log(`  rotation (euler): [${THREE.MathUtils.radToDeg(euler.x).toFixed(1)}°, ${THREE.MathUtils.radToDeg(euler.y).toFixed(1)}°, ${THREE.MathUtils.radToDeg(euler.z).toFixed(1)}°]`);
+    // Debug logging - only once per unique heading (dedupe)
+    const logKey = `${direction}-${heading.toFixed(1)}`;
+    if (!loggedArrows.has(logKey)) {
+      loggedArrows.add(logKey);
+      const euler = mesh.rotation;
+      console.log(`[Arrow ${direction}] h=${heading.toFixed(1)}° pos=[${position[0].toFixed(1)}, ${position[1].toFixed(1)}, ${position[2].toFixed(1)}] rot=[${THREE.MathUtils.radToDeg(euler.x).toFixed(1)}°, ${THREE.MathUtils.radToDeg(euler.y).toFixed(1)}°, ${THREE.MathUtils.radToDeg(euler.z).toFixed(1)}°]`);
+    }
   }, [heading, groundPitch, direction, position]);
 
   // Create texture: filled tall isosceles triangle for "next", bordered for "prev"
