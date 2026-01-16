@@ -1,3 +1,5 @@
+import { sql } from "@vercel/postgres";
+
 export default async function TestDbPage() {
     try {
       const result = await sql`

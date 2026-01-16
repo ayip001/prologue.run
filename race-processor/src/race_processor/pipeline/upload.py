@@ -290,6 +290,58 @@ def save_db_records(records: list[dict], output_path: Path) -> None:
     console.print(f"  [green]Saved {len(records)} database records to {output_path.name}[/]")
 
 
+def delete_from_r2(
+    config: R2Config,
+    storage_prefix: str,
+) -> bool:
+    """
+    Delete all objects under a specific prefix in R2.
+
+    Args:
+        config: R2 configuration
+        storage_prefix: Prefix path in R2 bucket (e.g., "races/hk-marathon-2025/")
+
+    Returns:
+        True if successful
+    """
+    client = create_r2_client(config)
+    prefix = storage_prefix.rstrip("/") + "/"
+
+    try:
+        console.print(f"  Listing objects in R2 under: {prefix}")
+        
+        # List all objects with the prefix
+        paginator = client.get_paginator("list_objects_v2")
+        pages = paginator.paginate(Bucket=config.bucket, Prefix=prefix)
+
+        delete_keys = []
+        for page in pages:
+            if "Contents" in page:
+                for obj in page["Contents"]:
+                    delete_keys.append({"Key": obj["Key"]})
+
+        if not delete_keys:
+            console.print("  [yellow]No objects found in R2 with that prefix.[/]")
+            return True
+
+        console.print(f"  Deleting {len(delete_keys)} objects from R2...")
+
+        # Delete in batches of 1000 (S3 API limit)
+        for i in range(0, len(delete_keys), 1000):
+            batch = delete_keys[i : i + 1000]
+            client.delete_objects(
+                Bucket=config.bucket,
+                Delete={"Objects": batch, "Quiet": True},
+            )
+
+        console.print(f"  [green]Successfully deleted {len(delete_keys)} objects from R2.[/]")
+        return True
+
+    except Exception as e:
+        console.print(f"  [red]Failed to delete objects from R2: {e}[/]")
+        return False
+
+
 def run_upload(
     output_base: Path,
     r2_config: Optional[R2Config],
