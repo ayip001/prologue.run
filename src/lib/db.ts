@@ -1,4 +1,5 @@
 import { sql } from "@vercel/postgres";
+import { unstable_noStore as noStore } from 'next/cache';
 import type {
   Race,
   RaceCardData,
@@ -183,6 +184,7 @@ function transformElevationPoint(row: ElevationPointRow): ElevationPoint {
  * Get all races that are ready for display.
  */
 export async function getAllRaces(): Promise<RaceCardData[]> {
+  noStore();
   const result = await sql<RaceRow>`
     SELECT
       id, slug, name, flag_emoji, recorded_year, recorded_by,
@@ -200,6 +202,7 @@ export async function getAllRaces(): Promise<RaceCardData[]> {
  * Get a single race by slug.
  */
 export async function getRaceBySlug(slug: string): Promise<Race | null> {
+  noStore();
   const result = await sql<RaceRow>`
     SELECT *
     FROM races

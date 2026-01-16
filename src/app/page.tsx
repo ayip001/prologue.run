@@ -15,7 +15,8 @@ export default async function HomePage() {
   let races: RaceCardData[];
   try {
     races = await getAllRaces();
-  } catch {
+  } catch (error) {
+    console.error("HOMEPAGE FETCH ERROR:", error);
     // If database is not available, use empty array
     races = [];
   }
