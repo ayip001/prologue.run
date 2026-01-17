@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { GradientText } from "@/components/shared/GradientText";
 import { GlobeBackground } from "./GlobeBackground";
@@ -36,20 +38,29 @@ export function HeroSection({ races }: HeroSectionProps) {
 
       {/* Race Grid Integrated */}
       <div id="races" className="relative z-10 container mx-auto px-4">
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="flex flex-wrap justify-center gap-6">
           {allRaces.map((race) => (
-            <RaceCard key={race.id} race={race} />
+            <RaceCard 
+              key={race.id} 
+              race={race} 
+              className="w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] max-w-sm"
+            />
           ))}
-          <AddRouteCard />
+          <AddRouteCard className="w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] max-w-sm" />
         </div>
       </div>
 
       {/* Buttons */}
       <div className="relative z-10 container mx-auto px-4 text-center mt-12 mb-12">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Button size="lg" asChild disabled className="opacity-60 pointer-events-none">
-            <a href="#">
-              Browse More Races
+          <Button 
+            size="lg" 
+            asChild 
+            className="!opacity-60 cursor-default group relative min-w-[200px]"
+          >
+            <a href="#" onClick={(e) => e.preventDefault()}>
+              <span className="group-hover:hidden">Browse More Races</span>
+              <span className="hidden group-hover:inline">Coming Soon!</span>
             </a>
           </Button>
           <Button variant="secondary" size="lg" asChild>
