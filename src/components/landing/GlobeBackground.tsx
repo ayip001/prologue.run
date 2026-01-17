@@ -2,11 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import { useTheme } from "@/components/providers/ThemeProvider";
 
 interface GlobeBackgroundProps {
-  color?: number;
-  color2?: number;
-  backgroundColor?: number;
   points?: number;
   maxDistance?: number;
   spacing?: number;
@@ -219,9 +217,6 @@ interface ExtendedCamera extends THREE.PerspectiveCamera {
 }
 
 export function GlobeBackground({
-  color = 0xffffff,
-  color2 = 0xffffff,
-  backgroundColor = 0x000000,
   points: n = 12,
   maxDistance = 22,
   spacing = 16,
@@ -233,6 +228,14 @@ export function GlobeBackground({
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const animationFrameRef = useRef<number>(0);
+  const { theme } = useTheme();
+
+  // Theme-dependent colors
+  // Dark mode: white lines on transparent/dark background
+  // Light mode: slate lines on transparent/light background
+  const color = theme === "dark" ? 0xffffff : 0x0f172a;
+  const color2 = theme === "dark" ? 0xffffff : 0x0f172a;
+  const backgroundColor = theme === "dark" ? 0x000000 : 0xffffff;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -504,7 +507,7 @@ export function GlobeBackground({
         container.removeChild(renderer.domElement);
       }
     };
-  }, [color, color2, backgroundColor, n, maxDistance, spacing, showDots, mouseControls, speed, size]);
+  }, [theme, color, color2, backgroundColor, n, maxDistance, spacing, showDots, mouseControls, speed, size]);
 
   return (
     <div
