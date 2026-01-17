@@ -11,7 +11,6 @@ export const TEST_CARD_DATA: RaceCardData = {
   id: "card-preview",
   slug: "card-preview",
   name: "Card Preview",
-  description: "This card did not come from the database.",
   flagEmoji: "🧪",
   recordedYear: 2024,
   recordedBy: "Developer",
