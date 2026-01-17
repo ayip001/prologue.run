@@ -62,7 +62,10 @@ function calculateArrowHeading(
 // Clamp arrow heading to improve UX - keep arrows in expected zones
 // Next arrow: 0-20° or 340-360° (forward area)
 // Prev arrow: 160-200° (backward area)
+// Then reflect: e.g., 14.1h → 345.9h, 161h → 199h
 function clampArrowHeading(heading: number, direction: "next" | "prev"): number {
+  let clamped: number;
+
   if (direction === "next") {
     // Forward zone: 0-20° or 340-360°
     // Convert to -180 to 180 range for easier comparison
@@ -74,14 +77,17 @@ function clampArrowHeading(heading: number, direction: "next" | "prev"): number 
     if (h < -20) h = -20;
 
     // Convert back to 0-360
-    return h < 0 ? h + 360 : h;
+    clamped = h < 0 ? h + 360 : h;
   } else {
     // Backward zone: 160-200° (centered on 180°)
     // Clamp to this range
-    if (heading < 160) return 160;
-    if (heading > 200) return 200;
-    return heading;
+    if (heading < 160) clamped = 160;
+    else if (heading > 200) clamped = 200;
+    else clamped = heading;
   }
+
+  // Reflect: 360 - heading (e.g., 14.1 → 345.9, 161 → 199)
+  return (360 - clamped) % 360;
 }
 
 // Convert spherical coordinates to cartesian for positioning in the scene
