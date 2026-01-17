@@ -12,7 +12,7 @@ interface ViewerHUDProps {
   raceName: string;
   distanceMeters: number;
   totalDistanceMeters: number;
-  elevationM: number;
+  totalAscentM: number;
   waypointName: string | null;
   isVisible: boolean;
   className?: string;
@@ -22,7 +22,7 @@ export function ViewerHUD({
   raceName,
   distanceMeters,
   totalDistanceMeters,
-  elevationM,
+  totalAscentM,
   waypointName,
   isVisible,
   className,
@@ -58,7 +58,7 @@ export function ViewerHUD({
           <MetricsPanel
             distanceMeters={distanceMeters}
             totalDistanceMeters={totalDistanceMeters}
-            elevationM={elevationM}
+            totalAscentM={totalAscentM}
           />
         </div>
 

@@ -55,6 +55,7 @@ interface ImageRow {
   heading_to_prev: string | null;
   heading_to_next: string | null;
   distance_from_start: number | null;
+  elevation_gain_from_start: number | null;
   path_thumbnail: string;
   path_medium: string;
   path_full: string;
@@ -153,6 +154,7 @@ function transformImage(row: ImageRow): ImageMeta {
     headingToPrev: row.heading_to_prev ? parseFloat(row.heading_to_prev) : null,
     headingToNext: row.heading_to_next ? parseFloat(row.heading_to_next) : null,
     distanceFromStart: row.distance_from_start,
+    elevationGainFromStart: row.elevation_gain_from_start,
     pathThumbnail: row.path_thumbnail,
     pathMedium: row.path_medium,
     pathFull: row.path_full,
@@ -264,9 +266,9 @@ export async function getImagesByRaceId(raceId: string): Promise<ImageMeta[]> {
  */
 export async function getImageMetadataByRaceId(
   raceId: string
-): Promise<Pick<ImageMeta, "id" | "positionIndex" | "latitude" | "longitude" | "altitudeMeters" | "distanceFromStart" | "capturedAt" | "headingDegrees" | "headingToPrev" | "headingToNext">[]> {
+): Promise<Pick<ImageMeta, "id" | "positionIndex" | "latitude" | "longitude" | "altitudeMeters" | "distanceFromStart" | "elevationGainFromStart" | "capturedAt" | "headingDegrees" | "headingToPrev" | "headingToNext">[]> {
   const result = await sql<ImageRow>`
-    SELECT id, position_index, latitude, longitude, altitude_meters, distance_from_start, captured_at, heading_degrees, heading_to_prev, heading_to_next
+    SELECT id, position_index, latitude, longitude, altitude_meters, distance_from_start, elevation_gain_from_start, captured_at, heading_degrees, heading_to_prev, heading_to_next
     FROM images
     WHERE race_id = ${raceId}
     ORDER BY position_index
@@ -279,6 +281,7 @@ export async function getImageMetadataByRaceId(
     longitude: row.longitude ? parseFloat(row.longitude) : null,
     altitudeMeters: row.altitude_meters ? parseFloat(row.altitude_meters) : null,
     distanceFromStart: row.distance_from_start,
+    elevationGainFromStart: row.elevation_gain_from_start,
     capturedAt: row.captured_at,
     headingDegrees: row.heading_degrees ? parseFloat(row.heading_degrees) : null,
     headingToPrev: row.heading_to_prev ? parseFloat(row.heading_to_prev) : null,

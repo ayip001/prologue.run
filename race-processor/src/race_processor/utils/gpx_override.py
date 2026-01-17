@@ -85,6 +85,37 @@ def calculate_cumulative_distances(gpx_points: list[dict]) -> list[int]:
     return cumulative
 
 
+def calculate_cumulative_elevation_gain(gpx_points: list[dict]) -> list[int]:
+    """
+    Pre-calculate cumulative elevation gain from start for each GPX point.
+
+    Only counts uphill segments (positive elevation change).
+    This is done once upfront for efficiency, so each image lookup is O(1).
+
+    Args:
+        gpx_points: List of GPX points with 'elevation' key
+
+    Returns:
+        List of cumulative elevation gains in meters (integer), same length as gpx_points
+    """
+    if not gpx_points:
+        return []
+
+    cumulative = [0]  # First point has 0 elevation gain
+
+    for i in range(1, len(gpx_points)):
+        prev_elev = gpx_points[i - 1].get("elevation", 0)
+        curr_elev = gpx_points[i].get("elevation", 0)
+
+        diff = curr_elev - prev_elev
+        # Only add positive elevation change (uphill)
+        gain = max(0, diff)
+
+        cumulative.append(cumulative[-1] + int(round(gain)))
+
+    return cumulative
+
+
 def find_gpx_point_by_elapsed_time(
     elapsed_seconds: float,
     gpx_points: list[dict],
@@ -230,6 +261,11 @@ def override_gps_from_gpx(
     total_gpx_distance = gpx_cumulative_distances[-1] if gpx_cumulative_distances else 0
     console.print(f"  Total GPX track distance: {total_gpx_distance:,} meters ({total_gpx_distance/1000:.2f} km)")
 
+    # Pre-calculate cumulative elevation gain for all GPX points (O(n) once, O(1) per image lookup)
+    gpx_cumulative_elevation_gain = calculate_cumulative_elevation_gain(gpx_points)
+    total_gpx_elevation_gain = gpx_cumulative_elevation_gain[-1] if gpx_cumulative_elevation_gain else 0
+    console.print(f"  Total GPX elevation gain: {total_gpx_elevation_gain:,} meters")
+
     # Get reference times
     gpx_start_time = gpx_points[0]["time"]
     gpx_end_time = gpx_points[-1]["time"]
@@ -329,12 +365,16 @@ def override_gps_from_gpx(
         # Assign cumulative distance from start (pre-calculated for efficiency)
         img["distance_from_start"] = gpx_cumulative_distances[nearest_idx]
 
+        # Assign cumulative elevation gain from start (pre-calculated for efficiency)
+        img["elevation_gain_from_start"] = gpx_cumulative_elevation_gain[nearest_idx]
+
         stats["updated"] += 1
 
         if debug:
             console.print(f"    GPS: ({old_lat}, {old_lon}) -> ({img['latitude']}, {img['longitude']})")
             console.print(f"    Altitude: {img['altitude_meters']}m")
             console.print(f"    Distance from start: {img['distance_from_start']:,}m")
+            console.print(f"    Elevation gain from start: {img['elevation_gain_from_start']:,}m")
 
     # Calculate heading_degrees from GPX fine-grained data (direction of travel)
     # This uses a 5-point moving average for accurate direction
@@ -422,5 +462,11 @@ def _print_summary(
     if distances:
         max_dist = max(distances)
         table.add_row("Distance range", f"0 to {max_dist:,}m ({max_dist/1000:.2f} km)")
+
+    # Show elevation gain range
+    elev_gains = [img.get("elevation_gain_from_start") for img in images if img.get("elevation_gain_from_start") is not None]
+    if elev_gains:
+        max_gain = max(elev_gains)
+        table.add_row("Elevation gain range", f"0 to {max_gain:,}m")
 
     console.print(table)

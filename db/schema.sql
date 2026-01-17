@@ -28,6 +28,8 @@ CREATE TABLE races (
     -- Elevation summary
     elevation_gain  INTEGER,                       -- meters
     elevation_loss  INTEGER,                       -- meters
+    elevation_min   INTEGER,                       -- meters (lowest point)
+    elevation_max   INTEGER,                       -- meters (highest point)
 
     -- Card display data (JSON for flexibility)
     elevation_bars  JSONB,                         -- [0-100] array, ~30-40 values
@@ -88,6 +90,8 @@ CREATE TABLE images (
 
     -- Distance from start (meters) - for progress bar
     distance_from_start INTEGER,
+    -- Cumulative elevation gain from start (meters) - for total ascent display
+    elevation_gain_from_start INTEGER,
 
     -- Storage paths (relative to race storage_prefix, WebP format)
     path_thumbnail  VARCHAR(255) NOT NULL,         -- 'thumb/0001.webp'
