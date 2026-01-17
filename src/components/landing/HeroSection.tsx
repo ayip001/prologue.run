@@ -3,7 +3,7 @@ import { GradientText } from "@/components/shared/GradientText";
 import { GlobeBackground } from "./GlobeBackground";
 import { RaceCard } from "./RaceCard";
 import { AddRouteCard } from "./AddRouteCard";
-import { ENABLE_TESTING_CARD, TEST_CARD_DATA } from "@/lib/constants";
+import { ENABLE_TESTING_CARDS, TEST_CARD_DATA } from "@/lib/constants";
 import type { RaceCardData } from "@/types";
 
 interface HeroSectionProps {
@@ -11,7 +11,7 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({ races }: HeroSectionProps) {
-  const allRaces = ENABLE_TESTING_CARD ? [TEST_CARD_DATA, ...races] : races;
+  const allRaces = ENABLE_TESTING_CARDS ? [TEST_CARD_DATA, ...races] : races;
 
   return (
     <section className="relative min-h-screen pt-32 pb-20 overflow-hidden">

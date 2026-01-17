@@ -3,26 +3,27 @@ export const CDN_BASE_URL =
   process.env.NEXT_PUBLIC_CDN_BASE_URL || "https://images.prologue.run";
 
 // Testing card configuration
-export const ENABLE_TESTING_CARD = true;
+export const ENABLE_TESTING_CARDS = false;
 
 export const TEST_CARD_DATA = {
-  id: "test-route",
-  slug: "test-route",
-  name: "Test Route",
+  id: "card-preview",
+  slug: "card-preview",
+  name: "Card Preview",
+  description: "This card did not come from the database.",
   flagEmoji: "🧪",
   recordedYear: 2024,
   recordedBy: "Developer",
   distanceMeters: 42195,
   elevationGain: 500,
   elevationLoss: 480,
-  city: "Test City",
-  country: "Testland",
+  city: "Preview",
+  country: "Hong Kong",
   tier: "bronze" as const,
   cardImageUrl: "https://images.unsplash.com/photo-1672182701054-20654f8f52cd?q=80&w=700",
   minimapUrl: "https://images.prologue.run/races/test-route-02/public/minimap.webp",
   elevationBars: [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 30, 35, 40, 45, 50, 55, 60, 65],
   totalImages: 1,
-  officialUrl: "https://www.worldmarathonmajors.com/",
+  officialUrl: "/",
 };
 
 export const TEST_VIEWER_IMAGE_URL = "https://upload.wikimedia.org/wikipedia/commons/5/50/Alcazar_de_Toledo_y_Academia_de_Infanter%C3%ADa.jpg";

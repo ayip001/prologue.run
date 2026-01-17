@@ -4,7 +4,7 @@ import { getRaceBySlug, getImageMetadataByRaceId, getWaypointsByRaceId, getEleva
 import { parseViewState } from "@/lib/viewState";
 import { RaceViewer } from "@/components/viewer/RaceViewer";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ENABLE_TESTING_CARD, TEST_CARD_DATA, TEST_VIEWER_IMAGE_URL, DEFAULT_VIEW } from "@/lib/constants";
+import { ENABLE_TESTING_CARDS, TEST_CARD_DATA, TEST_VIEWER_IMAGE_URL, DEFAULT_VIEW } from "@/lib/constants";
 import type { Race } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +59,7 @@ export default async function RaceViewerPage({ params }: PageProps) {
   const { slug, viewState: viewStateSegments } = await params;
 
   // Handle test route
-  if (slug === "test-route" && ENABLE_TESTING_CARD) {
+  if (slug === "card-preview" && ENABLE_TESTING_CARDS) {
     const viewStateStr = viewStateSegments?.[0] || "@0";
     const parsedViewState = parseViewState(viewStateStr);
 
@@ -141,7 +141,7 @@ export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params;
 
   // Handle test route metadata
-  if (slug === "test-route" && ENABLE_TESTING_CARD) {
+  if (slug === "card-preview" && ENABLE_TESTING_CARDS) {
     return {
       title: `${TEST_RACE.name} - prologue.run`,
       description: `Preview the ${TEST_RACE.name} route through interactive 360° street-level imagery.`,

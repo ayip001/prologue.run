@@ -1090,7 +1090,7 @@ def db_update(slug_or_id: str, config_path: Path) -> None:
         "distance_meters", "race_date", "city", "country", "elevation_gain",
         "elevation_loss", "elevation_bars", "minimap_url", "card_image_url",
         "tier", "total_images", "capture_date", "capture_device", "status",
-        "storage_bucket", "storage_prefix"
+        "is_testing", "storage_bucket", "storage_prefix"
     ]
 
     update_parts = []

@@ -194,7 +194,7 @@ def insert_race(config: dict, update_if_exists: bool = False) -> Optional[str]:
             "recorded_by", "distance_meters", "race_date", "city", "country",
             "elevation_gain", "elevation_loss", "elevation_bars", "minimap_url",
             "card_image_url", "tier", "total_images", "capture_date", "capture_device",
-            "status", "storage_bucket", "storage_prefix"
+            "status", "is_testing", "storage_bucket", "storage_prefix"
         ]
 
         # Build insert query with only fields that are present
@@ -246,7 +246,7 @@ def _update_race(cur, conn, race_id: str, config: dict) -> Optional[str]:
         "distance_meters", "race_date", "city", "country", "elevation_gain",
         "elevation_loss", "elevation_bars", "minimap_url", "card_image_url",
         "tier", "total_images", "capture_date", "capture_device", "status",
-        "storage_bucket", "storage_prefix"
+        "is_testing", "storage_bucket", "storage_prefix"
     ]
 
     update_parts = []

@@ -44,6 +44,7 @@ CREATE TABLE races (
 
     -- Processing status
     status          VARCHAR(20) NOT NULL DEFAULT 'pending',
+    is_testing      BOOLEAN NOT NULL DEFAULT FALSE,
                     -- pending, processing, ready, error
 
     -- Storage references

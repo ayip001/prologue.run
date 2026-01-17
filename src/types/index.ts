@@ -24,6 +24,7 @@ export interface Race {
   captureDate: string;
   captureDevice: string | null;
   status: "pending" | "processing" | "ready" | "error";
+  isTesting: boolean;
   storageBucket: string;
   storagePrefix: string;
   totalViews: number;
@@ -102,6 +103,7 @@ export interface RaceCardData {
   minimapUrl: string | null;
   elevationBars: number[] | null;
   totalImages: number;
+  isTesting: boolean;
   officialUrl?: string | null;
 }
 

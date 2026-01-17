@@ -1,5 +1,6 @@
 import { sql } from "@vercel/postgres";
 import { unstable_noStore as noStore } from 'next/cache';
+import { ENABLE_TESTING_CARDS } from './constants';
 import type {
   Race,
   RaceCardData,
@@ -34,6 +35,7 @@ interface RaceRow {
   capture_date: string;
   capture_device: string | null;
   status: "pending" | "processing" | "ready" | "error";
+  is_testing: boolean;
   storage_bucket: string;
   storage_prefix: string;
   total_views: number;
@@ -106,6 +108,7 @@ function transformRace(row: RaceRow): Race {
     captureDate: row.capture_date,
     captureDevice: row.capture_device,
     status: row.status,
+    isTesting: Boolean(row.is_testing),
     storageBucket: row.storage_bucket,
     storagePrefix: row.storage_prefix,
     totalViews: row.total_views,
@@ -132,6 +135,7 @@ function transformRaceCard(row: RaceRow): RaceCardData {
     minimapUrl: row.minimap_url,
     elevationBars: row.elevation_bars,
     totalImages: row.total_images,
+    isTesting: Boolean(row.is_testing),
     officialUrl: (row as any).official_url || null,
   };
 }
@@ -189,15 +193,30 @@ function transformElevationPoint(row: ElevationPointRow): ElevationPoint {
  */
 export async function getAllRaces(): Promise<RaceCardData[]> {
   noStore();
-  const result = await sql<RaceRow>`
-    SELECT
-      id, slug, name, flag_emoji, recorded_year, recorded_by,
-      distance_meters, elevation_gain, elevation_loss, city, country,
-      tier, card_image_url, minimap_url, elevation_bars, total_images
-    FROM races
-    WHERE status = 'ready'
-    ORDER BY created_at DESC
-  `;
+  
+  // If testing cards are disabled, only show non-testing races
+  // We use COALESCE(is_testing, FALSE) to treat NULL as not testing
+  const result = ENABLE_TESTING_CARDS
+    ? await sql<RaceRow>`
+        SELECT
+          id, slug, name, flag_emoji, recorded_year, recorded_by,
+          distance_meters, elevation_gain, elevation_loss, city, country,
+          tier, card_image_url, minimap_url, elevation_bars, total_images, 
+          COALESCE(is_testing, FALSE) as is_testing
+        FROM races
+        WHERE status = 'ready'
+        ORDER BY created_at DESC
+      `
+    : await sql<RaceRow>`
+        SELECT
+          id, slug, name, flag_emoji, recorded_year, recorded_by,
+          distance_meters, elevation_gain, elevation_loss, city, country,
+          tier, card_image_url, minimap_url, elevation_bars, total_images, 
+          COALESCE(is_testing, FALSE) as is_testing
+        FROM races
+        WHERE status = 'ready' AND COALESCE(is_testing, FALSE) = FALSE
+        ORDER BY created_at DESC
+      `;
 
   return result.rows.map(transformRaceCard);
 }
@@ -215,7 +234,15 @@ export async function getRaceBySlug(slug: string): Promise<Race | null> {
   `;
 
   if (result.rows.length === 0) return null;
-  return transformRace(result.rows[0]);
+  
+  const race = transformRace(result.rows[0]);
+  
+  // If it's a testing race and testing is disabled, hide it
+  if (race.isTesting && !ENABLE_TESTING_CARDS) {
+    return null;
+  }
+  
+  return race;
 }
 
 /**
