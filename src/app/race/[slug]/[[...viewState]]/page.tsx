@@ -29,6 +29,7 @@ const TEST_IMAGES = [{
   positionIndex: 0,
   latitude: 0,
   longitude: 0,
+  altitudeMeters: 0,
   distanceFromStart: 0,
   capturedAt: "2024-01-01T00:00:00Z",
   headingDegrees: null,

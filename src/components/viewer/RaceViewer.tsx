@@ -20,6 +20,7 @@ interface ImageMeta {
   positionIndex: number;
   latitude: number | null;
   longitude: number | null;
+  altitudeMeters: number | null;
   distanceFromStart: number | null;
   capturedAt: string;
   headingDegrees: number | null;
@@ -120,11 +121,15 @@ export function RaceViewer({
   // URL state sync
   useViewStateUrl({ raceSlug: race.slug, state });
 
-  // Calculate current elevation
+  // Calculate current elevation (from profile or fallback to image altitude)
   const currentElevation = useMemo(() => {
-    if (!elevationProfile) return 0;
-    return interpolateElevation(elevationProfile.points, state.currentDistance);
-  }, [elevationProfile, state.currentDistance]);
+    if (elevationProfile) {
+      return interpolateElevation(elevationProfile.points, state.currentDistance);
+    }
+    // Fallback to current image's altitude if no elevation profile
+    const currentImage = images[state.currentIndex];
+    return currentImage?.altitudeMeters ?? 0;
+  }, [elevationProfile, state.currentDistance, images, state.currentIndex]);
 
   // Find active waypoint
   const activeWaypoint = useMemo(() => {

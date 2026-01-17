@@ -237,9 +237,9 @@ export async function getImagesByRaceId(raceId: string): Promise<ImageMeta[]> {
  */
 export async function getImageMetadataByRaceId(
   raceId: string
-): Promise<Pick<ImageMeta, "id" | "positionIndex" | "latitude" | "longitude" | "distanceFromStart" | "capturedAt" | "headingDegrees" | "headingToPrev" | "headingToNext">[]> {
+): Promise<Pick<ImageMeta, "id" | "positionIndex" | "latitude" | "longitude" | "altitudeMeters" | "distanceFromStart" | "capturedAt" | "headingDegrees" | "headingToPrev" | "headingToNext">[]> {
   const result = await sql<ImageRow>`
-    SELECT id, position_index, latitude, longitude, distance_from_start, captured_at, heading_degrees, heading_to_prev, heading_to_next
+    SELECT id, position_index, latitude, longitude, altitude_meters, distance_from_start, captured_at, heading_degrees, heading_to_prev, heading_to_next
     FROM images
     WHERE race_id = ${raceId}
     ORDER BY position_index
@@ -250,6 +250,7 @@ export async function getImageMetadataByRaceId(
     positionIndex: row.position_index,
     latitude: row.latitude ? parseFloat(row.latitude) : null,
     longitude: row.longitude ? parseFloat(row.longitude) : null,
+    altitudeMeters: row.altitude_meters ? parseFloat(row.altitude_meters) : null,
     distanceFromStart: row.distance_from_start,
     capturedAt: row.captured_at,
     headingDegrees: row.heading_degrees ? parseFloat(row.heading_degrees) : null,
