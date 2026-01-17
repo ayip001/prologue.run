@@ -211,6 +211,7 @@ export function RaceViewer({
         <ProgressScrubber
           totalDistance={race.distanceMeters}
           currentDistance={state.currentDistance}
+          elevationBars={race.elevationBars}
           onSeek={handleSeek}
         />
       </div>
