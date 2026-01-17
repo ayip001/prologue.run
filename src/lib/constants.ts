@@ -23,6 +23,7 @@ export const TEST_CARD_DATA = {
   minimapUrl: "https://images.prologue.run/races/test-route-02/public/minimap.webp",
   elevationBars: [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 30, 35, 40, 45, 50, 55, 60, 65],
   totalImages: 1,
+  isTesting: true,
   officialUrl: "/",
 };
 
