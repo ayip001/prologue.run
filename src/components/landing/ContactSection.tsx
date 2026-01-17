@@ -3,13 +3,13 @@ import { Button } from "@/components/ui/button";
 
 export function ContactSection() {
   return (
-    <section className="py-24 bg-slate-950">
+    <section className="py-24 dark:bg-slate-950 light:bg-white">
       <div className="container mx-auto px-4">
         <div className="max-w-3xl mx-auto text-center space-y-8">
-          <h2 className="text-3xl md:text-4xl font-bold text-white">
+          <h2 className="text-3xl md:text-4xl font-bold dark:text-white light:text-slate-900">
             Get in Touch
           </h2>
-          <p className="text-lg text-slate-400">
+          <p className="text-lg dark:text-slate-400 light:text-slate-600">
             Contact me if you want to help log a race, want your race logged, or
             to report an issue.
           </p>

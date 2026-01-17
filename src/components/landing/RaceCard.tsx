@@ -85,7 +85,9 @@ export function RaceCard({ race, className }: RaceCardProps) {
     <div
       ref={cardRef}
       className={cn(
-        "group relative overflow-hidden rounded-xl border border-white/10 bg-slate-900/80 transition-all duration-500 hover:bg-slate-900/90 hover:border-coral/50 hover:shadow-xl hover:shadow-coral/5",
+        "group relative overflow-hidden rounded-xl border transition-all duration-500 hover:border-coral/50 hover:shadow-xl hover:shadow-coral/5",
+        "dark:border-white/10 dark:bg-slate-900/80 dark:hover:bg-slate-900/90",
+        "light:border-slate-200 light:bg-slate-100 light:hover:bg-slate-50",
         "perspective-1000",
         className
       )}
@@ -106,7 +108,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
       `}</style>
 
       {/* Card Image */}
-      <div className="relative aspect-[16/10] overflow-hidden bg-slate-950">
+      <div className="relative aspect-[16/10] overflow-hidden dark:bg-slate-950 light:bg-slate-200">
         {race.cardImageUrl ? (
           <Image
             src={race.cardImageUrl}
@@ -116,7 +118,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
             className="object-cover transition-all duration-700 opacity-60 group-hover:opacity-40 group-hover:scale-105"
           />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900 opacity-70 group-hover:opacity-60 transition-opacity duration-700" />
+          <div className="absolute inset-0 bg-gradient-to-br dark:from-slate-800 dark:to-slate-900 light:from-slate-200 light:to-slate-300 opacity-70 group-hover:opacity-60 transition-opacity duration-700" />
         )}
 
         {/* Route Path Overlay */}
@@ -153,12 +155,12 @@ export function RaceCard({ race, className }: RaceCardProps) {
               {race.flagEmoji && (
                 <span className="text-lg">{race.flagEmoji}</span>
               )}
-              <h3 className="text-lg font-semibold text-white">
+              <h3 className="text-lg font-semibold dark:text-white light:text-slate-900">
                 {race.name}
               </h3>
             </div>
             {race.city && race.country && (
-              <p className="text-sm text-slate-400">
+              <p className="text-sm dark:text-slate-400 light:text-slate-600">
                 {race.city}, {race.country}
               </p>
             )}
@@ -166,7 +168,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
         </div>
 
         {/* Stats */}
-        <div className="flex items-center gap-4 mb-4 text-sm text-slate-400">
+        <div className="flex items-center gap-4 mb-4 text-sm dark:text-slate-400 light:text-slate-600">
           <div className="flex items-center gap-1.5">
             <Route className="h-4 w-4" />
             <span>{formatRaceDistance(race.distanceMeters)}</span>
@@ -181,7 +183,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
 
         {/* Recorded By */}
         {race.recordedBy && race.recordedYear && (
-          <p className="text-xs text-slate-500 mb-4">
+          <p className="text-xs dark:text-slate-500 light:text-slate-500 mb-4">
             Recorded by {race.recordedBy} ({race.recordedYear})
           </p>
         )}

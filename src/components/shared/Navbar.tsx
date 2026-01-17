@@ -57,16 +57,16 @@ export function Navbar({ className, transparent = false }: NavbarProps) {
               <div
                 className={cn(
                   "absolute w-6 h-6 bg-coral rounded-full shadow-sm transition-transform duration-200",
-                  isDark ? "left-1" : "left-[calc(100%-1.75rem)]"
+                  isDark ? "left-[calc(100%-1.75rem)]" : "left-1"
                 )}
               />
               <Sun className={cn(
                 "h-3.5 w-3.5 z-10 ml-1.5 transition-colors",
-                isDark ? "text-white" : "text-slate-400"
+                isDark ? "text-slate-400 group-hover:text-slate-300" : "text-white"
               )} />
               <Moon className={cn(
                 "h-3.5 w-3.5 z-10 ml-auto mr-1.5 transition-colors",
-                isDark ? "text-slate-400 group-hover:text-slate-300" : "text-slate-700"
+                isDark ? "text-white" : "text-slate-400"
               )} />
             </button>
 
@@ -138,16 +138,16 @@ export function Navbar({ className, transparent = false }: NavbarProps) {
                 <div
                   className={cn(
                     "absolute w-6 h-6 bg-coral rounded-full shadow-sm transition-transform duration-200",
-                    isDark ? "left-1" : "left-[calc(100%-1.75rem)]"
+                    isDark ? "left-[calc(100%-1.75rem)]" : "left-1"
                   )}
                 />
                 <Sun className={cn(
                   "h-3.5 w-3.5 z-10 ml-1.5 transition-colors",
-                  isDark ? "text-white" : "text-slate-400"
+                  isDark ? "text-slate-400" : "text-white"
                 )} />
                 <Moon className={cn(
                   "h-3.5 w-3.5 z-10 ml-auto mr-1.5 transition-colors",
-                  isDark ? "text-slate-400" : "text-slate-700"
+                  isDark ? "text-white" : "text-slate-400"
                 )} />
               </button>
             </div>

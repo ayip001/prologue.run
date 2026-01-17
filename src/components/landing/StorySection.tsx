@@ -33,24 +33,24 @@ export function StorySection() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="py-24 bg-slate-950">
+    <section ref={sectionRef} className="py-24 dark:bg-slate-950 light:bg-white">
       <div className="container mx-auto px-4">
         <div className="flex flex-col lg:flex-row items-center gap-16">
           {/* Left Text */}
           <div className="flex-1 space-y-6">
-            <h2 className="text-3xl md:text-4xl font-bold text-white">
+            <h2 className="text-3xl md:text-4xl font-bold dark:text-white light:text-slate-900">
               About Prologue.run
             </h2>
-            <p className="text-lg text-slate-400 leading-relaxed">
+            <p className="text-lg dark:text-slate-400 light:text-slate-600 leading-relaxed">
               Hi, I'm Angus, an avid runner and developer.
             </p>
-            <p className="text-lg text-slate-400 leading-relaxed">
+            <p className="text-lg dark:text-slate-400 light:text-slate-600 leading-relaxed">
               Like many other runners, I enjoy running marathons outside of my hometown,
               and I sometimes just wish to see the route before running it (like
               reading the prologue for a book!). Then I noticed my 360 camera
               that's been gathering dust, and that's how this idea came to be.
             </p>
-            <p className="text-lg text-slate-400 leading-relaxed">
+            <p className="text-lg dark:text-slate-400 light:text-slate-600 leading-relaxed">
               Prologue.run allows you to preview the route of a race before you run it,
               like using Google Maps' Street View feature. Right now, the selection of races is limited
               to races that I have run, but I plan to add more races in the future as I complete more races.
@@ -63,7 +63,7 @@ export function StorySection() {
           {/* Right Image Stack */}
           <div className="flex-1 relative aspect-[2/3] max-w-md w-full mx-auto">
             {/* Base Image */}
-            <div className="relative w-full h-full rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
+            <div className="relative w-full h-full rounded-2xl overflow-hidden border dark:border-white/10 light:border-slate-200 shadow-2xl">
               <picture>
                 <source srcSet="/prologue-run-about.avif" type="image/avif" />
                 <img

@@ -10,19 +10,21 @@ export function AddRouteCard({ className }: AddRouteCardProps) {
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/90 transition-all duration-300 hover:border-coral/50 hover:bg-slate-900/95",
+        "relative overflow-hidden rounded-xl border-2 border-dashed transition-all duration-300 hover:border-coral/50",
+        "dark:border-slate-700 dark:bg-slate-900/90 dark:hover:bg-slate-900/95",
+        "light:border-slate-300 light:bg-slate-100 light:hover:bg-slate-50",
         className
       )}
     >
       <div className="flex flex-col items-center justify-center h-full min-h-[280px] p-8 text-center">
-        <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center mb-4">
+        <div className="w-12 h-12 rounded-full dark:bg-slate-800 light:bg-slate-200 flex items-center justify-center mb-4">
           <Plus className="h-6 w-6 text-coral" />
         </div>
 
-        <h3 className="text-lg font-semibold text-white mb-2">
+        <h3 className="text-lg font-semibold dark:text-white light:text-slate-900 mb-2">
           Add Your Race
         </h3>
-        <p className="text-sm text-slate-400 mb-6 max-w-[200px]">
+        <p className="text-sm dark:text-slate-400 light:text-slate-600 mb-6 max-w-[200px]">
           Have a race you'd like to see? Let us know!
         </p>
 
