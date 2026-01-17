@@ -89,7 +89,7 @@ def calculate_cumulative_elevation_gain(gpx_points: list[dict]) -> list[int]:
     """
     Pre-calculate cumulative elevation gain from start for each GPX point.
 
-    Only counts uphill segments (positive elevation change).
+    Uses noise filtering (3m threshold) to avoid counting GPS noise as elevation gain.
     This is done once upfront for efficiency, so each image lookup is O(1).
 
     Args:
@@ -101,19 +101,11 @@ def calculate_cumulative_elevation_gain(gpx_points: list[dict]) -> list[int]:
     if not gpx_points:
         return []
 
-    cumulative = [0]  # First point has 0 elevation gain
+    # Import the filtered calculation from gpx_process to keep logic consistent
+    from .gpx_process import calculate_cumulative_elevation_gain_filtered
 
-    for i in range(1, len(gpx_points)):
-        prev_elev = gpx_points[i - 1].get("elevation", 0)
-        curr_elev = gpx_points[i].get("elevation", 0)
-
-        diff = curr_elev - prev_elev
-        # Only add positive elevation change (uphill)
-        gain = max(0, diff)
-
-        cumulative.append(cumulative[-1] + int(round(gain)))
-
-    return cumulative
+    elevations = [p.get("elevation", 0) for p in gpx_points]
+    return calculate_cumulative_elevation_gain_filtered(elevations, threshold=3.0)
 
 
 def find_gpx_point_by_elapsed_time(
@@ -255,6 +247,14 @@ def override_gps_from_gpx(
         return manifest
 
     console.print(f"  Found {len(gpx_points)} track points in GPX")
+
+    # Check elevation data in GPX
+    elevations = [p.get("elevation", 0) for p in gpx_points]
+    non_zero_elevations = [e for e in elevations if e != 0]
+    if non_zero_elevations:
+        console.print(f"  GPX elevations: min={min(non_zero_elevations):.1f}m, max={max(non_zero_elevations):.1f}m")
+    else:
+        console.print("  [yellow]Warning: GPX file has no elevation data (all elevations are 0 or None)[/]")
 
     # Pre-calculate cumulative distances for all GPX points (O(n) once, O(1) per image lookup)
     gpx_cumulative_distances = calculate_cumulative_distances(gpx_points)

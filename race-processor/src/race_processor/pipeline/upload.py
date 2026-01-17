@@ -8,9 +8,12 @@ This step:
 """
 
 import os
+import sys
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
+from contextlib import redirect_stderr
+from io import StringIO
 
 import exifread
 import boto3
@@ -38,7 +41,9 @@ def check_exif_privacy(image_path: Path) -> list[str]:
 
     try:
         with open(image_path, "rb") as f:
-            tags = exifread.process_file(f, details=False)
+            # Suppress exifread warnings (e.g., "Webp file does not have exif data")
+            with redirect_stderr(StringIO()):
+                tags = exifread.process_file(f, details=False)
 
         # Check for any GPS-related tags
         gps_tag_prefixes = ["GPS", "Image GPSInfo"]

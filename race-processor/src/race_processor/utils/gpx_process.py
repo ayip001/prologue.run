@@ -22,6 +22,84 @@ from .geo import haversine_distance
 console = Console()
 
 
+def calculate_elevation_stats(
+    elevations: list[float],
+    threshold: float = 3.0,
+) -> tuple[float, float]:
+    """
+    Calculate total elevation gain and loss with noise filtering.
+
+    Uses a threshold-based accumulator to filter out GPS noise.
+    Only counts elevation changes when the accumulated change in one
+    direction exceeds the threshold before reversing.
+
+    Args:
+        elevations: List of elevation values in meters
+        threshold: Minimum elevation change to count (default 3m, similar to Garmin)
+
+    Returns:
+        Tuple of (total_gain, total_loss) in meters
+    """
+    if len(elevations) < 2:
+        return 0.0, 0.0
+
+    total_gain = 0.0
+    total_loss = 0.0
+
+    # Track the "anchor" point - last confirmed elevation
+    anchor_elevation = elevations[0]
+
+    for i in range(1, len(elevations)):
+        diff = elevations[i] - anchor_elevation
+
+        # Only commit the change if it exceeds threshold
+        if diff >= threshold:
+            total_gain += diff
+            anchor_elevation = elevations[i]
+        elif diff <= -threshold:
+            total_loss += abs(diff)
+            anchor_elevation = elevations[i]
+
+    return total_gain, total_loss
+
+
+def calculate_cumulative_elevation_gain_filtered(
+    elevations: list[float],
+    threshold: float = 3.0,
+) -> list[int]:
+    """
+    Calculate cumulative elevation gain from start with noise filtering.
+
+    Args:
+        elevations: List of elevation values in meters
+        threshold: Minimum elevation change to count (default 3m)
+
+    Returns:
+        List of cumulative elevation gain values (same length as input)
+    """
+    if not elevations:
+        return []
+
+    cumulative = [0]
+    anchor_elevation = elevations[0]
+    current_gain = 0
+
+    for i in range(1, len(elevations)):
+        diff = elevations[i] - anchor_elevation
+
+        if diff >= threshold:
+            # Committed uphill change
+            current_gain += diff
+            anchor_elevation = elevations[i]
+        elif diff <= -threshold:
+            # Committed downhill change - just move anchor, no gain added
+            anchor_elevation = elevations[i]
+
+        cumulative.append(int(round(current_gain)))
+
+    return cumulative
+
+
 def parse_gpx_track(gpx_path: Path) -> list[dict]:
     """
     Parse GPX file into a list of track points.
@@ -359,20 +437,13 @@ def process_gpx(
     console.print(f"  Creating elevation profile ({elevation_samples} samples)...")
     elevation_profile = create_elevation_profile(points, elevation_samples)
 
-    # Calculate elevation stats
+    # Calculate elevation stats with noise filtering
     elevations = [p.get("elevation", 0) for p in points]
     min_elevation = min(elevations) if elevations else 0
     max_elevation = max(elevations) if elevations else 0
 
-    # Calculate gain/loss
-    total_gain = 0
-    total_loss = 0
-    for i in range(1, len(elevations)):
-        diff = elevations[i] - elevations[i - 1]
-        if diff > 0:
-            total_gain += diff
-        else:
-            total_loss += abs(diff)
+    # Calculate gain/loss with 3m threshold filter (like Garmin)
+    total_gain, total_loss = calculate_elevation_stats(elevations, threshold=3.0)
 
     result = {
         "polyline": [{"lat": p["lat"], "lon": p["lon"]} for p in simplified],
@@ -447,17 +518,9 @@ def extract_gpx_race_stats(gpx_path: Path) -> dict:
     distances = calculate_cumulative_distances(points)
     total_distance_m = distances[-1] if distances else 0
 
-    # Calculate elevation stats
+    # Calculate elevation stats with noise filtering (3m threshold like Garmin)
     elevations = [p.get("elevation", 0) for p in points]
-    total_gain = 0
-    total_loss = 0
-
-    for i in range(1, len(elevations)):
-        diff = elevations[i] - elevations[i - 1]
-        if diff > 0:
-            total_gain += diff
-        else:
-            total_loss += abs(diff)
+    total_gain, total_loss = calculate_elevation_stats(elevations, threshold=3.0)
 
     # Calculate min/max elevation
     elevation_min = int(round(min(elevations))) if elevations else 0
