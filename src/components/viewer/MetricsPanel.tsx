@@ -6,13 +6,15 @@ import { formatDistanceCompact, formatElevationCompact } from "@/lib/formatters"
 import { cn } from "@/lib/utils";
 
 interface MetricsPanelProps {
-  distanceKm: number;
+  distanceMeters: number;
+  totalDistanceMeters: number;
   elevationM: number;
   className?: string;
 }
 
 export function MetricsPanel({
-  distanceKm,
+  distanceMeters,
+  totalDistanceMeters,
   elevationM,
   className,
 }: MetricsPanelProps) {
@@ -23,7 +25,11 @@ export function MetricsPanel({
         <Route className="h-4 w-4 text-coral" />
         <div className="flex items-baseline gap-1">
           <span className="text-lg font-semibold text-white">
-            {formatDistanceCompact(distanceKm * 1000)}
+            {formatDistanceCompact(distanceMeters)}
+          </span>
+          <span className="text-xs text-slate-400">/</span>
+          <span className="text-xs text-slate-400">
+            {formatDistanceCompact(totalDistanceMeters)}
           </span>
           <span className="text-xs text-slate-400">km</span>
         </div>

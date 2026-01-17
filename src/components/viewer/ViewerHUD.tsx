@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
 
 interface ViewerHUDProps {
   raceName: string;
-  distanceKm: number;
+  distanceMeters: number;
+  totalDistanceMeters: number;
   elevationM: number;
   waypointName: string | null;
   isVisible: boolean;
@@ -19,7 +20,8 @@ interface ViewerHUDProps {
 
 export function ViewerHUD({
   raceName,
-  distanceKm,
+  distanceMeters,
+  totalDistanceMeters,
   elevationM,
   waypointName,
   isVisible,
@@ -53,7 +55,11 @@ export function ViewerHUD({
           <ContextPanel raceName={raceName} waypointName={waypointName} />
 
           {/* Metrics */}
-          <MetricsPanel distanceKm={distanceKm} elevationM={elevationM} />
+          <MetricsPanel
+            distanceMeters={distanceMeters}
+            totalDistanceMeters={totalDistanceMeters}
+            elevationM={elevationM}
+          />
         </div>
 
         {/* Right side - Close button */}

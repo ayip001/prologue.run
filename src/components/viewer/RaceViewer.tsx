@@ -181,7 +181,8 @@ export function RaceViewer({
       {/* HUD Overlay */}
       <ViewerHUD
         raceName={race.name}
-        distanceKm={state.currentDistance / 1000}
+        distanceMeters={state.currentDistance}
+        totalDistanceMeters={race.distanceMeters}
         elevationM={currentElevation}
         waypointName={activeWaypoint}
         isVisible={state.isHUDVisible}
