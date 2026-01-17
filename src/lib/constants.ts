@@ -1,3 +1,5 @@
+import type { RaceCardData } from "@/types";
+
 // CDN and storage configuration
 export const CDN_BASE_URL =
   process.env.NEXT_PUBLIC_CDN_BASE_URL || "https://images.prologue.run";
@@ -5,7 +7,7 @@ export const CDN_BASE_URL =
 // Testing card configuration
 export const ENABLE_TESTING_CARDS = false;
 
-export const TEST_CARD_DATA = {
+export const TEST_CARD_DATA: RaceCardData = {
   id: "card-preview",
   slug: "card-preview",
   name: "Card Preview",
