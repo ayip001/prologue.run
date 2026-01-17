@@ -65,7 +65,7 @@ export function MethodologySection() {
             <ul className="space-y-6">
               {captureSteps.map((step, idx) => (
                 <li key={idx} className="flex items-center gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 dark:bg-white/5 light:bg-slate-200 rounded flex items-center justify-center">
+                  <div className="flex-shrink-0 w-8 h-8 dark:bg-white/5 light:bg-coral/20 rounded flex items-center justify-center">
                     <step.icon className="h-4 w-4 dark:text-slate-300 light:text-slate-600" />
                   </div>
                   <span className="dark:text-slate-300 light:text-slate-600 leading-snug">{step.text}</span>
@@ -86,7 +86,7 @@ export function MethodologySection() {
             <ul className="space-y-6">
               {processSteps.map((step, idx) => (
                 <li key={idx} className="flex items-center gap-4">
-                  <div className="flex-shrink-0 w-8 h-8 dark:bg-white/5 light:bg-slate-200 rounded flex items-center justify-center">
+                  <div className="flex-shrink-0 w-8 h-8 dark:bg-white/5 light:bg-blue-500/20 rounded flex items-center justify-center">
                     <step.icon className="h-4 w-4 dark:text-slate-300 light:text-slate-600" />
                   </div>
                   <span className="dark:text-slate-300 light:text-slate-600 leading-snug">{step.text}</span>
