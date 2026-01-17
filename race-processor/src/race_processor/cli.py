@@ -1174,6 +1174,7 @@ def db_update_gpx(slug_or_id: str, gpx_path: Path) -> None:
     console.print(f"    Elevation gain: {stats['elevation_gain']:,} m")
     console.print(f"    Elevation loss: {stats['elevation_loss']:,} m")
     console.print(f"    Elevation range: {stats['elevation_min']:,} m to {stats['elevation_max']:,} m")
+    console.print(f"    Elevation bars: {len(stats.get('elevation_bars', []))} samples")
 
     # Update the race
     success = update_race_gpx_stats(
@@ -1183,6 +1184,7 @@ def db_update_gpx(slug_or_id: str, gpx_path: Path) -> None:
         elevation_loss=stats["elevation_loss"],
         elevation_min=stats["elevation_min"],
         elevation_max=stats["elevation_max"],
+        elevation_bars=stats.get("elevation_bars"),
     )
 
     if not success:

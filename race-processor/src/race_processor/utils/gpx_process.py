@@ -496,18 +496,21 @@ def _print_summary(result: dict) -> None:
     console.print(table)
 
 
-def extract_gpx_race_stats(gpx_path: Path) -> dict:
+def extract_gpx_race_stats(gpx_path: Path, num_elevation_bars: int = 35) -> dict:
     """
     Extract race-level statistics from GPX file for updating race records.
 
     This is a lightweight function that calculates only the stats needed
-    for race metadata updates (distance, elevation gain/loss, min/max elevation).
+    for race metadata updates (distance, elevation gain/loss, min/max elevation,
+    and elevation bars for scrubber visualization).
 
     Args:
         gpx_path: Path to GPX file
+        num_elevation_bars: Number of bars for elevation visualization (default 35)
 
     Returns:
-        Dict with keys: distance_meters, elevation_gain, elevation_loss, elevation_min, elevation_max
+        Dict with keys: distance_meters, elevation_gain, elevation_loss,
+                        elevation_min, elevation_max, elevation_bars
     """
     # Parse GPX
     points = parse_gpx_track(gpx_path)
@@ -526,10 +529,47 @@ def extract_gpx_race_stats(gpx_path: Path) -> dict:
     elevation_min = int(round(min(elevations))) if elevations else 0
     elevation_max = int(round(max(elevations))) if elevations else 0
 
+    # Generate elevation bars (normalized 0-100 values at regular distance intervals)
+    elevation_bars = []
+    if total_distance_m > 0 and len(points) > 1:
+        elev_range = elevation_max - elevation_min
+        interval = total_distance_m / num_elevation_bars
+
+        sample_idx = 0
+        for i in range(num_elevation_bars):
+            target_dist = (i + 0.5) * interval  # Sample at center of each bar
+
+            # Find the segment containing this distance
+            while sample_idx < len(distances) - 1 and distances[sample_idx + 1] < target_dist:
+                sample_idx += 1
+
+            # Interpolate elevation at target distance
+            if sample_idx >= len(points) - 1:
+                elevation = elevations[-1]
+            else:
+                d1 = distances[sample_idx]
+                d2 = distances[sample_idx + 1]
+                e1 = elevations[sample_idx]
+                e2 = elevations[sample_idx + 1]
+
+                if d2 - d1 > 0:
+                    t = (target_dist - d1) / (d2 - d1)
+                    elevation = e1 + t * (e2 - e1)
+                else:
+                    elevation = e1
+
+            # Normalize to 0-100 range
+            if elev_range > 0:
+                normalized = int(round((elevation - elevation_min) / elev_range * 100))
+            else:
+                normalized = 50  # Flat terrain
+            elevation_bars.append(max(0, min(100, normalized)))
+
     return {
         "distance_meters": int(round(total_distance_m)),
         "elevation_gain": int(round(total_gain)),
         "elevation_loss": int(round(total_loss)),
         "elevation_min": elevation_min,
         "elevation_max": elevation_max,
+        "elevation_bars": elevation_bars,
     }

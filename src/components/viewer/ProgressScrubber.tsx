@@ -7,6 +7,7 @@ import { formatDistanceCompact } from "@/lib/formatters";
 interface ProgressScrubberProps {
   totalDistance: number;
   currentDistance: number;
+  elevationBars?: number[] | null;
   onSeek: (distance: number) => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
@@ -16,6 +17,7 @@ interface ProgressScrubberProps {
 export function ProgressScrubber({
   totalDistance,
   currentDistance,
+  elevationBars,
   onSeek,
   onDragStart,
   onDragEnd,
@@ -105,6 +107,19 @@ export function ProgressScrubber({
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
+        {/* Elevation bars */}
+        {elevationBars && elevationBars.length > 0 && (
+          <div className="absolute inset-0 flex items-end pointer-events-none">
+            {elevationBars.map((value, index) => (
+              <div
+                key={index}
+                className="flex-1 bg-white/30"
+                style={{ height: `${Math.max(5, value * 0.9)}%` }}
+              />
+            ))}
+          </div>
+        )}
+
         {/* Progress fill */}
         <div
           className="absolute inset-y-0 left-0 bg-gradient-to-r from-coral/30 to-golden/30"

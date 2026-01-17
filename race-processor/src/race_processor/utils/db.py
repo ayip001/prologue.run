@@ -539,6 +539,7 @@ def update_race_gpx_stats(
     elevation_loss: int,
     elevation_min: int,
     elevation_max: int,
+    elevation_bars: list[int] | None = None,
 ) -> bool:
     """
     Update a race's distance and elevation data from GPX-derived stats.
@@ -550,12 +551,18 @@ def update_race_gpx_stats(
         elevation_loss: Total elevation loss in meters
         elevation_min: Lowest elevation in meters
         elevation_max: Highest elevation in meters
+        elevation_bars: Normalized elevation values (0-100) for scrubber visualization
 
     Returns:
         True if successful
     """
+    from psycopg2.extras import Json
+
     conn = get_connection()
     cur = conn.cursor()
+
+    # Convert elevation_bars to Json for JSONB column
+    bars_json = Json(elevation_bars) if elevation_bars else None
 
     try:
         # Try as UUID first, then as slug
@@ -564,11 +571,11 @@ def update_race_gpx_stats(
                 """
                 UPDATE races
                 SET distance_meters = %s, elevation_gain = %s, elevation_loss = %s,
-                    elevation_min = %s, elevation_max = %s
+                    elevation_min = %s, elevation_max = %s, elevation_bars = %s
                 WHERE id = %s
                 RETURNING slug
                 """,
-                (distance_meters, elevation_gain, elevation_loss, elevation_min, elevation_max, slug_or_id)
+                (distance_meters, elevation_gain, elevation_loss, elevation_min, elevation_max, bars_json, slug_or_id)
             )
         except Exception:
             conn.rollback()
@@ -576,11 +583,11 @@ def update_race_gpx_stats(
                 """
                 UPDATE races
                 SET distance_meters = %s, elevation_gain = %s, elevation_loss = %s,
-                    elevation_min = %s, elevation_max = %s
+                    elevation_min = %s, elevation_max = %s, elevation_bars = %s
                 WHERE slug = %s
                 RETURNING slug
                 """,
-                (distance_meters, elevation_gain, elevation_loss, elevation_min, elevation_max, slug_or_id)
+                (distance_meters, elevation_gain, elevation_loss, elevation_min, elevation_max, bars_json, slug_or_id)
             )
 
         result = cur.fetchone()
@@ -591,6 +598,8 @@ def update_race_gpx_stats(
             console.print(f"  Elevation gain: {elevation_gain:,} m")
             console.print(f"  Elevation loss: {elevation_loss:,} m")
             console.print(f"  Elevation range: {elevation_min:,} m to {elevation_max:,} m")
+            if elevation_bars:
+                console.print(f"  Elevation bars: {len(elevation_bars)} samples")
             return True
         else:
             console.print(f"[yellow]Race not found:[/] {slug_or_id}")
