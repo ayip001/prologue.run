@@ -443,7 +443,7 @@ def process_gpx(
     max_elevation = max(elevations) if elevations else 0
 
     # Calculate gain/loss with 3m threshold filter (like Garmin)
-    total_gain, total_loss = calculate_elevation_stats(elevations, threshold=3.0)
+    total_gain, total_loss = calculate_elevation_stats(elevations, threshold=1.0)
 
     result = {
         "polyline": [{"lat": p["lat"], "lon": p["lon"]} for p in simplified],
@@ -520,7 +520,7 @@ def extract_gpx_race_stats(gpx_path: Path) -> dict:
 
     # Calculate elevation stats with noise filtering (3m threshold like Garmin)
     elevations = [p.get("elevation", 0) for p in points]
-    total_gain, total_loss = calculate_elevation_stats(elevations, threshold=3.0)
+    total_gain, total_loss = calculate_elevation_stats(elevations, threshold=1.0)
 
     # Calculate min/max elevation
     elevation_min = int(round(min(elevations))) if elevations else 0

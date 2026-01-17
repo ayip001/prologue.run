@@ -89,7 +89,7 @@ def calculate_cumulative_elevation_gain(gpx_points: list[dict]) -> list[int]:
     """
     Pre-calculate cumulative elevation gain from start for each GPX point.
 
-    Uses noise filtering (3m threshold) to avoid counting GPS noise as elevation gain.
+    Uses noise filtering (1m threshold) to avoid counting GPS noise as elevation gain.
     This is done once upfront for efficiency, so each image lookup is O(1).
 
     Args:
@@ -105,7 +105,7 @@ def calculate_cumulative_elevation_gain(gpx_points: list[dict]) -> list[int]:
     from .gpx_process import calculate_cumulative_elevation_gain_filtered
 
     elevations = [p.get("elevation", 0) for p in gpx_points]
-    return calculate_cumulative_elevation_gain_filtered(elevations, threshold=3.0)
+    return calculate_cumulative_elevation_gain_filtered(elevations, threshold=1.0)
 
 
 def find_gpx_point_by_elapsed_time(
