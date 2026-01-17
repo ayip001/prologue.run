@@ -531,6 +531,73 @@ def print_races_table(races: list[dict]) -> None:
     console.print(table)
 
 
+def update_race_gpx_stats(
+    slug_or_id: str,
+    distance_meters: int,
+    elevation_gain: int,
+    elevation_loss: int,
+) -> bool:
+    """
+    Update a race's distance and elevation data from GPX-derived stats.
+
+    Args:
+        slug_or_id: Race slug or UUID
+        distance_meters: Total distance in meters
+        elevation_gain: Total elevation gain in meters
+        elevation_loss: Total elevation loss in meters
+
+    Returns:
+        True if successful
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        # Try as UUID first, then as slug
+        try:
+            cur.execute(
+                """
+                UPDATE races
+                SET distance_meters = %s, elevation_gain = %s, elevation_loss = %s
+                WHERE id = %s
+                RETURNING slug
+                """,
+                (distance_meters, elevation_gain, elevation_loss, slug_or_id)
+            )
+        except Exception:
+            conn.rollback()
+            cur.execute(
+                """
+                UPDATE races
+                SET distance_meters = %s, elevation_gain = %s, elevation_loss = %s
+                WHERE slug = %s
+                RETURNING slug
+                """,
+                (distance_meters, elevation_gain, elevation_loss, slug_or_id)
+            )
+
+        result = cur.fetchone()
+        if result:
+            conn.commit()
+            console.print(f"[green]Updated race:[/] {result[0]}")
+            console.print(f"  Distance: {distance_meters:,} m ({distance_meters/1000:.2f} km)")
+            console.print(f"  Elevation gain: {elevation_gain:,} m")
+            console.print(f"  Elevation loss: {elevation_loss:,} m")
+            return True
+        else:
+            console.print(f"[yellow]Race not found:[/] {slug_or_id}")
+            return False
+
+    except Exception as e:
+        conn.rollback()
+        console.print(f"[red]Failed to update race:[/] {e}")
+        return False
+
+    finally:
+        cur.close()
+        conn.close()
+
+
 def print_race_details(race: dict) -> None:
     """Print race details as a formatted table."""
     table = Table(title=f"Race: {race.get('name', 'Unknown')}")

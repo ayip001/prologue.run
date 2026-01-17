@@ -1131,6 +1131,59 @@ def db_update(slug_or_id: str, config_path: Path) -> None:
         conn.close()
 
 
+@db.command("update-gpx")
+@click.argument("slug_or_id")
+@click.argument(
+    "gpx_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+def db_update_gpx(slug_or_id: str, gpx_path: Path) -> None:
+    """Update race distance and elevation stats from GPX file.
+
+    Extracts the following from the GPX track:
+    - distance_meters: Total track distance
+    - elevation_gain: Total elevation gain
+    - elevation_loss: Total elevation loss
+
+    \b
+    Examples:
+      race-processor db update-gpx test-route-01 ./track.gpx
+      race-processor db update-gpx f5df5237-7b9b-4ab1-90ce-e5d3b00e9acc ./route.gpx
+    """
+    from .utils.db import get_race, update_race_gpx_stats
+    from .utils.gpx_process import extract_gpx_race_stats
+
+    race = get_race(slug_or_id)
+    if not race:
+        console.print(f"[red]Race not found:[/] {slug_or_id}")
+        raise SystemExit(1)
+
+    console.print(f"[bold]Updating race from GPX:[/] {race['slug']}")
+    console.print(f"  GPX file: {gpx_path}")
+
+    # Extract stats from GPX
+    stats = extract_gpx_race_stats(gpx_path)
+    if not stats:
+        console.print("[red]Failed to extract stats from GPX file[/]")
+        raise SystemExit(1)
+
+    console.print(f"  Extracted stats:")
+    console.print(f"    Distance: {stats['distance_meters']:,} m ({stats['distance_meters']/1000:.2f} km)")
+    console.print(f"    Elevation gain: {stats['elevation_gain']:,} m")
+    console.print(f"    Elevation loss: {stats['elevation_loss']:,} m")
+
+    # Update the race
+    success = update_race_gpx_stats(
+        slug_or_id=race["id"],
+        distance_meters=stats["distance_meters"],
+        elevation_gain=stats["elevation_gain"],
+        elevation_loss=stats["elevation_loss"],
+    )
+
+    if not success:
+        raise SystemExit(1)
+
+
 @db.command("delete")
 @click.argument("slug_or_id")
 @click.option(

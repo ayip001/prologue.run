@@ -423,3 +423,44 @@ def _print_summary(result: dict) -> None:
 
     console.print()
     console.print(table)
+
+
+def extract_gpx_race_stats(gpx_path: Path) -> dict:
+    """
+    Extract race-level statistics from GPX file for updating race records.
+
+    This is a lightweight function that calculates only the stats needed
+    for race metadata updates (distance, elevation gain/loss).
+
+    Args:
+        gpx_path: Path to GPX file
+
+    Returns:
+        Dict with keys: distance_meters, elevation_gain, elevation_loss
+    """
+    # Parse GPX
+    points = parse_gpx_track(gpx_path)
+    if not points:
+        return {}
+
+    # Calculate total distance
+    distances = calculate_cumulative_distances(points)
+    total_distance_m = distances[-1] if distances else 0
+
+    # Calculate elevation gain/loss
+    elevations = [p.get("elevation", 0) for p in points]
+    total_gain = 0
+    total_loss = 0
+
+    for i in range(1, len(elevations)):
+        diff = elevations[i] - elevations[i - 1]
+        if diff > 0:
+            total_gain += diff
+        else:
+            total_loss += abs(diff)
+
+    return {
+        "distance_meters": int(round(total_distance_m)),
+        "elevation_gain": int(round(total_gain)),
+        "elevation_loss": int(round(total_loss)),
+    }
