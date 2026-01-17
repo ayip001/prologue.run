@@ -5,7 +5,6 @@ import Image from "next/image";
 import { ArrowRight, Link as LinkIcon, Mountain, Route } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { RaceCardData } from "@/types";
-import { ElevationBars } from "./ElevationBars";
 import { GoldBadge } from "./GoldBadge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -107,21 +106,18 @@ export function RaceCard({ race, className }: RaceCardProps) {
       `}</style>
 
       {/* Card Image */}
-      <div className="relative aspect-[16/10] overflow-hidden">
+      <div className="relative aspect-[16/10] overflow-hidden bg-slate-950">
         {race.cardImageUrl ? (
           <Image
             src={race.cardImageUrl}
             alt={race.name}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            className="object-cover transition-transform duration-700 group-hover:scale-105"
+            className="object-cover transition-all duration-700 opacity-60 group-hover:opacity-40 group-hover:scale-105"
           />
         ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900" />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900 opacity-70 group-hover:opacity-60 transition-opacity duration-700" />
         )}
-
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/50 to-transparent" />
 
         {/* Route Path Overlay */}
         {minimapUrl && (
@@ -146,9 +142,6 @@ export function RaceCard({ race, className }: RaceCardProps) {
         {race.tier && (
           <GoldBadge tier={race.tier} className="absolute top-3 right-3" />
         )}
-
-        {/* Elevation Bars */}
-        {race.elevationBars && <ElevationBars bars={race.elevationBars} />}
       </div>
 
       {/* Card Content */}
