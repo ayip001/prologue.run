@@ -13,7 +13,6 @@ import { ViewerHUD } from "./ViewerHUD";
 import { NavigationChevrons } from "./NavigationChevrons";
 import { ProgressScrubber } from "./ProgressScrubber";
 import { ElevationProfile } from "./ElevationProfile";
-import { interpolateElevation } from "@/lib/utils";
 
 interface ImageMeta {
   id: string;
@@ -22,6 +21,7 @@ interface ImageMeta {
   longitude: number | null;
   altitudeMeters: number | null;
   distanceFromStart: number | null;
+  elevationGainFromStart: number | null;
   capturedAt: string;
   headingDegrees: number | null;
   headingToPrev: number | null;
@@ -121,15 +121,11 @@ export function RaceViewer({
   // URL state sync
   useViewStateUrl({ raceSlug: race.slug, state });
 
-  // Calculate current elevation (from profile or fallback to image altitude)
-  const currentElevation = useMemo(() => {
-    if (elevationProfile) {
-      return interpolateElevation(elevationProfile.points, state.currentDistance);
-    }
-    // Fallback to current image's altitude if no elevation profile
+  // Get cumulative elevation gain (total ascent) from current image
+  const totalAscent = useMemo(() => {
     const currentImage = images[state.currentIndex];
-    return currentImage?.altitudeMeters ?? 0;
-  }, [elevationProfile, state.currentDistance, images, state.currentIndex]);
+    return currentImage?.elevationGainFromStart ?? 0;
+  }, [images, state.currentIndex]);
 
   // Find active waypoint
   const activeWaypoint = useMemo(() => {
@@ -188,7 +184,7 @@ export function RaceViewer({
         raceName={race.name}
         distanceMeters={state.currentDistance}
         totalDistanceMeters={race.distanceMeters}
-        elevationM={currentElevation}
+        totalAscentM={totalAscent}
         waypointName={activeWaypoint}
         isVisible={state.isHUDVisible}
       />
@@ -215,6 +211,7 @@ export function RaceViewer({
         <ProgressScrubber
           totalDistance={race.distanceMeters}
           currentDistance={state.currentDistance}
+          elevationBars={race.elevationBars}
           onSeek={handleSeek}
         />
       </div>

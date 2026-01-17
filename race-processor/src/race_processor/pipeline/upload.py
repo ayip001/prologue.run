@@ -8,9 +8,12 @@ This step:
 """
 
 import os
+import sys
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
+from contextlib import redirect_stderr
+from io import StringIO
 
 import exifread
 import boto3
@@ -38,7 +41,9 @@ def check_exif_privacy(image_path: Path) -> list[str]:
 
     try:
         with open(image_path, "rb") as f:
-            tags = exifread.process_file(f, details=False)
+            # Suppress exifread warnings (e.g., "Webp file does not have exif data")
+            with redirect_stderr(StringIO()):
+                tags = exifread.process_file(f, details=False)
 
         # Check for any GPS-related tags
         gps_tag_prefixes = ["GPS", "Image GPSInfo"]
@@ -269,8 +274,9 @@ def generate_db_records(
             "heading_degrees": meta.heading_degrees,
             "heading_to_prev": meta.heading_to_prev,
             "heading_to_next": meta.heading_to_next,
-            # Distance from start (calculated from GPX track)
+            # Distance and elevation from start (calculated from GPX track)
             "distance_from_start": meta.distance_from_start,
+            "elevation_gain_from_start": meta.elevation_gain_from_start,
             # Storage paths (WebP only)
             "path_thumbnail": f"thumb/{base_name}.webp",
             "path_medium": f"medium/{base_name}.webp",

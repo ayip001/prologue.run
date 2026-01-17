@@ -5,7 +5,7 @@ export function MethodologySection() {
   const captureSteps = [
     {
       icon: Footprints,
-      text: "Carry a 360 camera on a selfie stick",
+      text: "Carry a 360 camera to a race",
     },
     {
       icon: Zap,

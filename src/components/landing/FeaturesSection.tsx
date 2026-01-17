@@ -6,19 +6,19 @@ const features = [
     icon: Eye,
     title: "360° Street View",
     description:
-      "Immerse yourself in the race route with full panoramic imagery captured from the runner's perspective.",
-  },
-  {
-    icon: Map,
-    title: "Full Route Coverage",
-    description:
-      "Every kilometer covered, from start to finish. No gaps, no surprises on race day.",
+      "Never ran this marathon before? Immerse yourself in the race route from the runner's perspective.",
   },
   {
     icon: Camera,
-    title: "High Quality",
+    title: "Full Route Coverage",
     description:
-      "Captured with professional 360° cameras for crystal-clear detail in any direction.",
+      "Every kilometer covered, from start to finish. Never take a wrong turn. No surprises on race day.",
+  },
+  {
+    icon: Map,
+    title: "Race Details",
+    description:
+      "Prepare yourself for the race with detailed elevation profiles and distance markers.",
   },
   {
     icon: Zap,

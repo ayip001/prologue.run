@@ -8,14 +8,14 @@ import { cn } from "@/lib/utils";
 interface MetricsPanelProps {
   distanceMeters: number;
   totalDistanceMeters: number;
-  elevationM: number;
+  totalAscentM: number;
   className?: string;
 }
 
 export function MetricsPanel({
   distanceMeters,
   totalDistanceMeters,
-  elevationM,
+  totalAscentM,
   className,
 }: MetricsPanelProps) {
   return (
@@ -35,12 +35,13 @@ export function MetricsPanel({
         </div>
       </GlassPanel>
 
-      {/* Elevation */}
+      {/* Total Ascent */}
       <GlassPanel className="px-3 py-2 flex items-center gap-2">
         <Mountain className="h-4 w-4 text-golden" />
         <div className="flex items-baseline gap-1">
+          <span className="text-xs text-slate-400 mr-1">↑</span>
           <span className="text-lg font-semibold text-white">
-            {formatElevationCompact(elevationM)}
+            {formatElevationCompact(totalAscentM)}
           </span>
           <span className="text-xs text-slate-400">m</span>
         </div>
