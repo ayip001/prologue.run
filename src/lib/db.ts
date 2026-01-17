@@ -82,6 +82,26 @@ interface ElevationPointRow {
   gradient_percent: string | null;
 }
 
+interface RaceTranslationRow {
+  id: string;
+  race_id: string;
+  locale: string;
+  name: string | null;
+  description: string | null;
+  city: string | null;
+  country: string | null;
+}
+
+export interface RaceTranslation {
+  id: string;
+  raceId: string;
+  locale: string;
+  name: string | null;
+  description: string | null;
+  city: string | null;
+  country: string | null;
+}
+
 // ============================================================================
 // Transform Functions
 // ============================================================================
@@ -326,4 +346,75 @@ export async function incrementRaceViews(raceId: string): Promise<void> {
     SET total_views = total_views + 1
     WHERE id = ${raceId}
   `;
+}
+
+// ============================================================================
+// Race Translations
+// ============================================================================
+
+/**
+ * Get translation for a race in a specific locale.
+ * Returns null if no translation exists for the locale or if the table doesn't exist yet.
+ */
+export async function getRaceTranslation(
+  raceId: string,
+  locale: string
+): Promise<RaceTranslation | null> {
+  // Skip for default locale (English) - use base race data
+  if (locale === "en") {
+    return null;
+  }
+
+  try {
+    const result = await sql<RaceTranslationRow>`
+      SELECT id, race_id, locale, name, description, city, country
+      FROM race_translations
+      WHERE race_id = ${raceId} AND locale = ${locale}
+      LIMIT 1
+    `;
+
+    if (result.rows.length === 0) return null;
+
+    const row = result.rows[0];
+    return {
+      id: row.id,
+      raceId: row.race_id,
+      locale: row.locale,
+      name: row.name,
+      description: row.description,
+      city: row.city,
+      country: row.country,
+    };
+  } catch {
+    // Table might not exist yet - return null gracefully
+    return null;
+  }
+}
+
+/**
+ * Get all translations for a race.
+ */
+export async function getRaceTranslations(
+  raceId: string
+): Promise<RaceTranslation[]> {
+  try {
+    const result = await sql<RaceTranslationRow>`
+      SELECT id, race_id, locale, name, description, city, country
+      FROM race_translations
+      WHERE race_id = ${raceId}
+    `;
+
+    return result.rows.map((row) => ({
+      id: row.id,
+      raceId: row.race_id,
+      locale: row.locale,
+      name: row.name,
+      description: row.description,
+      city: row.city,
+      country: row.country,
+    }));
+  } catch {
+    // Table might not exist yet - return empty array
+    return [];
+  }
 }

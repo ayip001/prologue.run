@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { GradientText } from "@/components/shared/GradientText";
 import { GlobeBackground } from "./GlobeBackground";
@@ -7,12 +8,14 @@ import { RaceCard } from "./RaceCard";
 import { AddRouteCard } from "./AddRouteCard";
 import { ENABLE_TESTING_CARDS, TEST_CARD_DATA } from "@/lib/constants";
 import type { RaceCardData } from "@/types";
+import { Link } from "@/i18n/navigation";
 
 interface HeroSectionProps {
   races: RaceCardData[];
 }
 
 export function HeroSection({ races }: HeroSectionProps) {
+  const t = useTranslations("hero");
   const allRaces = ENABLE_TESTING_CARDS ? [TEST_CARD_DATA, ...races] : races;
 
   return (
@@ -26,13 +29,12 @@ export function HeroSection({ races }: HeroSectionProps) {
       {/* Hero Content */}
       <div className="relative z-10 container mx-auto px-4 text-center mb-16">
         <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6">
-          <span className="text-white">Scout Your </span>
-          <GradientText>Next Race</GradientText>
+          <span className="text-white">{t("title")}</span>
+          <GradientText>{t("titleHighlight")}</GradientText>
         </h1>
 
         <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-10">
-          Preview marathon routes through interactive 360° street-level imagery.
-          Know exactly what to expect before race day.
+          {t("description")}
         </p>
       </div>
 
@@ -40,9 +42,9 @@ export function HeroSection({ races }: HeroSectionProps) {
       <div id="races" className="relative z-10 container mx-auto px-4">
         <div className="flex flex-wrap justify-center gap-6">
           {allRaces.map((race) => (
-            <RaceCard 
-              key={race.id} 
-              race={race} 
+            <RaceCard
+              key={race.id}
+              race={race}
               className="w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] max-w-sm"
             />
           ))}
@@ -53,18 +55,18 @@ export function HeroSection({ races }: HeroSectionProps) {
       {/* Buttons */}
       <div className="relative z-10 container mx-auto px-4 text-center mt-12 mb-12">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Button 
-            size="lg" 
-            asChild 
+          <Button
+            size="lg"
+            asChild
             className="!opacity-60 cursor-default group relative min-w-[200px]"
           >
             <a href="#" onClick={(e) => e.preventDefault()}>
-              <span className="group-hover:hidden">Browse More Races</span>
-              <span className="hidden group-hover:inline">Coming Soon!</span>
+              <span className="group-hover:hidden">{t("browseMoreRaces")}</span>
+              <span className="hidden group-hover:inline">{t("comingSoon")}</span>
             </a>
           </Button>
           <Button variant="secondary" size="lg" asChild>
-            <a href="#features">Learn More</a>
+            <Link href="#features">{t("learnMore")}</Link>
           </Button>
         </div>
       </div>

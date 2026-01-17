@@ -1,0 +1,160 @@
+{
+  "metadata": {
+    "title": "prologue.run - Scout Your Next Race",
+    "description": "Preview marathon routes through interactive 360° street-level imagery. Know exactly what to expect before race day.",
+    "keywords": "marathon, running, 360 view, street view, race preview, route viewer"
+  },
+  "navbar": {
+    "races": "Races",
+    "features": "Features",
+    "appearance": "Appearance",
+    "language": "Language"
+  },
+  "hero": {
+    "title": "Scout Your ",
+    "titleHighlight": "Next Race",
+    "description": "Preview marathon routes through interactive 360° street-level imagery. Know exactly what to expect before race day.",
+    "browseMoreRaces": "Browse More Races",
+    "comingSoon": "Coming Soon!",
+    "learnMore": "Learn More"
+  },
+  "features": {
+    "title": "Why Prologue?",
+    "subtitle": "Know the course before you run it. Mental preparation is half the battle.",
+    "streetView": {
+      "title": "360° Street View",
+      "description": "Never ran this marathon before? Immerse yourself in the race route from the runner's perspective."
+    },
+    "fullRoute": {
+      "title": "Full Route Coverage",
+      "description": "Every kilometer covered, from start to finish. Never take a wrong turn. No surprises on race day."
+    },
+    "raceDetails": {
+      "title": "Race Details",
+      "description": "Prepare yourself for the race with detailed elevation profiles and distance markers."
+    },
+    "fastSmooth": {
+      "title": "Fast & Smooth",
+      "description": "Optimized loading with progressive image quality for a seamless viewing experience."
+    }
+  },
+  "story": {
+    "title": "About Prologue.run",
+    "paragraph1": "Hi, I'm Angus, an avid runner and developer.",
+    "paragraph2": "Like many other runners, I enjoy running marathons outside of my hometown, and I sometimes just wish to see the route before running it (like reading the prologue for a book!). Then I noticed my 360 camera that's been gathering dust, and that's how this idea came to be.",
+    "paragraph3": "Prologue.run allows you to preview the route of a race before you run it, like using Google Maps' Street View feature. Right now, the selection of races is limited to races that I have run, but I plan to add more races in the future as I complete more races. If you have a race that you would like to see on Prologue.run, or if you want to help log a race, please let me know by emailing me at"
+  },
+  "methodology": {
+    "title": "How it Works",
+    "subtitle": "From the first kilometer to the final upload, here is how we bring the race to your screen.",
+    "capture": {
+      "title": "Capture",
+      "step1": "Carry a 360 camera to a race",
+      "step2": "Set interval photo mode on a 10s timer",
+      "step3": "Run the entire track from start to finish"
+    },
+    "processing": {
+      "title": "Processing",
+      "step1": "Gyro-stabilize to keep the view facing forward",
+      "step2": "AI-driven face and plate blurring for privacy",
+      "step3": "Generate equirectangular tiles and sync to DB",
+      "step4": "Map GPX coordinates to the image sequence",
+      "step5": "New route is published and ready to scout"
+    }
+  },
+  "contact": {
+    "title": "Get in Touch",
+    "description": "Contact me if you want to help log a race, want your race logged, or to report an issue.",
+    "emailMe": "Email Me",
+    "reportIssue": "Report an Issue on GitHub"
+  },
+  "footer": {
+    "tagline": "Preview marathon routes through interactive 360° street-level imagery. Scout your next race from anywhere in the world.",
+    "links": "Links",
+    "browseRaces": "Browse Races",
+    "features": "Features",
+    "termsOfService": "Terms of Service",
+    "privacyPolicy": "Privacy Policy",
+    "contact": "Contact",
+    "copyright": "© {year} prologue.run. All rights reserved.",
+    "madeWith": "Made with",
+    "forRunners": "for runners",
+    "buyMeCoffee": "Buy me a coffee"
+  },
+  "raceCard": {
+    "viewRoute": "View Route",
+    "officialSite": "Official Site",
+    "recordedBy": "Recorded by {name} ({year})"
+  },
+  "addRouteCard": {
+    "title": "Add Your Race",
+    "description": "Have a race you'd like to see? Let us know!",
+    "requestRace": "Request Race"
+  },
+  "viewer": {
+    "loading": "Loading viewer..."
+  },
+  "racePage": {
+    "notFoundTitle": "Race Not Found - prologue.run",
+    "metaDescription": "Preview the {raceName} route through interactive 360° street-level imagery."
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "section1": {
+      "title": "1. Information We Collect",
+      "paragraph1": "prologue.run does not require a login, and we do not provide a way for users to upload data. We do not collect personal information such as names, email addresses, or phone numbers unless you contact us directly.",
+      "paragraph2": "We use standard web analytics to understand how our site is used. This data is anonymous and helps us improve the user experience."
+    },
+    "section2": {
+      "title": "2. Imagery and Privacy",
+      "paragraph1": "Our 360° imagery is captured in public spaces. We respect individual privacy and strive to ensure that faces and license plates are obscured."
+    },
+    "section3": {
+      "title": "3. Content Removal Requests",
+      "paragraph1": "If you appear in a photo or 360° view on prologue.run and wish to be removed, please contact us at",
+      "requirements": "To process your request, you must:",
+      "requirement1": "Include the exact link to the view where you are visible.",
+      "requirement2": "Submit proof that you are the person in the imagery.",
+      "note": "Note: We will only blur your face and other identifying features. Publicly available information, such as store signage or race bib numbers, will not be removed."
+    },
+    "section4": {
+      "title": "4. Cookies",
+      "paragraph1": "We may use cookies to remember your preferences and improve your experience. You can choose to disable cookies in your browser settings."
+    },
+    "section5": {
+      "title": "5. Third-Party Links",
+      "paragraph1": "Our site may contain links to other websites. We are not responsible for the privacy practices or content of these third-party sites."
+    },
+    "section6": {
+      "title": "6. Contact Us",
+      "paragraph1": "If you have any questions about this Privacy Policy, please contact us at"
+    }
+  },
+  "terms": {
+    "title": "Terms of Service",
+    "section1": {
+      "title": "1. Acceptance of Terms",
+      "paragraph1": "By accessing and using prologue.run, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our service."
+    },
+    "section2": {
+      "title": "2. Description of Service",
+      "paragraph1": "prologue.run provides interactive 360° street-level imagery of race routes for preview purposes. The service is provided \"as is\" and \"as available\". We do not require user accounts, and there is no facility for users to upload content."
+    },
+    "section3": {
+      "title": "3. Use of Content",
+      "paragraph1": "All imagery and data provided on prologue.run are for personal, non-commercial use only. You may not scrape, download, or redistribute the content without explicit permission."
+    },
+    "section4": {
+      "title": "4. Privacy and Data",
+      "paragraph1": "Our collection and use of data are governed by our Privacy Policy. Since we do not offer accounts or uploads, we do not store personal user data beyond standard web analytics."
+    },
+    "section5": {
+      "title": "5. Limitation of Liability",
+      "paragraph1": "prologue.run is not responsible for any inaccuracies in the imagery or route data. Users should rely on official race information for accurate course details. We are not liable for any damages arising from the use of this service."
+    },
+    "section6": {
+      "title": "6. Changes to Terms",
+      "paragraph1": "We reserve the right to modify these terms at any time. Your continued use of the service following any changes constitutes acceptance of the new terms."
+    }
+  }
+}
