@@ -42,7 +42,10 @@ export function StorySection() {
               About Prologue.run
             </h2>
             <p className="text-lg text-slate-400 leading-relaxed">
-              Like many other avid runners, I enjoy running marathons outside of my hometown,
+              Hi, I'm Angus, an avid runner and developer.
+            </p>
+            <p className="text-lg text-slate-400 leading-relaxed">
+              Like many other runners, I enjoy running marathons outside of my hometown,
               and I sometimes just wish to see the route before running it (like
               reading the prologue for a book!). Then I noticed my 360 camera
               that's been gathering dust, and that's how this idea came to be.
