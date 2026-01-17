@@ -54,11 +54,14 @@ export function preloadImage(url: string): Promise<HTMLImageElement> {
 }
 
 /**
- * Get the route SVG URL for a race card.
+ * Get the minimap image URL for a race card.
  */
-export function getRouteSvgUrl(raceSlug: string, svgPath: string | null): string | null {
-  if (!svgPath) return null;
-  return `${CDN_BASE_URL}/races/${raceSlug}/assets/${svgPath}`;
+export function getMinimapUrl(raceSlug: string, minimapPath: string | null): string | null {
+  if (!minimapPath) return null;
+  // If it's a full URL, return as-is
+  if (minimapPath.startsWith("http")) return minimapPath;
+  // Otherwise, treat as relative path
+  return `${CDN_BASE_URL}/races/${raceSlug}/assets/${minimapPath}`;
 }
 
 /**

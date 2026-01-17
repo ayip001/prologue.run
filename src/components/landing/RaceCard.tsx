@@ -10,7 +10,7 @@ import { GoldBadge } from "./GoldBadge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatRaceDistance, formatElevationSummary } from "@/lib/formatters";
-import { getRouteSvgUrl } from "@/lib/imageUrl";
+import { getMinimapUrl } from "@/lib/imageUrl";
 
 interface RaceCardProps {
   race: RaceCardData;
@@ -78,9 +78,9 @@ export function RaceCard({ race, className }: RaceCardProps) {
     };
   }, []);
 
-  const routeImageUrl = race.routeSvgPath?.startsWith("/") 
-    ? race.routeSvgPath 
-    : getRouteSvgUrl(race.slug, race.routeSvgPath);
+  const minimapUrl = race.minimapUrl?.startsWith("/") 
+    ? race.minimapUrl 
+    : getMinimapUrl(race.slug, race.minimapUrl);
 
   return (
     <div
@@ -124,7 +124,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/50 to-transparent" />
 
         {/* Route Path Overlay */}
-        {routeImageUrl && (
+        {minimapUrl && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-8 preserve-3d">
             <div className="relative w-full h-full pitch-wrapper preserve-3d">
               <div 
@@ -132,7 +132,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
                 className="relative w-full h-full opacity-60 group-hover:opacity-100 transition-opacity duration-500"
               >
                 <Image
-                  src={routeImageUrl}
+                  src={minimapUrl}
                   alt="Route Map"
                   fill
                   className="object-contain"

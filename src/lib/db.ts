@@ -27,7 +27,7 @@ interface RaceRow {
   elevation_gain: number | null;
   elevation_loss: number | null;
   elevation_bars: number[] | null;
-  route_svg_path: string | null;
+  minimap_url: string | null;
   card_image_url: string | null;
   tier: "gold" | "silver" | "bronze" | null;
   total_images: number;
@@ -99,7 +99,7 @@ function transformRace(row: RaceRow): Race {
     elevationGain: row.elevation_gain,
     elevationLoss: row.elevation_loss,
     elevationBars: row.elevation_bars,
-    routeSvgPath: row.route_svg_path,
+    minimapUrl: row.minimap_url,
     cardImageUrl: row.card_image_url,
     tier: row.tier,
     totalImages: row.total_images,
@@ -129,7 +129,7 @@ function transformRaceCard(row: RaceRow): RaceCardData {
     country: row.country,
     tier: row.tier,
     cardImageUrl: row.card_image_url,
-    routeSvgPath: row.route_svg_path,
+    minimapUrl: row.minimap_url,
     elevationBars: row.elevation_bars,
     totalImages: row.total_images,
     officialUrl: (row as any).official_url || null,
@@ -193,7 +193,7 @@ export async function getAllRaces(): Promise<RaceCardData[]> {
     SELECT
       id, slug, name, flag_emoji, recorded_year, recorded_by,
       distance_meters, elevation_gain, elevation_loss, city, country,
-      tier, card_image_url, route_svg_path, elevation_bars, total_images
+      tier, card_image_url, minimap_url, elevation_bars, total_images
     FROM races
     WHERE status = 'ready'
     ORDER BY created_at DESC

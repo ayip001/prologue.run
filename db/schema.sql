@@ -31,7 +31,7 @@ CREATE TABLE races (
 
     -- Card display data (JSON for flexibility)
     elevation_bars  JSONB,                         -- [0-100] array, ~30-40 values
-    route_svg_path  VARCHAR(255),                  -- 'races/hk-marathon/route-overlay.svg'
+    minimap_url     VARCHAR(500),                  -- Image URL for the route minimap
     card_image_url  VARCHAR(500),                  -- Hero image for card
 
     -- Quality tier badge

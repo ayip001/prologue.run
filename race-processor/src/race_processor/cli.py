@@ -1088,7 +1088,7 @@ def db_update(slug_or_id: str, config_path: Path) -> None:
     fields = [
         "name", "description", "flag_emoji", "recorded_year", "recorded_by",
         "distance_meters", "race_date", "city", "country", "elevation_gain",
-        "elevation_loss", "elevation_bars", "route_svg_path", "card_image_url",
+        "elevation_loss", "elevation_bars", "minimap_url", "card_image_url",
         "tier", "total_images", "capture_date", "capture_device", "status",
         "storage_bucket", "storage_prefix"
     ]

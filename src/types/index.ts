@@ -17,7 +17,7 @@ export interface Race {
   elevationGain: number | null;
   elevationLoss: number | null;
   elevationBars: number[] | null;
-  routeSvgPath: string | null;
+  minimapUrl: string | null;
   cardImageUrl: string | null;
   tier: "gold" | "silver" | "bronze" | null;
   totalImages: number;
@@ -99,7 +99,7 @@ export interface RaceCardData {
   country: string | null;
   tier: "gold" | "silver" | "bronze" | null;
   cardImageUrl: string | null;
-  routeSvgPath: string | null;
+  minimapUrl: string | null;
   elevationBars: number[] | null;
   totalImages: number;
   officialUrl?: string | null;
