@@ -17,6 +17,7 @@ const TEST_RACE: Race = {
   captureDate: "2024-01-01",
   captureDevice: "Test Device",
   status: "ready",
+  isTesting: true,
   storageBucket: "test",
   storagePrefix: "test",
   totalViews: 0,
@@ -26,15 +27,26 @@ const TEST_RACE: Race = {
 
 const TEST_IMAGES = [{
   id: "test-image-1",
+  raceId: "card-preview",
   positionIndex: 0,
   latitude: 0,
   longitude: 0,
   altitudeMeters: 0,
   distanceFromStart: 0,
+  elevationGainFromStart: 0,
   capturedAt: "2024-01-01T00:00:00Z",
   headingDegrees: null,
   headingToPrev: null,
   headingToNext: null,
+  pathThumbnail: "",
+  pathMedium: "",
+  pathFull: "",
+  fileSizeThumb: null,
+  fileSizeMedium: null,
+  fileSizeFull: null,
+  hasBlurApplied: false,
+  blurRegionsCount: 0,
+  createdAt: "2024-01-01T00:00:00Z",
 }];
 
 interface PageProps {
