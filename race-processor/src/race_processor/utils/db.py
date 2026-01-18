@@ -72,9 +72,13 @@ def get_connection():
             for k, v in query_params.items():
                 params[k] = v[0]
 
-        return psycopg2.connect(**params)
+        conn = psycopg2.connect(**params)
+        conn.set_client_encoding("UTF8")
+        return conn
 
-    return psycopg2.connect(conn_str)
+    conn = psycopg2.connect(conn_str)
+    conn.set_client_encoding("UTF8")
+    return conn
 
 
 def init_schema(schema_path: Optional[Path] = None) -> bool:
@@ -128,7 +132,7 @@ def load_race_config(config_path: Path) -> dict:
     Returns:
         Dict with race configuration
     """
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         if config_path.suffix in (".yaml", ".yml"):
             return yaml.safe_load(f)
         else:

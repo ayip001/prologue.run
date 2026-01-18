@@ -994,7 +994,7 @@ def db_insert_images(slug_or_id: str, records_path: Path) -> None:
         console.print(f"[red]Race not found:[/] {slug_or_id}")
         raise SystemExit(1)
 
-    with open(records_path) as f:
+    with open(records_path, encoding="utf-8") as f:
         records = json.load(f)
 
     success = insert_images(race["id"], records)

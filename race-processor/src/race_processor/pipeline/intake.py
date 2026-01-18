@@ -271,8 +271,8 @@ def run_intake(
 
     # Save metadata.json
     metadata_path = output_dir / "metadata.json"
-    with open(metadata_path, "w") as f:
-        json.dump(manifest.to_dict(), f, indent=2)
+    with open(metadata_path, "w", encoding="utf-8") as f:
+        json.dump(manifest.to_dict(), f, indent=2, ensure_ascii=False)
 
     console.print(f"  [green]Saved metadata.json with {len(image_metadata)} entries[/]")
 
@@ -319,7 +319,7 @@ def load_manifest(output_dir: Path) -> Optional[IntakeManifest]:
         return None
 
     try:
-        with open(metadata_path) as f:
+        with open(metadata_path, encoding="utf-8") as f:
             data = json.load(f)
 
         images = [
