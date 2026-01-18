@@ -190,26 +190,27 @@ export function RaceCard({ race, className }: RaceCardProps) {
 
         {/* Actions */}
         <div className="grid grid-cols-2 gap-2">
-          <Link href={`/race/${race.slug}`}>
-            <Button className="w-full group/btn">
+          <Button asChild className="w-full group/btn">
+            <Link href={`/race/${race.slug}`}>
               {t("viewRoute")}
               <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
-            </Button>
-          </Link>
+            </Link>
+          </Button>
 
-          <a
-            href={race.officialUrl || "#"}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Button
+            asChild
+            variant="secondary"
+            className="w-full gap-2"
           >
-            <Button
-              variant="secondary"
-              className="w-full gap-2"
+            <a
+              href={race.officialUrl || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
             >
               <LinkIcon className="h-4 w-4" />
               {t("officialSite")}
-            </Button>
-          </a>
+            </a>
+          </Button>
         </div>
       </div>
     </div>
