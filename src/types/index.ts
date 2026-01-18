@@ -19,6 +19,7 @@ export interface Race {
   elevationBars: number[] | null;
   minimapUrl: string | null;
   cardImageUrl: string | null;
+  officialUrl: string | null;
   tier: "gold" | "silver" | "bronze" | null;
   totalImages: number;
   captureDate: string;
@@ -105,7 +106,7 @@ export interface RaceCardData {
   elevationBars: number[] | null;
   totalImages: number;
   isTesting: boolean;
-  officialUrl?: string | null;
+  officialUrl: string | null;
 }
 
 export interface RacesResponse {
