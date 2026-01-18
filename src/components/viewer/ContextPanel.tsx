@@ -16,7 +16,7 @@ export function ContextPanel({
 }: ContextPanelProps) {
   return (
     <GlassPanel className={cn("px-4 py-3", className)}>
-      <h1 className="text-lg font-semibold text-white">{raceName}</h1>
+      <h1 className="text-lg font-semibold dark:text-white light:text-slate-900">{raceName}</h1>
       {waypointName && (
         <div className="flex items-center gap-2 mt-1">
           {/* Pulse dot */}
@@ -24,7 +24,7 @@ export function ContextPanel({
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-coral opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-coral" />
           </span>
-          <span className="text-sm text-slate-300">{waypointName}</span>
+          <span className="text-sm dark:text-slate-300 light:text-slate-600">{waypointName}</span>
         </div>
       )}
     </GlassPanel>
