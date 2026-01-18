@@ -12,6 +12,7 @@ import type {
   ElevationPoint,
   PoiMarker,
   PoiType,
+  Poi,
 } from "@/types";
 
 // ============================================================================
