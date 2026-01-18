@@ -14,17 +14,17 @@ interface FAQItemProps {
 
 function FAQItem({ question, answer, isOpen, onToggle }: FAQItemProps) {
   return (
-    <div className="border-b border-white/5 last:border-b-0">
+    <div className="border-b dark:border-white/5 light:border-slate-200 last:border-b-0">
       <button
         onClick={onToggle}
         className="w-full py-5 flex items-center justify-between text-left group"
       >
-        <span className="text-white font-medium pr-4 group-hover:text-coral transition-colors">
+        <span className="dark:text-white light:text-slate-900 font-medium pr-4 group-hover:text-coral transition-colors">
           {question}
         </span>
         <ChevronDown
           className={cn(
-            "h-5 w-5 text-slate-400 shrink-0 transition-transform duration-200",
+            "h-5 w-5 dark:text-slate-400 light:text-slate-500 shrink-0 transition-transform duration-200",
             isOpen && "rotate-180"
           )}
         />
@@ -35,7 +35,9 @@ function FAQItem({ question, answer, isOpen, onToggle }: FAQItemProps) {
           isOpen ? "max-h-96 pb-5" : "max-h-0"
         )}
       >
-        <p className="text-slate-400 text-sm leading-relaxed">{answer}</p>
+        <p className="dark:text-slate-400 light:text-slate-600 text-sm leading-relaxed">
+          {answer}
+        </p>
       </div>
     </div>
   );
@@ -64,17 +66,17 @@ export function FAQSection() {
   ];
 
   return (
-    <section className="py-24 bg-slate-950">
+    <section className="py-24 dark:bg-slate-950 light:bg-white">
       <div className="container mx-auto px-4">
         <div className="max-w-3xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold dark:text-white light:text-slate-900 text-center mb-4">
             {t("title")}
           </h2>
-          <p className="text-slate-400 text-center mb-12">
+          <p className="dark:text-slate-400 light:text-slate-600 text-center mb-12">
             {t("subtitle")}
           </p>
 
-          <div className="bg-slate-900/50 rounded-xl border border-white/5 px-6">
+          <div className="dark:bg-slate-900/50 light:bg-slate-100 rounded-xl border dark:border-white/5 light:border-slate-200 px-6">
             {faqKeys.map((key, index) => (
               <FAQItem
                 key={key}

@@ -202,7 +202,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
           <Button
             asChild
             variant="secondary"
-            className="w-full gap-2"
+            className="w-full gap-2 light:bg-white light:hover:bg-slate-50 light:border-slate-200"
           >
             <a
               href={race.officialUrl || "#"}

@@ -65,7 +65,12 @@ export function HeroSection({ races }: HeroSectionProps) {
               <span className="hidden group-hover:inline">{t("comingSoon")}</span>
             </a>
           </Button>
-          <Button variant="secondary" size="lg" asChild>
+          <Button
+            variant="secondary"
+            size="lg"
+            asChild
+            className="light:bg-white light:hover:bg-slate-50 light:border-slate-200"
+          >
             <Link href="#features">{t("learnMore")}</Link>
           </Button>
         </div>

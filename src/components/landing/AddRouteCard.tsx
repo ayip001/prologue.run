@@ -33,7 +33,11 @@ export function AddRouteCard({ className }: AddRouteCardProps) {
           {t("description")}
         </p>
 
-        <Button variant="secondary" asChild>
+        <Button
+          variant="secondary"
+          asChild
+          className="light:bg-white light:hover:bg-slate-50 light:border-slate-200"
+        >
           <a href="mailto:hello@prologue.run?subject=Race%20Request">
             <Mail className="mr-2 h-4 w-4" />
             {t("requestRace")}
