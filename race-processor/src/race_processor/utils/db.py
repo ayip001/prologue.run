@@ -656,3 +656,67 @@ def print_race_details(race: dict) -> None:
             table.add_row(label, str(value))
 
     console.print(table)
+
+
+def update_image_heading_offsets(
+    race_slug: str,
+    offsets: dict[int, float],
+) -> tuple[int, int]:
+    """
+    Update heading_offset_degrees for multiple images by position index.
+
+    Args:
+        race_slug: Race slug to identify the race
+        offsets: Dict mapping position_index to heading_offset_degrees
+
+    Returns:
+        Tuple of (updated_count, failed_count)
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+
+    updated = 0
+    failed = 0
+
+    try:
+        # First get the race ID
+        cur.execute("SELECT id FROM races WHERE slug = %s", (race_slug,))
+        result = cur.fetchone()
+        if not result:
+            console.print(f"[red]Race not found:[/] {race_slug}")
+            return 0, len(offsets)
+
+        race_id = result[0]
+
+        # Update each image
+        for position_index, offset_degrees in offsets.items():
+            try:
+                cur.execute(
+                    """
+                    UPDATE images
+                    SET heading_offset_degrees = %s
+                    WHERE race_id = %s AND position_index = %s
+                    RETURNING id
+                    """,
+                    (offset_degrees, race_id, position_index),
+                )
+                if cur.fetchone():
+                    updated += 1
+                else:
+                    console.print(f"  [yellow]Image not found: index {position_index}[/]")
+                    failed += 1
+            except Exception as e:
+                console.print(f"  [red]Failed to update index {position_index}: {e}[/]")
+                failed += 1
+
+        conn.commit()
+        return updated, failed
+
+    except Exception as e:
+        conn.rollback()
+        console.print(f"[red]Database error:[/] {e}")
+        return 0, len(offsets)
+
+    finally:
+        cur.close()
+        conn.close()
