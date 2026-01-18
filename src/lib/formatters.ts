@@ -106,3 +106,17 @@ export function formatRaceDistance(meters: number, t?: (key: string) => string):
   }
   return `${km.toFixed(1)}km`;
 }
+
+/**
+ * Format view count with abbreviated suffixes.
+ * Examples: "0", "123", "1.2K", "15K", "1.5M"
+ */
+export function formatViewCount(count: number): string {
+  if (count >= 1_000_000) {
+    return `${(count / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+  }
+  if (count >= 1_000) {
+    return `${(count / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+  }
+  return count.toString();
+}

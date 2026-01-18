@@ -2,13 +2,13 @@
 
 import Image from "next/image";
 import { useTranslations } from "next-intl";
-import { ArrowRight, Link as LinkIcon, Mountain, Route } from "lucide-react";
+import { ArrowRight, Eye, Link as LinkIcon, Mountain, Route } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { RaceCardData } from "@/types";
 import { GoldBadge } from "./GoldBadge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { formatRaceDistance, formatElevationSummary } from "@/lib/formatters";
+import { formatRaceDistance, formatElevationSummary, formatViewCount } from "@/lib/formatters";
 import { getMinimapUrl } from "@/lib/imageUrl";
 import { Link } from "@/i18n/navigation";
 
@@ -189,10 +189,21 @@ export function RaceCard({ race, className }: RaceCardProps) {
           </div>
         </div>
 
-        {/* Recorded By */}
-        {race.recordedBy && race.recordedYear && (
-          <p className="text-xs dark:text-slate-500 light:text-slate-500 mb-4">
-            {t("recordedBy", { name: race.recordedBy, year: race.recordedYear })}
+        {/* View Count & Recorded By */}
+        {(race.totalViews > 0 || (race.recordedBy && race.recordedYear)) && (
+          <p className="flex items-center gap-1.5 text-xs dark:text-slate-500 light:text-slate-500 mb-4">
+            {race.totalViews > 0 && (
+              <>
+                <Eye className="h-3.5 w-3.5" />
+                <span>{formatViewCount(race.totalViews)}</span>
+              </>
+            )}
+            {race.totalViews > 0 && race.recordedBy && race.recordedYear && (
+              <span className="mx-1">|</span>
+            )}
+            {race.recordedBy && race.recordedYear && (
+              <span>{t("recordedBy", { name: race.recordedBy, year: race.recordedYear })}</span>
+            )}
           </p>
         )}
 

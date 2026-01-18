@@ -16,8 +16,8 @@ export const ENABLE_CACHING = true;
 export const CACHE_REVALIDATE_SECONDS = 3600;
 
 // View counting configuration
-// Disabled until rate limiting is implemented to prevent abuse
-export const ENABLE_VIEW_COUNTING = false;
+// Rate limiting now implemented via Upstash Redis
+export const ENABLE_VIEW_COUNTING = true;
 
 export const TEST_CARD_DATA: RaceCardData = {
   id: "card-preview",
@@ -36,6 +36,7 @@ export const TEST_CARD_DATA: RaceCardData = {
   minimapUrl: "https://images.prologue.run/races/test-route-02/public/minimap.webp",
   elevationBars: [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 30, 35, 40, 45, 50, 55, 60, 65],
   totalImages: 1,
+  totalViews: 0,
   isTesting: true,
   officialUrl: "/",
 };

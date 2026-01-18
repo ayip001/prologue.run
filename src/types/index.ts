@@ -135,6 +135,7 @@ export interface RaceCardData {
   minimapUrl: string | null;
   elevationBars: number[] | null;
   totalImages: number;
+  totalViews: number;
   isTesting: boolean;
   officialUrl: string | null;
 }

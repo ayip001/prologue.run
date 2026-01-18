@@ -224,6 +224,7 @@ function transformRaceCard(row: RaceRow): RaceCardData {
     minimapUrl: row.minimap_url,
     elevationBars: row.elevation_bars,
     totalImages: row.total_images,
+    totalViews: row.total_views ?? 0,
     isTesting: Boolean(row.is_testing),
     officialUrl: row.official_url,
   };
@@ -293,14 +294,15 @@ export async function getAllRaces(locale: string = "en"): Promise<RaceCardData[]
     // Attempt to fetch with translations
     const result = ENABLE_TESTING_CARDS
       ? await sql<RaceRow>`
-          SELECT 
-            r.id, r.slug, 
-            COALESCE(t.name, r.name) as name, 
+          SELECT
+            r.id, r.slug,
+            COALESCE(t.name, r.name) as name,
             r.flag_emoji, r.recorded_year, r.recorded_by,
-            r.distance_meters, r.elevation_gain, r.elevation_loss, 
-            COALESCE(t.city, r.city) as city, 
+            r.distance_meters, r.elevation_gain, r.elevation_loss,
+            COALESCE(t.city, r.city) as city,
             COALESCE(t.country, r.country) as country,
-            r.tier, r.card_image_url, r.minimap_url, r.official_url, r.elevation_bars, r.total_images, 
+            r.tier, r.card_image_url, r.minimap_url, r.official_url, r.elevation_bars,
+            r.total_images, r.total_views,
             COALESCE(r.is_testing, FALSE) as is_testing
           FROM races r
           LEFT JOIN race_translations t ON r.id = t.race_id AND t.locale = ${locale}
@@ -308,14 +310,15 @@ export async function getAllRaces(locale: string = "en"): Promise<RaceCardData[]
           ORDER BY r.created_at DESC
         `
       : await sql<RaceRow>`
-          SELECT 
-            r.id, r.slug, 
-            COALESCE(t.name, r.name) as name, 
+          SELECT
+            r.id, r.slug,
+            COALESCE(t.name, r.name) as name,
             r.flag_emoji, r.recorded_year, r.recorded_by,
-            r.distance_meters, r.elevation_gain, r.elevation_loss, 
-            COALESCE(t.city, r.city) as city, 
+            r.distance_meters, r.elevation_gain, r.elevation_loss,
+            COALESCE(t.city, r.city) as city,
             COALESCE(t.country, r.country) as country,
-            r.tier, r.card_image_url, r.minimap_url, r.official_url, r.elevation_bars, r.total_images, 
+            r.tier, r.card_image_url, r.minimap_url, r.official_url, r.elevation_bars,
+            r.total_images, r.total_views,
             COALESCE(r.is_testing, FALSE) as is_testing
           FROM races r
           LEFT JOIN race_translations t ON r.id = t.race_id AND t.locale = ${locale}
