@@ -7,6 +7,18 @@ export const CDN_BASE_URL =
 // Testing card configuration
 export const ENABLE_TESTING_CARDS = false;
 
+// Caching configuration
+// Set to false during active development/race uploads for immediate updates
+// Set to true for production to reduce costs and improve performance
+export const ENABLE_CACHING = false;
+
+// Cache duration in seconds (1 hour default)
+export const CACHE_REVALIDATE_SECONDS = 3600;
+
+// View counting configuration
+// Disabled until rate limiting is implemented to prevent abuse
+export const ENABLE_VIEW_COUNTING = false;
+
 export const TEST_CARD_DATA: RaceCardData = {
   id: "card-preview",
   slug: "card-preview",

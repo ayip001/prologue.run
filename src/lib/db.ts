@@ -1,6 +1,6 @@
 import { sql } from "@vercel/postgres";
 import { unstable_noStore as noStore } from 'next/cache';
-import { ENABLE_TESTING_CARDS } from './constants';
+import { ENABLE_TESTING_CARDS, ENABLE_CACHING } from './constants';
 import type {
   Race,
   RaceCardData,
@@ -214,7 +214,10 @@ function transformElevationPoint(row: ElevationPointRow): ElevationPoint {
  * Get all races that are ready for display.
  */
 export async function getAllRaces(): Promise<RaceCardData[]> {
-  noStore();
+  // Only bypass cache during development/race uploads
+  if (!ENABLE_CACHING) {
+    noStore();
+  }
   
   // If testing cards are disabled, only show non-testing races
   // We use COALESCE(is_testing, FALSE) to treat NULL as not testing
@@ -247,7 +250,10 @@ export async function getAllRaces(): Promise<RaceCardData[]> {
  * Get a single race by slug.
  */
 export async function getRaceBySlug(slug: string): Promise<Race | null> {
-  noStore();
+  // Only bypass cache during development/race uploads
+  if (!ENABLE_CACHING) {
+    noStore();
+  }
   const result = await sql<RaceRow>`
     SELECT *
     FROM races

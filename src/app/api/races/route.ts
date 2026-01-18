@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { getAllRaces } from "@/lib/db";
+import { ENABLE_CACHING, CACHE_REVALIDATE_SECONDS } from "@/lib/constants";
 
-export const dynamic = "force-dynamic";
+// When caching is enabled, use ISR with revalidation
+// When disabled (during development/uploads), force dynamic rendering
+export const dynamic = ENABLE_CACHING ? "auto" : "force-dynamic";
+export const revalidate = ENABLE_CACHING ? CACHE_REVALIDATE_SECONDS : 0;
 
 /**
  * GET /api/races
