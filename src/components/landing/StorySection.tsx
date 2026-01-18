@@ -65,14 +65,11 @@ export function StorySection() {
           <div className="flex-1 relative aspect-[2/3] max-w-md w-full mx-auto">
             {/* Base Image */}
             <div className="relative w-full h-full rounded-2xl overflow-hidden border dark:border-white/10 light:border-slate-200 shadow-2xl">
-              <picture>
-                <source srcSet="/prologue-run-about.avif" type="image/avif" />
-                <img
-                  src="/prologue-run-about.jpg"
-                  alt="About Prologue base"
-                  className="w-full h-full object-cover"
-                />
-              </picture>
+              <img
+                src="https://images.prologue.run/public/prologue-run-about.webp"
+                alt="About Prologue base"
+                className="w-full h-full object-cover"
+              />
             </div>
 
             {/* Overlay Image */}
@@ -80,14 +77,11 @@ export function StorySection() {
               className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none"
               style={{ opacity }}
             >
-              <picture>
-                <source srcSet="/prologue-run-about-overlay.avif" type="image/avif" />
-                <img
-                  src="/prologue-run-about-overlay.jpg"
-                  alt="About Prologue overlay"
-                  className="w-full h-full object-cover"
-                />
-              </picture>
+              <img
+                src="https://images.prologue.run/public/prologue-run-about-overlay.webp"
+                alt="About Prologue overlay"
+                className="w-full h-full object-cover"
+              />
             </div>
           </div>
         </div>
