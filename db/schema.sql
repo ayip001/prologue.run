@@ -107,6 +107,7 @@ CREATE TABLE images (
     -- Quality/processing flags
     has_blur_applied BOOLEAN DEFAULT FALSE,
     blur_regions_count INTEGER DEFAULT 0,
+    is_disabled BOOLEAN DEFAULT FALSE,           -- Hidden from viewer (skipped)
 
     created_at      TIMESTAMPTZ DEFAULT NOW(),
 

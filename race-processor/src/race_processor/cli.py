@@ -1354,6 +1354,114 @@ def db_update_heading_offset(
         raise SystemExit(1)
 
 
+@db.command("disable-images")
+@click.argument("race_slug")
+@click.option(
+    "--indexes", "-i",
+    type=str,
+    required=True,
+    help="Comma-separated list of position indexes to disable (e.g., '0,5,10' or '0-5' for range)",
+)
+def db_disable_images(race_slug: str, indexes: str) -> None:
+    """Disable images so they are skipped in the viewer.
+
+    Disabled images are filtered out at the database level, so they
+    simply don't appear in the viewer. No redirect or flicker.
+
+    \b
+    Examples:
+      race-processor db disable-images my-race -i "0,1,2"
+      race-processor db disable-images my-race -i "0-5"
+      race-processor db disable-images my-race -i "0-3,10,15-20"
+    """
+    from .utils.db import set_images_disabled
+
+    # Parse index specification (supports: "0,1,2" or "0-5" or "0-3,10,15-20")
+    index_set: set[int] = set()
+    for part in indexes.split(","):
+        part = part.strip()
+        if "-" in part:
+            try:
+                start, end = part.split("-", 1)
+                for i in range(int(start.strip()), int(end.strip()) + 1):
+                    index_set.add(i)
+            except ValueError:
+                console.print(f"[red]Invalid range:[/] {part}")
+                raise SystemExit(1)
+        else:
+            try:
+                index_set.add(int(part))
+            except ValueError:
+                console.print(f"[red]Invalid index:[/] {part}")
+                raise SystemExit(1)
+
+    if not index_set:
+        console.print("[red]No indexes specified[/]")
+        raise SystemExit(1)
+
+    console.print(f"[bold]Disabling images for:[/] {race_slug}")
+    console.print(f"  Indexes: {sorted(index_set)}")
+
+    updated, failed = set_images_disabled(race_slug, list(index_set), disabled=True)
+
+    if updated > 0:
+        console.print(f"[green]Disabled {updated} image(s)[/]")
+    if failed > 0:
+        console.print(f"[yellow]Not found: {failed} image(s)[/]")
+
+
+@db.command("enable-images")
+@click.argument("race_slug")
+@click.option(
+    "--indexes", "-i",
+    type=str,
+    required=True,
+    help="Comma-separated list of position indexes to enable (e.g., '0,5,10' or '0-5' for range)",
+)
+def db_enable_images(race_slug: str, indexes: str) -> None:
+    """Re-enable previously disabled images.
+
+    \b
+    Examples:
+      race-processor db enable-images my-race -i "0,1,2"
+      race-processor db enable-images my-race -i "0-5"
+    """
+    from .utils.db import set_images_disabled
+
+    # Parse index specification
+    index_set: set[int] = set()
+    for part in indexes.split(","):
+        part = part.strip()
+        if "-" in part:
+            try:
+                start, end = part.split("-", 1)
+                for i in range(int(start.strip()), int(end.strip()) + 1):
+                    index_set.add(i)
+            except ValueError:
+                console.print(f"[red]Invalid range:[/] {part}")
+                raise SystemExit(1)
+        else:
+            try:
+                index_set.add(int(part))
+            except ValueError:
+                console.print(f"[red]Invalid index:[/] {part}")
+                raise SystemExit(1)
+
+    if not index_set:
+        console.print("[red]No indexes specified[/]")
+        raise SystemExit(1)
+
+    console.print(f"[bold]Enabling images for:[/] {race_slug}")
+    console.print(f"  Indexes: {sorted(index_set)}")
+
+    updated, failed = set_images_disabled(race_slug, list(index_set), disabled=False)
+
+    if updated > 0:
+        console.print(f"[green]Enabled {updated} image(s)[/]")
+    if failed > 0:
+        console.print(f"[yellow]Not found: {failed} image(s)[/]")
+
+
 @db.command("delete")
 @click.argument("slug_or_id")
 @click.option(

@@ -361,6 +361,7 @@ export async function getImageMetadataByRaceId(
     SELECT id, position_index, latitude, longitude, altitude_meters, distance_from_start, elevation_gain_from_start, captured_at, heading_degrees, heading_to_prev, heading_to_next
     FROM images
     WHERE race_id = ${raceId}
+      AND (is_disabled = FALSE OR is_disabled IS NULL)
     ORDER BY position_index
   `;
 

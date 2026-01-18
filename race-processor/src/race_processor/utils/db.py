@@ -720,3 +720,67 @@ def update_image_heading_offsets(
     finally:
         cur.close()
         conn.close()
+
+
+def set_images_disabled(
+    race_slug: str,
+    position_indexes: list[int],
+    disabled: bool = True,
+) -> tuple[int, int]:
+    """
+    Enable or disable images by position index.
+
+    Disabled images are filtered out in the frontend query, so they
+    simply don't appear in the viewer.
+
+    Args:
+        race_slug: Race slug to identify the race
+        position_indexes: List of position indexes to update
+        disabled: True to disable, False to enable
+
+    Returns:
+        Tuple of (updated_count, not_found_count)
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+
+    updated = 0
+    not_found = 0
+
+    try:
+        # First get the race ID
+        cur.execute("SELECT id FROM races WHERE slug = %s", (race_slug,))
+        result = cur.fetchone()
+        if not result:
+            console.print(f"[red]Race not found:[/] {race_slug}")
+            return 0, len(position_indexes)
+
+        race_id = result[0]
+
+        # Update each image
+        for position_index in position_indexes:
+            cur.execute(
+                """
+                UPDATE images
+                SET is_disabled = %s
+                WHERE race_id = %s AND position_index = %s
+                RETURNING id
+                """,
+                (disabled, race_id, position_index),
+            )
+            if cur.fetchone():
+                updated += 1
+            else:
+                not_found += 1
+
+        conn.commit()
+        return updated, not_found
+
+    except Exception as e:
+        conn.rollback()
+        console.print(f"[red]Database error:[/] {e}")
+        return 0, len(position_indexes)
+
+    finally:
+        cur.close()
+        conn.close()
