@@ -28,6 +28,11 @@ interface RaceRow {
   elevation_gain: number | null;
   elevation_loss: number | null;
   elevation_bars: number[] | null;
+  poi_markers: Array<{
+    imageIndex: number;
+    distanceFromStart: number;
+    pois: string[];
+  }> | null;
   minimap_url: string | null;
   card_image_url: string | null;
   official_url: string | null;
@@ -58,6 +63,12 @@ interface ImageRow {
   heading_offset_degrees: string | null;
   distance_from_start: number | null;
   elevation_gain_from_start: number | null;
+  pois: Array<{
+    type: string;
+    heading: number;
+    pitch: number;
+    visibleOnImage: boolean;
+  }> | null;
   path_thumbnail: string;
   path_medium: string;
   path_full: string;
@@ -124,6 +135,7 @@ function transformRace(row: RaceRow): Race {
     elevationGain: row.elevation_gain,
     elevationLoss: row.elevation_loss,
     elevationBars: row.elevation_bars,
+    poiMarkers: row.poi_markers,
     minimapUrl: row.minimap_url,
     cardImageUrl: row.card_image_url,
     officialUrl: row.official_url,
@@ -179,6 +191,7 @@ function transformImage(row: ImageRow): ImageMeta {
     headingOffsetDegrees: row.heading_offset_degrees ? parseFloat(row.heading_offset_degrees) : null,
     distanceFromStart: row.distance_from_start,
     elevationGainFromStart: row.elevation_gain_from_start,
+    pois: row.pois,
     pathThumbnail: row.path_thumbnail,
     pathMedium: row.path_medium,
     pathFull: row.path_full,
@@ -293,7 +306,7 @@ export async function getRaceBySlug(slug: string, locale: string = "en"): Promis
       SELECT 
         r.id, r.slug, r.flag_emoji, r.recorded_year, r.recorded_by,
         r.distance_meters, r.race_date, r.elevation_gain, r.elevation_loss,
-        r.elevation_bars, r.minimap_url, r.card_image_url, r.tier,
+        r.elevation_bars, r.poi_markers, r.minimap_url, r.card_image_url, r.tier,
         r.total_images, r.capture_date, r.capture_device, r.status,
         r.is_testing, r.storage_bucket, r.storage_prefix, r.total_views,
         r.created_at, r.updated_at,
@@ -358,9 +371,9 @@ export async function getImagesByRaceId(raceId: string): Promise<ImageMeta[]> {
  */
 export async function getImageMetadataByRaceId(
   raceId: string
-): Promise<Pick<ImageMeta, "id" | "positionIndex" | "latitude" | "longitude" | "altitudeMeters" | "distanceFromStart" | "elevationGainFromStart" | "capturedAt" | "headingDegrees" | "headingToPrev" | "headingToNext" | "headingOffsetDegrees">[]> {
+): Promise<Pick<ImageMeta, "id" | "positionIndex" | "latitude" | "longitude" | "altitudeMeters" | "distanceFromStart" | "elevationGainFromStart" | "capturedAt" | "headingDegrees" | "headingToPrev" | "headingToNext" | "headingOffsetDegrees" | "pois">[]> {
   const result = await sql<ImageRow>`
-    SELECT id, position_index, latitude, longitude, altitude_meters, distance_from_start, elevation_gain_from_start, captured_at, heading_degrees, heading_to_prev, heading_to_next, heading_offset_degrees
+    SELECT id, position_index, latitude, longitude, altitude_meters, distance_from_start, elevation_gain_from_start, captured_at, heading_degrees, heading_to_prev, heading_to_next, heading_offset_degrees, pois
     FROM images
     WHERE race_id = ${raceId}
     ORDER BY position_index
@@ -379,6 +392,7 @@ export async function getImageMetadataByRaceId(
     headingToPrev: row.heading_to_prev ? parseFloat(row.heading_to_prev) : null,
     headingToNext: row.heading_to_next ? parseFloat(row.heading_to_next) : null,
     headingOffsetDegrees: row.heading_offset_degrees ? parseFloat(row.heading_offset_degrees) : null,
+    pois: row.pois,
   }));
 }
 

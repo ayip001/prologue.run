@@ -1354,6 +1354,113 @@ def db_update_heading_offset(
         raise SystemExit(1)
 
 
+@db.command("add-poi")
+@click.argument("race_slug")
+@click.argument("image_index", type=int)
+@click.argument("poi_type", type=str)
+@click.option("--heading", type=float, required=True, help="Heading in degrees (0-360)")
+@click.option("--pitch", type=float, default=0.0, help="Pitch in degrees (default: 0)")
+@click.option(
+    "--no-visible",
+    "no_visible",
+    is_flag=True,
+    default=False,
+    help="Hide POI on the panorama image",
+)
+def db_add_poi(
+    race_slug: str,
+    image_index: int,
+    poi_type: str,
+    heading: float,
+    pitch: float,
+    no_visible: bool,
+) -> None:
+    """Add a POI to a specific image.
+
+    \b
+    Examples:
+      race-processor db add-poi my-race 12 water --heading 45 --pitch 0
+      race-processor db add-poi my-race 12 scenic-spot --heading 120 --pitch 5 --no-visible
+    """
+    from .utils.db import add_poi_to_image
+
+    success = add_poi_to_image(
+        race_slug=race_slug,
+        image_index=image_index,
+        poi_type=poi_type,
+        heading=heading,
+        pitch=pitch,
+        visible_on_image=not no_visible,
+    )
+
+    if not success:
+        raise SystemExit(1)
+
+
+@db.command("remove-poi")
+@click.argument("race_slug")
+@click.argument("image_index", type=int)
+@click.argument("poi_type", type=str)
+def db_remove_poi(race_slug: str, image_index: int, poi_type: str) -> None:
+    """Remove a POI type from a specific image.
+
+    \b
+    Examples:
+      race-processor db remove-poi my-race 12 water
+    """
+    from .utils.db import remove_poi_from_image
+
+    success = remove_poi_from_image(
+        race_slug=race_slug,
+        image_index=image_index,
+        poi_type=poi_type,
+    )
+
+    if not success:
+        raise SystemExit(1)
+
+
+@db.command("list-pois")
+@click.argument("race_slug")
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Output as JSON",
+)
+def db_list_pois(race_slug: str, as_json: bool) -> None:
+    """List POIs for a race.
+
+    \b
+    Examples:
+      race-processor db list-pois my-race
+      race-processor db list-pois my-race --json
+    """
+    from .utils.db import list_pois_for_race
+    import json as json_lib
+    from rich.table import Table
+
+    pois = list_pois_for_race(race_slug)
+
+    if as_json:
+        console.print(json_lib.dumps(pois, indent=2))
+        return
+
+    if not pois:
+        console.print("[yellow]No POIs found.[/]")
+        return
+
+    table = Table(title=f"POIs for {race_slug}")
+    table.add_column("Image Index", style="cyan")
+    table.add_column("Types", style="white")
+
+    for entry in pois:
+        types = ", ".join([poi.get("type", "unknown") for poi in entry.get("pois", [])])
+        table.add_row(str(entry["imageIndex"]), types)
+
+    console.print(table)
+
+
 @db.command("delete")
 @click.argument("slug_or_id")
 @click.option(

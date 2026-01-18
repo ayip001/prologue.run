@@ -4,9 +4,11 @@ import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
-import type { CameraState } from "@/types";
+import type { CameraState, Poi } from "@/types";
 import { clampFov } from "@/lib/viewState";
 import { CAMERA_CONSTRAINTS } from "@/lib/constants";
+import { sphericalToCartesian } from "@/lib/panorama";
+import { PanoramaPoi } from "./PanoramaPoi";
 
 // Offset to convert between our heading (0 = forward) and OrbitControls azimuth (0 = -Z axis)
 const HEADING_OFFSET = 90;
@@ -24,6 +26,7 @@ interface PanoramaCanvasProps {
   onNavigateNext?: () => void;
   onNavigatePrev?: () => void;
   headingOffset?: number;
+  pois?: Poi[] | null;
 }
 
 // Error boundary fallback component
@@ -44,26 +47,6 @@ function ContextDebugger() {
   return null;
 }
 
-// Convert spherical coordinates to cartesian for positioning in the scene
-// heading: 0-360, 0 = forward (where camera faces at azimuth 90°)
-// pitch: degrees, negative = down
-function sphericalToCartesian(
-  heading: number,
-  pitch: number,
-  radius: number
-): [number, number, number] {
-  const headingRad = THREE.MathUtils.degToRad(heading);
-  const pitchRad = THREE.MathUtils.degToRad(pitch);
-
-  // At heading 0, we want position along -X (where camera looks at azimuth 90°)
-  // At heading 90, we want position along +Z
-  const horizontalRadius = radius * Math.cos(pitchRad);
-  const x = -horizontalRadius * Math.cos(headingRad);
-  const y = radius * Math.sin(pitchRad);
-  const z = horizontalRadius * Math.sin(headingRad);
-
-  return [x, y, z];
-}
 
 // Ground navigation arrow component using mesh for perspective distortion
 interface GroundArrowProps {
@@ -352,6 +335,7 @@ function PanoramaSphere({
   onNavigateNext,
   onNavigatePrev,
   headingOffset,
+  pois,
 }: {
   imageUrl: string | null;
   initialCamera: { yaw: number; pitch: number };
@@ -360,6 +344,7 @@ function PanoramaSphere({
   onNavigateNext?: () => void;
   onNavigatePrev?: () => void;
   headingOffset: number;
+  pois?: Poi[] | null;
 }) {
   const { camera: threeCamera, invalidate: invalidateFrame, gl } = useThree();
   const controlsRef = useRef<any>(null);
@@ -636,6 +621,14 @@ function PanoramaSphere({
         />
       )}
 
+      {pois?.filter((poi) => poi.visibleOnImage).map((poi, index) => (
+        <PanoramaPoi
+          key={`${poi.type}-${index}`}
+          poi={poi}
+          headingOffset={headingOffset}
+        />
+      ))}
+
       {/* Camera controls */}
       <OrbitControls
         ref={controlsRef}
@@ -663,6 +656,7 @@ export function PanoramaCanvas({
   onNavigateNext,
   onNavigatePrev,
   headingOffset = 0,
+  pois,
 }: PanoramaCanvasProps) {
   const [canvasError, setCanvasError] = useState<string | null>(null);
   const [canvasReady, setCanvasReady] = useState(false);
@@ -713,6 +707,7 @@ export function PanoramaCanvas({
           onNavigateNext={onNavigateNext}
           onNavigatePrev={onNavigatePrev}
           headingOffset={headingOffset}
+          pois={pois}
         />
       </Canvas>
 
