@@ -8,11 +8,12 @@ export const config = {
   // - /api routes
   // - /_next (Next.js internals)
   // - /_vercel (Vercel internals)
-  // - Static files (e.g. /favicon.ico, /sitemap.xml, /robots.txt)
-  // - Public assets with extensions
+  // - Static files with common extensions
   matcher: [
-    "/((?!api|_next|_vercel|.*\\..*).*)",
-    // Also match root
+    // Match all paths except API, Next.js internals, and static files
+    // Use specific file extensions instead of generic .* pattern
+    // to avoid matching view state params like @75,5.9h,-1.0p
+    "/((?!api|_next|_vercel|.*\\.(?:ico|png|jpg|jpeg|gif|svg|webp|css|js|woff|woff2|ttf|eot|json|xml|txt|pdf|mp4|webm|mp3|wav)).*)",
     "/",
   ],
 };
