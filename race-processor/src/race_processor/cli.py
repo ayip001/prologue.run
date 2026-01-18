@@ -181,6 +181,12 @@ def main() -> None:
     default=0.0,
     help="Time offset in seconds between GPX start and first photo (default: 0)",
 )
+@click.option(
+    "--skip-first",
+    type=int,
+    default=0,
+    help="Skip the first N images during intake (useful if you started recording before the start line)",
+)
 def process(
     input_dir: Path | None,
     race_slug: str | None,
@@ -202,6 +208,7 @@ def process(
     copyright_text: str | None,
     gpx_path: Path | None,
     gpx_offset: float,
+    skip_first: int,
 ) -> None:
     """Process equirectangular images through the pipeline.
 
@@ -328,6 +335,7 @@ def process(
         r2=r2_config,
         gpx_path=gpx_path,
         gpx_offset=gpx_offset,
+        skip_first=skip_first,
     )
 
     # Import and run orchestrator

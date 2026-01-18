@@ -490,6 +490,7 @@ def run_pipeline(
             config.input_dir,
             dirs["intake"],
             config.race_slug,
+            skip_first=config.skip_first,
         )
 
         if not manifest:
