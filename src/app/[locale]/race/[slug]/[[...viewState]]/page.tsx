@@ -144,12 +144,22 @@ export default async function RaceViewerPage({ params }: PageProps) {
   const viewStateStr = viewStateSegments?.[0] || "@0";
   const parsedViewState = parseViewState(viewStateStr);
 
-  // Fetch related data in parallel
-  const [images, waypoints, elevationPoints] = await Promise.all([
-    getImageMetadataByRaceId(race.id),
-    getWaypointsByRaceId(race.id),
-    getElevationPointsByRaceId(race.id),
-  ]);
+  // Fetch related data in parallel with error handling
+  let images, waypoints, elevationPoints;
+  try {
+    [images, waypoints, elevationPoints] = await Promise.all([
+      getImageMetadataByRaceId(race.id),
+      getWaypointsByRaceId(race.id),
+      getElevationPointsByRaceId(race.id),
+    ]);
+  } catch (error) {
+    console.error("Error fetching race data:", error);
+    notFound();
+  }
+
+  // Clamp initial position to valid range to prevent out-of-bounds access
+  const maxPosition = Math.max(0, images.length - 1);
+  const clampedPosition = Math.min(parsedViewState?.position ?? 0, maxPosition);
 
   // Build elevation profile
   const elevationProfile =
@@ -176,7 +186,7 @@ export default async function RaceViewerPage({ params }: PageProps) {
           endDistanceMeters: w.endDistanceMeters,
         }))}
         elevationProfile={elevationProfile}
-        initialPosition={parsedViewState?.position ?? 0}
+        initialPosition={clampedPosition}
         initialHeading={parsedViewState?.heading ?? DEFAULT_VIEW.heading}
         initialPitch={parsedViewState?.pitch ?? DEFAULT_VIEW.pitch}
         initialFov={parsedViewState?.fov ?? DEFAULT_VIEW.fov}
