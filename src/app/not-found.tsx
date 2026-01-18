@@ -5,15 +5,15 @@ import { Logo } from "@/components/shared/Logo";
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
+    <div className="min-h-screen dark:bg-slate-950 light:bg-white flex items-center justify-center px-4">
       <div className="text-center">
         <Logo className="justify-center mb-8" />
 
-        <h1 className="text-6xl font-bold text-white mb-4">404</h1>
-        <h2 className="text-2xl font-semibold text-slate-300 mb-4">
+        <h1 className="text-6xl font-bold dark:text-white light:text-slate-900 mb-4">404</h1>
+        <h2 className="text-2xl font-semibold dark:text-slate-300 light:text-slate-700 mb-4">
           Page Not Found
         </h2>
-        <p className="text-slate-400 mb-8 max-w-md mx-auto">
+        <p className="dark:text-slate-400 light:text-slate-600 mb-8 max-w-md mx-auto">
           The page you're looking for doesn't exist or has been moved.
         </p>
 
