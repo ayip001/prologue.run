@@ -11,11 +11,9 @@ import { CAMERA_CONSTRAINTS } from "@/lib/constants";
 // Offset to convert between our heading (0 = forward) and OrbitControls azimuth (0 = -Z axis)
 const HEADING_OFFSET = 90;
 
-interface HeadingData {
-  headingDegrees: number | null;
-  headingToPrev: number | null;
-  headingToNext: number | null;
-}
+// Fixed arrow headings for navigation
+const NEXT_ARROW_HEADING = 0;   // Directly in front
+const PREV_ARROW_HEADING = 180; // Directly behind
 
 interface PanoramaCanvasProps {
   imageUrl: string | null;
@@ -23,7 +21,6 @@ interface PanoramaCanvasProps {
   initialCamera: { yaw: number; pitch: number };
   onCameraChange: (camera: Partial<CameraState>) => void;
   isLoading: boolean;
-  headingData: HeadingData | null;
   onNavigateNext?: () => void;
   onNavigatePrev?: () => void;
 }
@@ -44,50 +41,6 @@ function CanvasErrorFallback({ error }: { error: string }) {
 // Component to debug Three.js context state
 function ContextDebugger() {
   return null;
-}
-
-// Calculate arrow position in spherical coordinates
-// Returns the relative heading for the arrow (0-360)
-function calculateArrowHeading(
-  imageHeading: number,
-  targetHeading: number
-): number {
-  // Calculate relative angle: where the target is relative to image's orientation
-  let relativeAngle = targetHeading - imageHeading;
-  // Normalize to 0-360
-  relativeAngle = ((relativeAngle % 360) + 360) % 360;
-  return relativeAngle;
-}
-
-// Clamp arrow heading to improve UX - keep arrows in expected zones
-// Next arrow: 0-20° or 340-360° (forward area)
-// Prev arrow: 160-200° (backward area)
-// Then reflect: e.g., 14.1h → 345.9h, 161h → 199h
-function clampArrowHeading(heading: number, direction: "next" | "prev"): number {
-  let clamped: number;
-
-  if (direction === "next") {
-    // Forward zone: 0-20° or 340-360°
-    // Convert to -180 to 180 range for easier comparison
-    let h = heading;
-    if (h > 180) h -= 360; // Now in range -180 to 180, where 0 is forward
-
-    // Clamp to -20 to 20
-    if (h > 20) h = 20;
-    if (h < -20) h = -20;
-
-    // Convert back to 0-360
-    clamped = h < 0 ? h + 360 : h;
-  } else {
-    // Backward zone: 160-200° (centered on 180°)
-    // Clamp to this range
-    if (heading < 160) clamped = 160;
-    else if (heading > 200) clamped = 200;
-    else clamped = heading;
-  }
-
-  // Reflect: 360 - heading (e.g., 14.1 → 345.9, 161 → 199)
-  return (360 - clamped) % 360;
 }
 
 // Convert spherical coordinates to cartesian for positioning in the scene
@@ -395,7 +348,6 @@ function PanoramaSphere({
   initialCamera,
   fov,
   onCameraChange,
-  headingData,
   onNavigateNext,
   onNavigatePrev,
 }: {
@@ -403,7 +355,6 @@ function PanoramaSphere({
   initialCamera: { yaw: number; pitch: number };
   fov: number;
   onCameraChange: (camera: Partial<CameraState>) => void;
-  headingData: HeadingData | null;
   onNavigateNext?: () => void;
   onNavigatePrev?: () => void;
 }) {
@@ -414,30 +365,13 @@ function PanoramaSphere({
   const materialRef = useRef<THREE.MeshBasicMaterial>(null);
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
 
-  // Calculate arrow headings based on heading data
+  // Fixed arrow headings - next at front (0°), prev at back (180°)
   const arrowHeadings = useMemo(() => {
-    if (!headingData || headingData.headingDegrees === null) {
-      return { next: null, prev: null };
-    }
-
-    const imageHeading = headingData.headingDegrees;
-
-    // Calculate next arrow heading and clamp to forward zone (0-20° or 340-360°)
-    let nextHeading: number | null = null;
-    if (headingData.headingToNext !== null && onNavigateNext) {
-      const rawHeading = calculateArrowHeading(imageHeading, headingData.headingToNext);
-      nextHeading = clampArrowHeading(rawHeading, "next");
-    }
-
-    // Calculate prev arrow heading and clamp to backward zone (160-200°)
-    let prevHeading: number | null = null;
-    if (headingData.headingToPrev !== null && onNavigatePrev) {
-      const rawHeading = calculateArrowHeading(imageHeading, headingData.headingToPrev);
-      prevHeading = clampArrowHeading(rawHeading, "prev");
-    }
-
-    return { next: nextHeading, prev: prevHeading };
-  }, [headingData, onNavigateNext, onNavigatePrev]);
+    return {
+      next: onNavigateNext ? NEXT_ARROW_HEADING : null,
+      prev: onNavigatePrev ? PREV_ARROW_HEADING : null,
+    };
+  }, [onNavigateNext, onNavigatePrev]);
 
   // Camera state refs
   const initialCameraRef = useRef<{ yaw: number; pitch: number }>({ yaw: initialCamera.yaw, pitch: initialCamera.pitch });
@@ -719,7 +653,6 @@ export function PanoramaCanvas({
   initialCamera,
   onCameraChange,
   isLoading,
-  headingData,
   onNavigateNext,
   onNavigatePrev,
 }: PanoramaCanvasProps) {
@@ -769,7 +702,6 @@ export function PanoramaCanvas({
           initialCamera={initialCamera}
           fov={camera.fov}
           onCameraChange={onCameraChange}
-          headingData={headingData}
           onNavigateNext={onNavigateNext}
           onNavigatePrev={onNavigatePrev}
         />
