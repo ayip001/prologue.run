@@ -6,6 +6,7 @@ import { useViewer } from "@/hooks/useViewer";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { useKeyboardNav } from "@/hooks/useKeyboardNav";
 import { useViewStateUrl } from "@/hooks/useViewStateUrl";
+import { useViewTracking } from "@/hooks/useViewTracking";
 import { parseViewState } from "@/lib/viewState";
 import { DEFAULT_VIEW } from "@/lib/constants";
 import { PanoramaCanvas } from "./PanoramaCanvas";
@@ -120,6 +121,9 @@ export function RaceViewer({
 
   // URL state sync
   useViewStateUrl({ raceSlug: race.slug, state });
+
+  // View tracking (fires after 5s on page)
+  useViewTracking(race.slug);
 
   // Get cumulative elevation gain (total ascent) from current image
   const totalAscent = useMemo(() => {
