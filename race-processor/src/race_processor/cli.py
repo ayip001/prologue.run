@@ -994,7 +994,7 @@ def db_insert_images(slug_or_id: str, records_path: Path) -> None:
         console.print(f"[red]Race not found:[/] {slug_or_id}")
         raise SystemExit(1)
 
-    with open(records_path) as f:
+    with open(records_path, encoding="utf-8") as f:
         records = json.load(f)
 
     success = insert_images(race["id"], records)
@@ -1097,7 +1097,7 @@ def db_update(slug_or_id: str, config_path: Path) -> None:
         "name", "description", "flag_emoji", "recorded_year", "recorded_by",
         "distance_meters", "race_date", "city", "country", "elevation_gain",
         "elevation_loss", "elevation_bars", "minimap_url", "card_image_url",
-        "tier", "total_images", "capture_date", "capture_device", "status",
+        "official_url", "tier", "total_images", "capture_date", "capture_device", "status",
         "is_testing", "storage_bucket", "storage_prefix"
     ]
 
@@ -1145,7 +1145,13 @@ def db_update(slug_or_id: str, config_path: Path) -> None:
     "gpx_path",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
 )
-def db_update_gpx(slug_or_id: str, gpx_path: Path) -> None:
+@click.option(
+    "--smoothing",
+    type=float,
+    default=1.0,
+    help="Elevation smoothing threshold in meters (default: 1.0). Higher values filter more noise.",
+)
+def db_update_gpx(slug_or_id: str, gpx_path: Path, smoothing: float) -> None:
     """Update race distance and elevation stats from GPX file.
 
     Extracts the following from the GPX track:
@@ -1158,7 +1164,7 @@ def db_update_gpx(slug_or_id: str, gpx_path: Path) -> None:
     \b
     Examples:
       race-processor db update-gpx test-route-01 ./track.gpx
-      race-processor db update-gpx f5df5237-7b9b-4ab1-90ce-e5d3b00e9acc ./route.gpx
+      race-processor db update-gpx test-route-01 ./track.gpx --smoothing 3.0
     """
     from .utils.db import get_race, update_race_gpx_stats
     from .utils.gpx_process import extract_gpx_race_stats
@@ -1170,9 +1176,10 @@ def db_update_gpx(slug_or_id: str, gpx_path: Path) -> None:
 
     console.print(f"[bold]Updating race from GPX:[/] {race['slug']}")
     console.print(f"  GPX file: {gpx_path}")
+    console.print(f"  Smoothing threshold: {smoothing} m")
 
     # Extract stats from GPX
-    stats = extract_gpx_race_stats(gpx_path)
+    stats = extract_gpx_race_stats(gpx_path, elevation_threshold=smoothing)
     if not stats:
         console.print("[red]Failed to extract stats from GPX file[/]")
         raise SystemExit(1)
@@ -1197,6 +1204,261 @@ def db_update_gpx(slug_or_id: str, gpx_path: Path) -> None:
 
     if not success:
         raise SystemExit(1)
+
+
+@main.command("gpx-stats")
+@click.argument(
+    "gpx_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--smoothing",
+    type=float,
+    default=1.0,
+    help="Elevation smoothing threshold in meters (default: 1.0). Higher values filter more noise.",
+)
+def gpx_stats(gpx_path: Path, smoothing: float) -> None:
+    """Preview GPX file statistics without updating database.
+
+    Shows distance, elevation gain/loss, and elevation range.
+    Use --smoothing to adjust how much GPS noise is filtered.
+
+    \b
+    Examples:
+      race-processor gpx-stats ./track.gpx
+      race-processor gpx-stats ./track.gpx --smoothing 0.5
+      race-processor gpx-stats ./track.gpx --smoothing 3.0
+    """
+    from .utils.gpx_process import extract_gpx_race_stats
+
+    console.print(f"[bold]GPX Stats Preview[/]")
+    console.print(f"  File: {gpx_path}")
+    console.print(f"  Smoothing threshold: {smoothing} m")
+    console.print()
+
+    stats = extract_gpx_race_stats(gpx_path, elevation_threshold=smoothing)
+    if not stats:
+        console.print("[red]Failed to extract stats from GPX file[/]")
+        raise SystemExit(1)
+
+    console.print(f"  [cyan]Distance:[/]        {stats['distance_meters']:,} m ({stats['distance_meters']/1000:.2f} km)")
+    console.print(f"  [cyan]Elevation gain:[/]  +{stats['elevation_gain']:,} m")
+    console.print(f"  [cyan]Elevation loss:[/]  -{stats['elevation_loss']:,} m")
+    console.print(f"  [cyan]Elevation min:[/]   {stats['elevation_min']:,} m")
+    console.print(f"  [cyan]Elevation max:[/]   {stats['elevation_max']:,} m")
+    console.print(f"  [cyan]Elevation bars:[/]  {len(stats.get('elevation_bars', []))} samples")
+
+
+@db.command("update-heading-offset")
+@click.argument("race_slug")
+@click.option(
+    "--index", "-i",
+    type=int,
+    default=None,
+    help="Single image position index to update",
+)
+@click.option(
+    "--offset", "-o",
+    type=float,
+    default=None,
+    help="Heading offset in degrees for single image update",
+)
+@click.option(
+    "--batch", "-b",
+    type=str,
+    default=None,
+    help="Batch update as comma-separated 'index:offset' pairs (e.g., '0:20,5:-15,10:30')",
+)
+@click.option(
+    "--json", "-j",
+    "json_str",
+    type=str,
+    default=None,
+    help='Batch update as JSON object (e.g., \'{"0": 20, "5": -15, "10": 30}\')',
+)
+def db_update_heading_offset(
+    race_slug: str,
+    index: int | None,
+    offset: float | None,
+    batch: str | None,
+    json_str: str | None,
+) -> None:
+    """Update heading offset for images in a race.
+
+    The heading_offset_degrees field adjusts the camera orientation when
+    the camera wasn't pointing exactly forward during capture.
+
+    \b
+    Single image update:
+      race-processor db update-heading-offset my-race -i 0 -o 20
+      race-processor db update-heading-offset my-race --index 5 --offset -15
+
+    \b
+    Batch update (comma-separated):
+      race-processor db update-heading-offset my-race -b "0:20,5:-15,10:30"
+
+    \b
+    Batch update (JSON):
+      race-processor db update-heading-offset my-race -j '{"0": 20, "5": -15}'
+    """
+    import json
+
+    from .utils.db import update_image_heading_offsets
+
+    offsets: dict[int, float] = {}
+
+    # Parse single update
+    if index is not None and offset is not None:
+        offsets[index] = offset
+
+    # Parse batch string (e.g., "0:20,5:-15,10:30")
+    if batch:
+        for pair in batch.split(","):
+            pair = pair.strip()
+            if ":" not in pair:
+                console.print(f"[red]Invalid batch format:[/] {pair} (expected 'index:offset')")
+                raise SystemExit(1)
+            try:
+                idx, off = pair.split(":", 1)
+                offsets[int(idx.strip())] = float(off.strip())
+            except ValueError as e:
+                console.print(f"[red]Invalid batch value:[/] {pair} ({e})")
+                raise SystemExit(1)
+
+    # Parse JSON string
+    if json_str:
+        try:
+            json_data = json.loads(json_str)
+            for k, v in json_data.items():
+                offsets[int(k)] = float(v)
+        except (json.JSONDecodeError, ValueError) as e:
+            console.print(f"[red]Invalid JSON:[/] {e}")
+            raise SystemExit(1)
+
+    if not offsets:
+        console.print("[red]No offsets specified. Use -i/-o, -b, or -j options.[/]")
+        raise SystemExit(1)
+
+    console.print(f"[bold]Updating heading offsets for:[/] {race_slug}")
+    console.print(f"  Updates: {len(offsets)} image(s)")
+
+    for idx in sorted(offsets.keys()):
+        console.print(f"    Index {idx}: {offsets[idx]:+.1f}°")
+
+    updated, failed = update_image_heading_offsets(race_slug, offsets)
+
+    if updated > 0:
+        console.print(f"[green]Updated {updated} image(s)[/]")
+    if failed > 0:
+        console.print(f"[red]Failed to update {failed} image(s)[/]")
+        raise SystemExit(1)
+
+
+@db.command("add-poi")
+@click.argument("race_slug")
+@click.argument("image_index", type=int)
+@click.argument("poi_type", type=str)
+@click.option("--heading", type=float, required=True, help="Heading in degrees (0-360)")
+@click.option("--pitch", type=float, default=0.0, help="Pitch in degrees (default: 0)")
+@click.option(
+    "--no-visible",
+    "no_visible",
+    is_flag=True,
+    default=False,
+    help="Hide POI on the panorama image",
+)
+def db_add_poi(
+    race_slug: str,
+    image_index: int,
+    poi_type: str,
+    heading: float,
+    pitch: float,
+    no_visible: bool,
+) -> None:
+    """Add a POI to a specific image.
+
+    \b
+    Examples:
+      race-processor db add-poi my-race 12 water --heading 45 --pitch 0
+      race-processor db add-poi my-race 12 scenic-spot --heading 120 --pitch 5 --no-visible
+    """
+    from .utils.db import add_poi_to_image
+
+    success = add_poi_to_image(
+        race_slug=race_slug,
+        image_index=image_index,
+        poi_type=poi_type,
+        heading=heading,
+        pitch=pitch,
+        visible_on_image=not no_visible,
+    )
+
+    if not success:
+        raise SystemExit(1)
+
+
+@db.command("remove-poi")
+@click.argument("race_slug")
+@click.argument("image_index", type=int)
+@click.argument("poi_type", type=str)
+def db_remove_poi(race_slug: str, image_index: int, poi_type: str) -> None:
+    """Remove a POI type from a specific image.
+
+    \b
+    Examples:
+      race-processor db remove-poi my-race 12 water
+    """
+    from .utils.db import remove_poi_from_image
+
+    success = remove_poi_from_image(
+        race_slug=race_slug,
+        image_index=image_index,
+        poi_type=poi_type,
+    )
+
+    if not success:
+        raise SystemExit(1)
+
+
+@db.command("list-pois")
+@click.argument("race_slug")
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Output as JSON",
+)
+def db_list_pois(race_slug: str, as_json: bool) -> None:
+    """List POIs for a race.
+
+    \b
+    Examples:
+      race-processor db list-pois my-race
+      race-processor db list-pois my-race --json
+    """
+    from .utils.db import list_pois_for_race
+    import json as json_lib
+    from rich.table import Table
+
+    pois = list_pois_for_race(race_slug)
+
+    if as_json:
+        console.print(json_lib.dumps(pois, indent=2))
+        return
+
+    if not pois:
+        console.print("[yellow]No POIs found.[/]")
+        return
+
+    table = Table(title=f"POIs for {race_slug}")
+    table.add_column("Image Index", style="cyan")
+    table.add_column("Types", style="white")
+
+    for entry in pois:
+        types = ", ".join([poi.get("type", "unknown") for poi in entry.get("pois", [])])
+        table.add_row(str(entry["imageIndex"]), types)
+
+    console.print(table)
 
 
 @db.command("delete")

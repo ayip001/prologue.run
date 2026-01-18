@@ -5,6 +5,7 @@ import { Menu, X, Sun, Moon, Languages, ChevronDown, Check } from "lucide-react"
 import { useState, useTransition } from "react";
 import { Logo } from "./Logo";
 import { Button } from "@/components/ui/button";
+import { GlassPanel } from "./GlassPanel";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/providers/ThemeProvider";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
@@ -141,83 +142,85 @@ export function Navbar({ className, transparent = false }: NavbarProps) {
 
       {/* Mobile Menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden dark:bg-slate-900/95 light:bg-white/95 backdrop-blur-xl border-b dark:border-white/5 light:border-slate-200">
-          <div className="container mx-auto px-4 py-4 flex flex-col gap-4">
-            <Link
-              href="/#races"
-              className="dark:text-slate-300 dark:hover:text-white light:text-slate-600 light:hover:text-slate-900 transition-colors py-2"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              {t("races")}
-            </Link>
-            <Link
-              href="/#features"
-              className="dark:text-slate-300 dark:hover:text-white light:text-slate-600 light:hover:text-slate-900 transition-colors py-2"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              {t("features")}
-            </Link>
-
-            <div className="flex items-center justify-between py-2 border-t dark:border-white/5 light:border-slate-200 mt-2">
-              <span className="text-sm dark:text-slate-400 light:text-slate-500">
-                {t("appearance")}
-              </span>
-              <button
-                onClick={toggleTheme}
-                className="flex items-center p-1 dark:bg-slate-900/95 dark:border-white/10 light:bg-slate-200 light:border-slate-300 border rounded-full w-16 h-8 relative"
-                aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+        <div className="md:hidden fixed inset-0 z-40 pointer-events-none">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-slate-950/20 backdrop-blur-sm pointer-events-auto" 
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+          
+          <GlassPanel className="absolute top-20 right-4 w-64 p-4 shadow-2xl animate-in fade-in zoom-in-95 slide-in-from-top-4 pointer-events-auto">
+            <div className="flex flex-col gap-4">
+              <Link
+                href="/#races"
+                className="dark:text-slate-300 dark:hover:text-white light:text-slate-600 light:hover:text-slate-900 transition-colors py-2 text-sm font-medium"
+                onClick={() => setIsMobileMenuOpen(false)}
               >
-                <div
-                  className={cn(
-                    "absolute w-6 h-6 bg-coral rounded-full shadow-sm transition-transform duration-200",
-                    isDark ? "left-[calc(100%-1.75rem)]" : "left-1"
-                  )}
-                />
-                <Sun
-                  className={cn(
-                    "h-3.5 w-3.5 z-10 ml-1.5 transition-colors",
-                    isDark ? "text-slate-400" : "text-white"
-                  )}
-                />
-                <Moon
-                  className={cn(
-                    "h-3.5 w-3.5 z-10 ml-auto mr-1.5 transition-colors",
-                    isDark ? "text-white" : "text-slate-400"
-                  )}
-                />
-              </button>
-            </div>
+                {t("races")}
+              </Link>
+              <Link
+                href="/#features"
+                className="dark:text-slate-300 dark:hover:text-white light:text-slate-600 light:hover:text-slate-900 transition-colors py-2 text-sm font-medium"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                {t("features")}
+              </Link>
 
-            <div className="flex flex-col gap-2 py-2 border-t dark:border-white/5 light:border-slate-200">
-              <span className="text-sm dark:text-slate-400 light:text-slate-500 mb-1">
-                {t("language")}
-              </span>
-              <div className="space-y-1">
-                {locales.map((l) => (
+              <div className="pt-4 border-t dark:border-white/10 light:border-slate-200">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-bold uppercase tracking-wider dark:text-slate-500 light:text-slate-400">
+                    {t("appearance")}
+                  </span>
                   <button
-                    key={l}
-                    onClick={() => {
-                      handleLocaleChange(l);
-                      setIsMobileMenuOpen(false);
-                    }}
-                    disabled={isPending}
-                    className={cn(
-                      "w-full flex items-center justify-between px-3 py-2 rounded-md text-sm",
-                      l === locale
-                        ? "dark:bg-slate-900/95 dark:text-white light:bg-slate-100 light:text-slate-900"
-                        : "dark:bg-slate-900/95 dark:text-slate-400 light:bg-slate-100 light:text-slate-500",
-                      isPending && "opacity-50 cursor-wait"
-                    )}
+                    onClick={toggleTheme}
+                    className="flex items-center p-1 dark:bg-slate-900/95 dark:border-white/10 light:bg-slate-200 light:border-slate-300 border rounded-full w-14 h-7 relative"
+                    aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
                   >
-                    {localeNames[l]}
-                    {l === locale && (
-                      <div className="w-1.5 h-1.5 rounded-full bg-coral" />
-                    )}
+                    <div
+                      className={cn(
+                        "absolute w-5 h-5 bg-coral rounded-full shadow-sm transition-transform duration-200",
+                        isDark ? "left-[calc(100%-1.5rem)]" : "left-1"
+                      )}
+                    />
+                    <Sun className={cn(
+                      "h-3 w-3 z-10 ml-1 transition-colors",
+                      isDark ? "text-slate-400" : "text-white"
+                    )} />
+                    <Moon className={cn(
+                      "h-3 w-3 z-10 ml-auto mr-1 transition-colors",
+                      isDark ? "text-white" : "text-slate-400"
+                    )} />
                   </button>
-                ))}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider dark:text-slate-500 light:text-slate-400 mb-1">
+                    {t("language")}
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {locales.map((l) => (
+                      <button
+                        key={l}
+                        onClick={() => {
+                          handleLocaleChange(l);
+                          setIsMobileMenuOpen(false);
+                        }}
+                        disabled={isPending}
+                        className={cn(
+                          "flex items-center justify-center py-2 rounded-md text-xs border transition-all",
+                          l === locale
+                            ? "dark:bg-coral dark:border-coral dark:text-white light:bg-coral light:border-coral light:text-white font-bold"
+                            : "dark:bg-slate-900/50 dark:border-white/10 dark:text-slate-400 light:bg-slate-50 light:border-slate-200 light:text-slate-600 hover:dark:bg-white/5 hover:light:bg-slate-100"
+                        )}
+                      >
+                        {localeNames[l]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </GlassPanel>
         </div>
       )}
     </header>

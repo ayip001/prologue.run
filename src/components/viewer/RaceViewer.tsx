@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useEffect, useState } from "react";
-import type { Race, ElevationProfile as ElevationProfileType } from "@/types";
+import type { Race, ElevationProfile as ElevationProfileType, Poi } from "@/types";
 import { useViewer } from "@/hooks/useViewer";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { useKeyboardNav } from "@/hooks/useKeyboardNav";
@@ -14,6 +14,7 @@ import { ViewerHUD } from "./ViewerHUD";
 import { NavigationChevrons } from "./NavigationChevrons";
 import { ProgressScrubber } from "./ProgressScrubber";
 import { ElevationProfile } from "./ElevationProfile";
+import { PoiLegend } from "./PoiLegend";
 
 interface ImageMeta {
   id: string;
@@ -23,10 +24,12 @@ interface ImageMeta {
   altitudeMeters: number | null;
   distanceFromStart: number | null;
   elevationGainFromStart: number | null;
+  pois: Poi[] | null;
   capturedAt: string;
   headingDegrees: number | null;
   headingToPrev: number | null;
   headingToNext: number | null;
+  headingOffsetDegrees: number | null;
 }
 
 interface Waypoint {
@@ -143,16 +146,6 @@ export function RaceViewer({
     return null;
   }, [waypoints, state.currentDistance]);
 
-  // Get current image heading data for ground arrows
-  const currentImageHeading = useMemo(() => {
-    const currentImage = images[state.currentIndex];
-    if (!currentImage) return null;
-    return {
-      headingDegrees: currentImage.headingDegrees,
-      headingToPrev: currentImage.headingToPrev,
-      headingToNext: currentImage.headingToNext,
-    };
-  }, [images, state.currentIndex]);
 
   // Handlers
   const handleCameraChange = useCallback(
@@ -169,6 +162,20 @@ export function RaceViewer({
     [actions]
   );
 
+  // Get current image metadata for offset
+  const currentImageMetadata = useMemo(() => {
+    return images[state.currentIndex];
+  }, [images, state.currentIndex]);
+
+  // Calculate unique POI types present on this route
+  const activePoiTypes = useMemo(() => {
+    const types = new Set<string>();
+    race.poiMarkers?.forEach((marker) => {
+      marker.pois.forEach((type) => types.add(type));
+    });
+    return Array.from(types) as Poi["type"][];
+  }, [race.poiMarkers]);
+
   return (
     <div className="fixed inset-0 bg-slate-950">
       {/* Panorama Canvas */}
@@ -178,9 +185,10 @@ export function RaceViewer({
         initialCamera={initialCameraFromUrl}
         onCameraChange={handleCameraChange}
         isLoading={isLoading}
-        headingData={currentImageHeading}
         onNavigateNext={state.currentIndex < images.length - 1 ? actions.goNext : undefined}
         onNavigatePrev={state.currentIndex > 0 ? actions.goPrevious : undefined}
+        headingOffset={currentImageMetadata?.headingOffsetDegrees ?? 0}
+        pois={currentImageMetadata?.pois ?? []}
       />
 
       {/* HUD Overlay */}
@@ -211,11 +219,15 @@ export function RaceViewer({
           />
         )}
 
+        <PoiLegend activeTypes={activePoiTypes} />
+
         {/* Progress Scrubber */}
         <ProgressScrubber
           totalDistance={race.distanceMeters}
           currentDistance={state.currentDistance}
           elevationBars={race.elevationBars}
+          poiMarkers={race.poiMarkers ?? []}
+          onPoiClick={actions.goToIndex}
           onSeek={handleSeek}
         />
       </div>

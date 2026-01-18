@@ -38,6 +38,7 @@ const TEST_RACE: Race = {
   isTesting: true,
   storageBucket: "test",
   storagePrefix: "test",
+  poiMarkers: [],
   totalViews: 0,
   createdAt: "2024-01-01T00:00:00Z",
   updatedAt: "2024-01-01T00:00:00Z",
@@ -53,10 +54,12 @@ const TEST_IMAGES = [
     altitudeMeters: 0,
     distanceFromStart: 0,
     elevationGainFromStart: 0,
+    pois: [],
     capturedAt: "2024-01-01T00:00:00Z",
     headingDegrees: null,
     headingToPrev: null,
     headingToNext: null,
+    headingOffsetDegrees: null,
     pathThumbnail: "",
     pathMedium: "",
     pathFull: "",
@@ -128,7 +131,7 @@ export default async function RaceViewerPage({ params }: PageProps) {
   // Fetch race data
   let race;
   try {
-    race = await getRaceBySlug(slug);
+    race = await getRaceBySlug(slug, locale);
   } catch {
     race = null;
   }
@@ -136,18 +139,6 @@ export default async function RaceViewerPage({ params }: PageProps) {
   if (!race) {
     notFound();
   }
-
-  // Get translation for the race if available
-  const translation = await getRaceTranslation(race.id, locale);
-  const translatedRace = translation
-    ? {
-        ...race,
-        name: translation.name || race.name,
-        description: translation.description || race.description,
-        city: translation.city || race.city,
-        country: translation.country || race.country,
-      }
-    : race;
 
   // Parse view state from URL (viewStateStr already constructed above)
   const parsedViewState = parseViewState(viewStateStr);
@@ -186,7 +177,7 @@ export default async function RaceViewerPage({ params }: PageProps) {
   return (
     <Suspense fallback={<ViewerSkeleton />}>
       <RaceViewer
-        race={translatedRace}
+        race={race}
         images={images}
         waypoints={waypoints.map((w) => ({
           name: w.name,
@@ -232,7 +223,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   let race;
   try {
-    race = await getRaceBySlug(slug);
+    race = await getRaceBySlug(slug, locale);
   } catch {
     race = null;
   }
@@ -243,9 +234,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  // Get translated race name if available
-  const translation = await getRaceTranslation(race.id, locale);
-  const raceName = translation?.name || race.name;
+  const raceName = race.name;
 
   const canonicalUrl =
     locale === defaultLocale ? `${baseUrl}${path}` : `${baseUrl}/${locale}${path}`;

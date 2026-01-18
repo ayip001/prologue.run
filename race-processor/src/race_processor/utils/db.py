@@ -17,6 +17,19 @@ from rich.table import Table
 
 console = Console()
 
+POI_TYPES = {
+    "toilet",
+    "checkpoint",
+    "water",
+    "energy-drink",
+    "food",
+    "first-aid",
+    "scenic-spot",
+    "warning-spot",
+    "cheer-zone",
+}
+POI_MAX_PER_IMAGE = 10
+
 
 def get_connection_string() -> Optional[str]:
     """
@@ -72,9 +85,13 @@ def get_connection():
             for k, v in query_params.items():
                 params[k] = v[0]
 
-        return psycopg2.connect(**params)
+        conn = psycopg2.connect(**params)
+        conn.set_client_encoding("UTF8")
+        return conn
 
-    return psycopg2.connect(conn_str)
+    conn = psycopg2.connect(conn_str)
+    conn.set_client_encoding("UTF8")
+    return conn
 
 
 def init_schema(schema_path: Optional[Path] = None) -> bool:
@@ -128,7 +145,7 @@ def load_race_config(config_path: Path) -> dict:
     Returns:
         Dict with race configuration
     """
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         if config_path.suffix in (".yaml", ".yml"):
             return yaml.safe_load(f)
         else:
@@ -193,7 +210,7 @@ def insert_race(config: dict, update_if_exists: bool = False) -> Optional[str]:
             "slug", "name", "description", "flag_emoji", "recorded_year",
             "recorded_by", "distance_meters", "race_date", "city", "country",
             "elevation_gain", "elevation_loss", "elevation_bars", "minimap_url",
-            "card_image_url", "tier", "total_images", "capture_date", "capture_device",
+            "card_image_url", "official_url", "tier", "total_images", "capture_date", "capture_device",
             "status", "is_testing", "storage_bucket", "storage_prefix"
         ]
 
@@ -245,7 +262,7 @@ def _update_race(cur, conn, race_id: str, config: dict) -> Optional[str]:
         "name", "description", "flag_emoji", "recorded_year", "recorded_by",
         "distance_meters", "race_date", "city", "country", "elevation_gain",
         "elevation_loss", "elevation_bars", "minimap_url", "card_image_url",
-        "tier", "total_images", "capture_date", "capture_device", "status",
+        "official_url", "tier", "total_images", "capture_date", "capture_device", "status",
         "is_testing", "storage_bucket", "storage_prefix"
     ]
 
@@ -652,3 +669,295 @@ def print_race_details(race: dict) -> None:
             table.add_row(label, str(value))
 
     console.print(table)
+
+
+def update_image_heading_offsets(
+    race_slug: str,
+    offsets: dict[int, float],
+) -> tuple[int, int]:
+    """
+    Update heading_offset_degrees for multiple images by position index.
+
+    Args:
+        race_slug: Race slug to identify the race
+        offsets: Dict mapping position_index to heading_offset_degrees
+
+    Returns:
+        Tuple of (updated_count, failed_count)
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+
+    updated = 0
+    failed = 0
+
+    try:
+        # First get the race ID
+        cur.execute("SELECT id FROM races WHERE slug = %s", (race_slug,))
+        result = cur.fetchone()
+        if not result:
+            console.print(f"[red]Race not found:[/] {race_slug}")
+            return 0, len(offsets)
+
+        race_id = result[0]
+
+        # Update each image
+        for position_index, offset_degrees in offsets.items():
+            try:
+                cur.execute(
+                    """
+                    UPDATE images
+                    SET heading_offset_degrees = %s
+                    WHERE race_id = %s AND position_index = %s
+                    RETURNING id
+                    """,
+                    (offset_degrees, race_id, position_index),
+                )
+                if cur.fetchone():
+                    updated += 1
+                else:
+                    console.print(f"  [yellow]Image not found: index {position_index}[/]")
+                    failed += 1
+            except Exception as e:
+                console.print(f"  [red]Failed to update index {position_index}: {e}[/]")
+                failed += 1
+
+        conn.commit()
+        return updated, failed
+
+    except Exception as e:
+        conn.rollback()
+        console.print(f"[red]Database error:[/] {e}")
+        return 0, len(offsets)
+
+    finally:
+        cur.close()
+        conn.close()
+
+
+def _fetch_race_id(cur, race_slug: str) -> Optional[str]:
+    cur.execute("SELECT id FROM races WHERE slug = %s", (race_slug,))
+    row = cur.fetchone()
+    return str(row[0]) if row else None
+
+
+def _regenerate_poi_markers(cur, race_id: str) -> None:
+    from psycopg2.extras import Json
+
+    cur.execute(
+        """
+        SELECT position_index, distance_from_start, pois
+        FROM images
+        WHERE race_id = %s
+        ORDER BY position_index
+        """,
+        (race_id,),
+    )
+    rows = cur.fetchall()
+    markers: list[dict] = []
+
+    for position_index, distance_from_start, pois in rows:
+        if not pois:
+            continue
+        types = [poi.get("type") for poi in pois if poi.get("type")]
+        if not types:
+            continue
+        markers.append(
+            {
+                "imageIndex": position_index,
+                "distanceFromStart": distance_from_start or 0,
+                "pois": types,
+            }
+        )
+
+    cur.execute(
+        "UPDATE races SET poi_markers = %s WHERE id = %s",
+        (Json(markers), race_id),
+    )
+
+
+def add_poi_to_image(
+    race_slug: str,
+    image_index: int,
+    poi_type: str,
+    heading: float,
+    pitch: float = 0.0,
+    visible_on_image: bool = True,
+) -> bool:
+    """
+    Add a POI to an image and regenerate race-level poi_markers.
+
+    Args:
+        race_slug: Race slug to identify the race
+        image_index: Image position index
+        poi_type: Type of POI (must be in POI_TYPES)
+        heading: Heading (0-360 degrees)
+        pitch: Pitch in degrees
+        visible_on_image: Whether to render POI on panorama
+    """
+    from psycopg2.extras import Json
+
+    poi_type = poi_type.lower()
+    if poi_type not in POI_TYPES:
+        console.print(f"[red]Invalid POI type:[/] {poi_type}")
+        console.print(f"  Valid types: {', '.join(sorted(POI_TYPES))}")
+        return False
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        race_id = _fetch_race_id(cur, race_slug)
+        if not race_id:
+            console.print(f"[red]Race not found:[/] {race_slug}")
+            return False
+
+        cur.execute(
+            """
+            SELECT id, pois
+            FROM images
+            WHERE race_id = %s AND position_index = %s
+            """,
+            (race_id, image_index),
+        )
+        row = cur.fetchone()
+        if not row:
+            console.print(f"[red]Image not found:[/] index {image_index}")
+            return False
+
+        image_id, pois = row
+        pois = list(pois or [])
+
+        if len(pois) >= POI_MAX_PER_IMAGE:
+            console.print(f"[red]POI limit reached:[/] max {POI_MAX_PER_IMAGE} per image")
+            return False
+
+        pois.append(
+            {
+                "type": poi_type,
+                "heading": heading,
+                "pitch": pitch,
+                "visibleOnImage": visible_on_image,
+            }
+        )
+
+        cur.execute(
+            "UPDATE images SET pois = %s WHERE id = %s",
+            (Json(pois), image_id),
+        )
+
+        _regenerate_poi_markers(cur, race_id)
+        conn.commit()
+
+        console.print(
+            f"[green]Added POI:[/] {poi_type} (image {image_index}, heading {heading:.1f}°, pitch {pitch:.1f}°)"
+        )
+        return True
+
+    except Exception as e:
+        conn.rollback()
+        console.print(f"[red]Failed to add POI:[/] {e}")
+        return False
+
+    finally:
+        cur.close()
+        conn.close()
+
+
+def remove_poi_from_image(
+    race_slug: str,
+    image_index: int,
+    poi_type: str,
+) -> bool:
+    """
+    Remove a POI type from an image and regenerate race-level poi_markers.
+    """
+    from psycopg2.extras import Json
+
+    poi_type = poi_type.lower()
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        race_id = _fetch_race_id(cur, race_slug)
+        if not race_id:
+            console.print(f"[red]Race not found:[/] {race_slug}")
+            return False
+
+        cur.execute(
+            """
+            SELECT id, pois
+            FROM images
+            WHERE race_id = %s AND position_index = %s
+            """,
+            (race_id, image_index),
+        )
+        row = cur.fetchone()
+        if not row:
+            console.print(f"[red]Image not found:[/] index {image_index}")
+            return False
+
+        image_id, pois = row
+        pois = list(pois or [])
+        filtered = [poi for poi in pois if poi.get("type") != poi_type]
+
+        if len(filtered) == len(pois):
+            console.print(f"[yellow]No POIs of type '{poi_type}' found on image {image_index}[/]")
+            return False
+
+        cur.execute(
+            "UPDATE images SET pois = %s WHERE id = %s",
+            (Json(filtered), image_id),
+        )
+
+        _regenerate_poi_markers(cur, race_id)
+        conn.commit()
+
+        console.print(f"[green]Removed POI:[/] {poi_type} from image {image_index}")
+        return True
+
+    except Exception as e:
+        conn.rollback()
+        console.print(f"[red]Failed to remove POI:[/] {e}")
+        return False
+
+    finally:
+        cur.close()
+        conn.close()
+
+
+def list_pois_for_race(race_slug: str) -> list[dict]:
+    """
+    List all POIs for a race grouped by image.
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+
+    try:
+        race_id = _fetch_race_id(cur, race_slug)
+        if not race_id:
+            console.print(f"[red]Race not found:[/] {race_slug}")
+            return []
+
+        cur.execute(
+            """
+            SELECT position_index, pois
+            FROM images
+            WHERE race_id = %s
+            ORDER BY position_index
+            """,
+            (race_id,),
+        )
+        rows = cur.fetchall()
+        results = []
+
+        for position_index, pois in rows:
+            if not pois:
+                continue
+            results.append({"imageIndex": position_index, "pois": pois})
+
+        return results
+
+    finally:
+        cur.close()
+        conn.close()

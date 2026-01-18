@@ -4,18 +4,18 @@ import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { Canvas, useThree, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
-import type { CameraState } from "@/types";
+import type { CameraState, Poi } from "@/types";
 import { clampFov } from "@/lib/viewState";
 import { CAMERA_CONSTRAINTS } from "@/lib/constants";
+import { sphericalToCartesian } from "@/lib/panorama";
+import { PanoramaPoi } from "./PanoramaPoi";
 
 // Offset to convert between our heading (0 = forward) and OrbitControls azimuth (0 = -Z axis)
 const HEADING_OFFSET = 90;
 
-interface HeadingData {
-  headingDegrees: number | null;
-  headingToPrev: number | null;
-  headingToNext: number | null;
-}
+// Fixed arrow headings for navigation
+const NEXT_ARROW_HEADING = 0;   // Directly in front
+const PREV_ARROW_HEADING = 180; // Directly behind
 
 interface PanoramaCanvasProps {
   imageUrl: string | null;
@@ -23,9 +23,10 @@ interface PanoramaCanvasProps {
   initialCamera: { yaw: number; pitch: number };
   onCameraChange: (camera: Partial<CameraState>) => void;
   isLoading: boolean;
-  headingData: HeadingData | null;
   onNavigateNext?: () => void;
   onNavigatePrev?: () => void;
+  headingOffset?: number;
+  pois?: Poi[] | null;
 }
 
 // Error boundary fallback component
@@ -46,70 +47,6 @@ function ContextDebugger() {
   return null;
 }
 
-// Calculate arrow position in spherical coordinates
-// Returns the relative heading for the arrow (0-360)
-function calculateArrowHeading(
-  imageHeading: number,
-  targetHeading: number
-): number {
-  // Calculate relative angle: where the target is relative to image's orientation
-  let relativeAngle = targetHeading - imageHeading;
-  // Normalize to 0-360
-  relativeAngle = ((relativeAngle % 360) + 360) % 360;
-  return relativeAngle;
-}
-
-// Clamp arrow heading to improve UX - keep arrows in expected zones
-// Next arrow: 0-20° or 340-360° (forward area)
-// Prev arrow: 160-200° (backward area)
-// Then reflect: e.g., 14.1h → 345.9h, 161h → 199h
-function clampArrowHeading(heading: number, direction: "next" | "prev"): number {
-  let clamped: number;
-
-  if (direction === "next") {
-    // Forward zone: 0-20° or 340-360°
-    // Convert to -180 to 180 range for easier comparison
-    let h = heading;
-    if (h > 180) h -= 360; // Now in range -180 to 180, where 0 is forward
-
-    // Clamp to -20 to 20
-    if (h > 20) h = 20;
-    if (h < -20) h = -20;
-
-    // Convert back to 0-360
-    clamped = h < 0 ? h + 360 : h;
-  } else {
-    // Backward zone: 160-200° (centered on 180°)
-    // Clamp to this range
-    if (heading < 160) clamped = 160;
-    else if (heading > 200) clamped = 200;
-    else clamped = heading;
-  }
-
-  // Reflect: 360 - heading (e.g., 14.1 → 345.9, 161 → 199)
-  return (360 - clamped) % 360;
-}
-
-// Convert spherical coordinates to cartesian for positioning in the scene
-// heading: 0-360, 0 = forward (where camera faces at azimuth 90°)
-// pitch: degrees, negative = down
-function sphericalToCartesian(
-  heading: number,
-  pitch: number,
-  radius: number
-): [number, number, number] {
-  const headingRad = THREE.MathUtils.degToRad(heading);
-  const pitchRad = THREE.MathUtils.degToRad(pitch);
-
-  // At heading 0, we want position along -X (where camera looks at azimuth 90°)
-  // At heading 90, we want position along +Z
-  const horizontalRadius = radius * Math.cos(pitchRad);
-  const x = -horizontalRadius * Math.cos(headingRad);
-  const y = radius * Math.sin(pitchRad);
-  const z = horizontalRadius * Math.sin(headingRad);
-
-  return [x, y, z];
-}
 
 // Ground navigation arrow component using mesh for perspective distortion
 interface GroundArrowProps {
@@ -395,17 +332,19 @@ function PanoramaSphere({
   initialCamera,
   fov,
   onCameraChange,
-  headingData,
   onNavigateNext,
   onNavigatePrev,
+  headingOffset,
+  pois,
 }: {
   imageUrl: string | null;
   initialCamera: { yaw: number; pitch: number };
   fov: number;
   onCameraChange: (camera: Partial<CameraState>) => void;
-  headingData: HeadingData | null;
   onNavigateNext?: () => void;
   onNavigatePrev?: () => void;
+  headingOffset: number;
+  pois?: Poi[] | null;
 }) {
   const { camera: threeCamera, invalidate: invalidateFrame, gl } = useThree();
   const controlsRef = useRef<any>(null);
@@ -414,30 +353,13 @@ function PanoramaSphere({
   const materialRef = useRef<THREE.MeshBasicMaterial>(null);
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
 
-  // Calculate arrow headings based on heading data
+  // Fixed arrow headings - next at front (0°), prev at back (180°)
   const arrowHeadings = useMemo(() => {
-    if (!headingData || headingData.headingDegrees === null) {
-      return { next: null, prev: null };
-    }
-
-    const imageHeading = headingData.headingDegrees;
-
-    // Calculate next arrow heading and clamp to forward zone (0-20° or 340-360°)
-    let nextHeading: number | null = null;
-    if (headingData.headingToNext !== null && onNavigateNext) {
-      const rawHeading = calculateArrowHeading(imageHeading, headingData.headingToNext);
-      nextHeading = clampArrowHeading(rawHeading, "next");
-    }
-
-    // Calculate prev arrow heading and clamp to backward zone (160-200°)
-    let prevHeading: number | null = null;
-    if (headingData.headingToPrev !== null && onNavigatePrev) {
-      const rawHeading = calculateArrowHeading(imageHeading, headingData.headingToPrev);
-      prevHeading = clampArrowHeading(rawHeading, "prev");
-    }
-
-    return { next: nextHeading, prev: prevHeading };
-  }, [headingData, onNavigateNext, onNavigatePrev]);
+    return {
+      next: onNavigateNext ? NEXT_ARROW_HEADING : null,
+      prev: onNavigatePrev ? PREV_ARROW_HEADING : null,
+    };
+  }, [onNavigateNext, onNavigatePrev]);
 
   // Camera state refs
   const initialCameraRef = useRef<{ yaw: number; pitch: number }>({ yaw: initialCamera.yaw, pitch: initialCamera.pitch });
@@ -576,7 +498,7 @@ function PanoramaSphere({
     const { yaw, pitch } = initialCameraRef.current;
 
     const azimuthRad = THREE.MathUtils.degToRad(yaw + HEADING_OFFSET);
-    const polarRad = THREE.MathUtils.degToRad(90 - pitch);
+    const polarRad = THREE.MathUtils.degToRad(90 + pitch);
 
     const wasDamping = controls.enableDamping;
     controls.enableDamping = false;
@@ -593,7 +515,7 @@ function PanoramaSphere({
         const currentAzimuth = THREE.MathUtils.radToDeg(controlsRef.current.getAzimuthalAngle());
         const currentPolar = THREE.MathUtils.radToDeg(controlsRef.current.getPolarAngle());
         const heading = ((currentAzimuth - HEADING_OFFSET) % 360 + 360) % 360;
-        const finalPitch = 90 - currentPolar;
+        const finalPitch = currentPolar - 90;
         onCameraChange({ yaw: heading, pitch: finalPitch });
       }
     }, 50);
@@ -606,7 +528,7 @@ function PanoramaSphere({
     const controls = controlsRef.current;
     const azimuth = THREE.MathUtils.radToDeg(controls.getAzimuthalAngle());
     const polar = THREE.MathUtils.radToDeg(controls.getPolarAngle());
-    const pitch = 90 - polar;
+    const pitch = polar - 90;
     const heading = ((azimuth - HEADING_OFFSET) % 360 + 360) % 360;
 
     onCameraChange({ yaw: heading, pitch });
@@ -668,7 +590,11 @@ function PanoramaSphere({
     <>
       <ContextDebugger />
       {/* Sky sphere with panorama texture */}
-      <mesh ref={meshRef} scale={[-1, 1, 1]}>
+      <mesh 
+        ref={meshRef} 
+        scale={[-1, 1, 1]} 
+        rotation={[0, THREE.MathUtils.degToRad(-headingOffset), 0]}
+      >
         <sphereGeometry args={[500, 64, 32]} />
         <meshBasicMaterial
           ref={materialRef}
@@ -695,6 +621,14 @@ function PanoramaSphere({
         />
       )}
 
+      {pois?.filter((poi) => poi.visibleOnImage).map((poi, index) => (
+        <PanoramaPoi
+          key={`${poi.type}-${index}`}
+          poi={poi}
+          headingOffset={headingOffset}
+        />
+      ))}
+
       {/* Camera controls */}
       <OrbitControls
         ref={controlsRef}
@@ -719,9 +653,10 @@ export function PanoramaCanvas({
   initialCamera,
   onCameraChange,
   isLoading,
-  headingData,
   onNavigateNext,
   onNavigatePrev,
+  headingOffset = 0,
+  pois,
 }: PanoramaCanvasProps) {
   const [canvasError, setCanvasError] = useState<string | null>(null);
   const [canvasReady, setCanvasReady] = useState(false);
@@ -769,9 +704,10 @@ export function PanoramaCanvas({
           initialCamera={initialCamera}
           fov={camera.fov}
           onCameraChange={onCameraChange}
-          headingData={headingData}
           onNavigateNext={onNavigateNext}
           onNavigatePrev={onNavigatePrev}
+          headingOffset={headingOffset}
+          pois={pois}
         />
       </Canvas>
 

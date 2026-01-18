@@ -20,7 +20,7 @@ CREATE TABLE races (
     recorded_by     VARCHAR(100),                  -- 'Angus Yip'
 
     -- Race metadata
-    distance_meters INTEGER NOT NULL,              -- 42195 for marathon
+    distance_meters INTEGER NOT NULL,              -- ~42195 for marathon
     race_date       DATE,
     city            VARCHAR(100),
     country         VARCHAR(100),
@@ -33,8 +33,10 @@ CREATE TABLE races (
 
     -- Card display data (JSON for flexibility)
     elevation_bars  JSONB,                         -- [0-100] array, ~30-40 values
+    poi_markers     JSONB DEFAULT '[]',            -- [{imageIndex, distanceFromStart, pois: [type]}]
     minimap_url     VARCHAR(500),                  -- Image URL for the route minimap
     card_image_url  VARCHAR(500),                  -- Hero image for card
+    official_url    VARCHAR(500),                  -- Official race website
 
     -- Quality tier badge
     tier            VARCHAR(20),                   -- 'gold', 'silver', 'bronze', null
@@ -87,6 +89,7 @@ CREATE TABLE images (
     heading_to_prev DECIMAL(5, 2),                 -- Bearing to previous image (for back arrow)
     heading_to_next DECIMAL(5, 2),                 -- Bearing to next image (for forward arrow)
     heading_offset_degrees DECIMAL(5, 2) DEFAULT 0, -- Manual adjustment if camera wasn't pointing forward
+    pois            JSONB DEFAULT '[]',            -- [{type, heading, pitch, visibleOnImage}]
 
     -- Distance from start (meters) - for progress bar
     distance_from_start INTEGER,

@@ -18,8 +18,19 @@
     "comingSoon": "即將推出！",
     "learnMore": "為何需要？"
   },
+  "distances": {
+    "marathon": "馬拉松",
+    "halfMarathon": "半馬拉松",
+    "10k": "10K",
+    "5k": "5K"
+  },
+  "tiers": {
+    "gold": "世界田徑金標賽事",
+    "silver": "世界田徑銀標賽事",
+    "bronze": "世界田徑銅標賽事"
+  },
   "features": {
-    "title": "備戰，不只在跑道",
+    "title": "備戰，不只在賽道",
     "subtitle": "為馬拉松跑者打造的街景地圖。",
     "streetView": {
       "title": "360° 實景探路",

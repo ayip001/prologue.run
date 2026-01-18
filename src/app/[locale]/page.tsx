@@ -73,7 +73,7 @@ export default async function HomePage({ params }: PageProps) {
   // Fetch races from database
   let races: RaceCardData[];
   try {
-    races = await getAllRaces();
+    races = await getAllRaces(locale);
   } catch (error) {
     console.error("HOMEPAGE FETCH ERROR:", error);
     races = [];

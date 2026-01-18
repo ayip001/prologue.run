@@ -412,8 +412,8 @@ def override_gps_from_gpx(
 
 def save_manifest(manifest: dict, output_path: Path) -> None:
     """Save the updated manifest to a JSON file."""
-    with open(output_path, "w") as f:
-        json.dump(manifest, f, indent=2)
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2, ensure_ascii=False)
     console.print(f"\n[green]Saved updated manifest to:[/] {output_path}")
 
 
