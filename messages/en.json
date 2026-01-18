@@ -18,6 +18,12 @@
     "comingSoon": "Coming Soon!",
     "learnMore": "Why Use Prologue?"
   },
+  "distances": {
+    "marathon": "Marathon",
+    "halfMarathon": "Half Marathon",
+    "10k": "10K",
+    "5k": "5K"
+  },
   "features": {
     "title": "The Runner's Edge",
     "subtitle": "Eliminate the unknown. Master the course before race day.",

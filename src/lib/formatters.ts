@@ -91,14 +91,14 @@ export function formatPercent(value: number): string {
  * Format a race distance in kilometers with appropriate suffix.
  * Examples: "Marathon", "Half Marathon", "10K", "5K", "42.2km"
  */
-export function formatRaceDistance(meters: number): string {
+export function formatRaceDistance(meters: number, t?: (key: string) => string): string {
   const km = meters / 1000;
 
   // Check for standard race distances
-  if (Math.abs(km - 42.195) < 0.1) return "Marathon";
-  if (Math.abs(km - 21.0975) < 0.1) return "Half Marathon";
-  if (Math.abs(km - 10) < 0.1) return "10K";
-  if (Math.abs(km - 5) < 0.1) return "5K";
+  if (km >= 42 && km <= 43) return t ? t("marathon") : "Marathon";
+  if (km >= 20 && km <= 22) return t ? t("halfMarathon") : "Half Marathon";
+  if (km >= 10 && km <= 12) return t ? t("10k") : "10K";
+  if (km >= 5 && km <= 6) return t ? t("5k") : "5K";
 
   // For other distances, show km
   if (km >= 10) {

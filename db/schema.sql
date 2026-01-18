@@ -20,7 +20,7 @@ CREATE TABLE races (
     recorded_by     VARCHAR(100),                  -- 'Angus Yip'
 
     -- Race metadata
-    distance_meters INTEGER NOT NULL,              -- 42195 for marathon
+    distance_meters INTEGER NOT NULL,              -- ~42195 for marathon
     race_date       DATE,
     city            VARCHAR(100),
     country         VARCHAR(100),

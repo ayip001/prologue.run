@@ -18,6 +18,12 @@
     "comingSoon": "即將推出！",
     "learnMore": "為何需要？"
   },
+  "distances": {
+    "marathon": "馬拉松",
+    "halfMarathon": "半馬拉松",
+    "10k": "10K",
+    "5k": "5K"
+  },
   "features": {
     "title": "備戰，不只在跑道",
     "subtitle": "為馬拉松跑者打造的街景地圖。",
