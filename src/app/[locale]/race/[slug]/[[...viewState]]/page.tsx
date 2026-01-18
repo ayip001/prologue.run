@@ -98,9 +98,14 @@ export default async function RaceViewerPage({ params }: PageProps) {
   // Enable static rendering
   setRequestLocale(locale);
 
+  // Reconstruct view state string - join all segments in case commas split them
+  // This handles both: ["@75,320.8h,18.3p"] and ["@75", "320.8h", "18.3p"]
+  const viewStateStr = viewStateSegments?.length
+    ? viewStateSegments.join(",")
+    : "@0";
+
   // Handle test route
   if (slug === "card-preview" && ENABLE_TESTING_CARDS) {
-    const viewStateStr = viewStateSegments?.[0] || "@0";
     const parsedViewState = parseViewState(viewStateStr);
 
     return (
@@ -144,8 +149,7 @@ export default async function RaceViewerPage({ params }: PageProps) {
       }
     : race;
 
-  // Parse view state from URL
-  const viewStateStr = viewStateSegments?.[0] || "@0";
+  // Parse view state from URL (viewStateStr already constructed above)
   const parsedViewState = parseViewState(viewStateStr);
 
   // Fetch related data in parallel with error handling
