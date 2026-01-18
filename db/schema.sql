@@ -35,6 +35,7 @@ CREATE TABLE races (
     elevation_bars  JSONB,                         -- [0-100] array, ~30-40 values
     minimap_url     VARCHAR(500),                  -- Image URL for the route minimap
     card_image_url  VARCHAR(500),                  -- Hero image for card
+    official_url    VARCHAR(500),                  -- Official race website
 
     -- Quality tier badge
     tier            VARCHAR(20),                   -- 'gold', 'silver', 'bronze', null

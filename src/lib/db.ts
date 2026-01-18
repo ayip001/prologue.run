@@ -30,6 +30,7 @@ interface RaceRow {
   elevation_bars: number[] | null;
   minimap_url: string | null;
   card_image_url: string | null;
+  official_url: string | null;
   tier: "gold" | "silver" | "bronze" | null;
   total_images: number;
   capture_date: string;
@@ -124,6 +125,7 @@ function transformRace(row: RaceRow): Race {
     elevationBars: row.elevation_bars,
     minimapUrl: row.minimap_url,
     cardImageUrl: row.card_image_url,
+    officialUrl: row.official_url,
     tier: row.tier,
     totalImages: row.total_images,
     captureDate: row.capture_date,
@@ -157,7 +159,7 @@ function transformRaceCard(row: RaceRow): RaceCardData {
     elevationBars: row.elevation_bars,
     totalImages: row.total_images,
     isTesting: Boolean(row.is_testing),
-    officialUrl: (row as any).official_url || null,
+    officialUrl: row.official_url,
   };
 }
 
@@ -230,7 +232,7 @@ export async function getAllRaces(locale: string = "en"): Promise<RaceCardData[]
             r.distance_meters, r.elevation_gain, r.elevation_loss, 
             COALESCE(t.city, r.city) as city, 
             COALESCE(t.country, r.country) as country,
-            r.tier, r.card_image_url, r.minimap_url, r.elevation_bars, r.total_images, 
+            r.tier, r.card_image_url, r.minimap_url, r.official_url, r.elevation_bars, r.total_images, 
             COALESCE(r.is_testing, FALSE) as is_testing
           FROM races r
           LEFT JOIN race_translations t ON r.id = t.race_id AND t.locale = ${locale}
@@ -245,7 +247,7 @@ export async function getAllRaces(locale: string = "en"): Promise<RaceCardData[]
             r.distance_meters, r.elevation_gain, r.elevation_loss, 
             COALESCE(t.city, r.city) as city, 
             COALESCE(t.country, r.country) as country,
-            r.tier, r.card_image_url, r.minimap_url, r.elevation_bars, r.total_images, 
+            r.tier, r.card_image_url, r.minimap_url, r.official_url, r.elevation_bars, r.total_images, 
             COALESCE(r.is_testing, FALSE) as is_testing
           FROM races r
           LEFT JOIN race_translations t ON r.id = t.race_id AND t.locale = ${locale}
