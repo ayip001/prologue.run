@@ -29,7 +29,7 @@ class DetectionSource(Enum):
 
     FACE_YOLO_NANO = "face_yolo_n"
     FACE_YOLO_MEDIUM = "face_yolo_m"
-    BODY_POSE_HEAD = "body_pose_head"
+    FACE_PATCH = "face_patch"
     LICENSE_PLATE = "plate"
     VEHICLE = "vehicle"
     EDGE_WRAPPED = "edge_wrapped"
@@ -415,7 +415,6 @@ class PrivacyBlurEnsemble:
         self.conf_threshold = conf_threshold
         self._models_loaded = False
         self.face_detector = None
-        self.pose_detector = None
         self.plate_detector = None
 
         if mode == "full" and models_dir:
@@ -439,14 +438,6 @@ class PrivacyBlurEnsemble:
             else:
                 console.print(f"  [yellow]Warning: Face model not found[/]")
 
-            # Check for pose model
-            pose_path = self.models_dir / "yolov8n-pose.pt"
-            if pose_path.exists():
-                self.pose_detector = YOLO(str(pose_path))
-                console.print(f"  [green]Loaded pose model:[/] {pose_path.name}")
-            else:
-                console.print(f"  [yellow]Warning: Pose model not found[/]")
-
             # Check for plate model
             plate_path = self.models_dir / "yolov8n-plate.pt"
             if plate_path.exists():
@@ -466,7 +457,6 @@ class PrivacyBlurEnsemble:
 
             self._models_loaded = (
                 self.face_detector is not None 
-                or self.pose_detector is not None 
                 or self.plate_detector is not None
             )
 
@@ -510,71 +500,7 @@ class PrivacyBlurEnsemble:
                         )
                     )
 
-        # 2. Pose Detection (to find heads when faces aren't visible)
-        if self.pose_detector:
-            results = self.pose_detector(image, conf=self.conf_threshold, verbose=False)
-            for r in results:
-                if not r.keypoints or r.keypoints.data.shape[0] == 0:
-                    continue
-                
-                # keypoints are [N, 17, 3] or [17, 3]
-                kps = r.keypoints.data[0].cpu().numpy()
-                
-                # COCO Keypoints: 5=l-shoulder, 6=r-shoulder
-                l_sh = kps[5]
-                r_sh = kps[6]
-                
-                # Check if shoulders are visible (conf > 0.5)
-                if l_sh[2] > 0.5 and r_sh[2] > 0.5:
-                    # Calculate shoulder midpoint and width
-                    mid_x = (l_sh[0] + r_sh[0]) / 2
-                    mid_y = (l_sh[1] + r_sh[1]) / 2
-                    sh_width = np.sqrt((l_sh[0] - r_sh[0])**2 + (l_sh[1] - r_sh[1])**2)
-                    
-                    # Estimate head: 
-                    # 1. Center is above the shoulder midpoint
-                    # 2. Head height/width is proportional to shoulder width
-                    head_size = sh_width * 0.8  # Head is roughly 80% of shoulder width
-                    head_y_offset = sh_width * 0.5  # Shift up by 50% of shoulder width
-                    
-                    all_regions.append(
-                        BlurRegion(
-                            x=int(mid_x),
-                            y=int(mid_y - head_y_offset),
-                            width=int(head_size),
-                            height=int(head_size * 1.2),
-                            confidence=float((l_sh[2] + r_sh[2]) / 2),
-                            source=DetectionSource.BODY_POSE_HEAD,
-                        )
-                    )
-                
-                # Fallback: if shoulders aren't visible, try facial features (0-4)
-                else:
-                    head_points = kps[:5]
-                    visible = head_points[head_points[:, 2] > 0.5]
-                    if len(visible) > 0:
-                        # Create a box around visible head points
-                        min_x, min_y = np.min(visible[:, :2], axis=0)
-                        max_x, max_y = np.max(visible[:, :2], axis=0)
-                        
-                        # Expand the box slightly
-                        w = max_x - min_x
-                        h = max_y - min_y
-                        w = max(w, 20)  # Min size
-                        h = max(h, 20)
-                        
-                        all_regions.append(
-                            BlurRegion(
-                                x=int((min_x + max_x) / 2),
-                                y=int((min_y + max_y) / 2),
-                                width=int(w * 1.5),
-                                height=int(h * 1.5),
-                                confidence=float(np.mean(visible[:, 2])),
-                                source=DetectionSource.BODY_POSE_HEAD,
-                            )
-                        )
-
-        # 3. Two-Stage Plate Detection (Vehicle -> Plate)
+        # 2. Two-Stage Plate Detection (Vehicle -> Plate)
         if self.vehicle_detector and self.plate_detector:
             # Detect vehicles first (COCO: 2=car, 3=motorcycle, 5=bus, 7=truck)
             v_results = self.vehicle_detector(image, conf=0.3, classes=[2, 3, 5, 7], verbose=False)
@@ -629,26 +555,94 @@ class PrivacyBlurEnsemble:
                                     )
                                 )
 
-        # 4. Fallback: Standalone Plate Detection
-        # (Only if no plates were found via vehicles, or just to be safe)
-        if self.plate_detector:
-            p_results = self.plate_detector(image, conf=self.conf_threshold, verbose=False)
-            for p_r in p_results:
-                for p_box in p_r.boxes:
-                    x1, y1, x2, y2 = p_box.xyxy[0].cpu().numpy()
-                    conf = float(p_box.conf[0])
-                    all_regions.append(
+        return all_regions
+
+    def _run_patch_detection(
+        self,
+        image: np.ndarray,
+    ) -> list[BlurRegion]:
+        """
+        Run face detection on overlapping patches within the horizon strip.
+
+        Targets the region between 25% and 55% from the bottom of the image.
+        """
+        if not self.face_detector:
+            return []
+
+        height, width = image.shape[:2]
+
+        # Calculate strip coordinates (25% to 55% from bottom)
+        # 25% from bottom = 75% from top
+        # 55% from bottom = 45% from top
+        y1 = int(height * 0.45)
+        y2 = int(height * 0.75)
+        strip_h = y2 - y1
+
+        if strip_h <= 0:
+            return []
+
+        # Square box size equals strip height
+        box_size = strip_h
+        overlap = int(box_size * 0.1)
+        step = box_size - overlap
+
+        patch_regions: list[BlurRegion] = []
+
+        x = 0
+        while x < width:
+            # Determine if we need to wrap around the seam
+            is_wrap_around = x + box_size > width
+
+            if not is_wrap_around:
+                patch = image[y1:y2, x : x + box_size]
+            else:
+                # Construct wrap-around patch
+                left_part = image[y1:y2, x : width]
+                right_part = image[y1:y2, 0 : box_size - (width - x)]
+                patch = np.concatenate([left_part, right_part], axis=1)
+
+            # Run detection on patch
+            results = self.face_detector(patch, conf=self.conf_threshold, verbose=False)
+
+            for r in results:
+                for box in r.boxes:
+                    bx1, by1, bx2, by2 = box.xyxy[0].cpu().numpy()
+
+                    # Calculate center relative to patch
+                    p_cx = (bx1 + bx2) / 2
+                    p_cy = (by1 + by2) / 2
+                    p_w = bx2 - bx1
+                    p_h = by2 - by1
+
+                    # Translate to original coordinates
+                    orig_x = (x + p_cx) % width
+                    orig_y = y1 + p_cy
+
+                    # Check if this specific detection spans the seam in a wrap-around patch
+                    spans_edge = False
+                    if is_wrap_around:
+                        split_x = width - x
+                        if bx1 < split_x and bx2 > split_x:
+                            spans_edge = True
+
+                    patch_regions.append(
                         BlurRegion(
-                            x=int((x1 + x2) / 2),
-                            y=int((y1 + y2) / 2),
-                            width=int(x2 - x1),
-                            height=int(y2 - y1),
-                            confidence=conf,
-                            source=DetectionSource.LICENSE_PLATE,
+                            x=int(orig_x),
+                            y=int(orig_y),
+                            width=int(p_w),
+                            height=int(p_h),
+                            confidence=float(box.conf[0]),
+                            source=DetectionSource.FACE_PATCH,
+                            spans_edge=spans_edge
                         )
                     )
 
-        return all_regions
+            if is_wrap_around:
+                break # Finished last (wrapped) patch
+
+            x += step
+
+        return patch_regions
 
     def detect_all(
         self,
@@ -657,8 +651,10 @@ class PrivacyBlurEnsemble:
         """
         Run all detectors and return merged blur regions.
 
-        For equirectangular images, runs detection on both the original
-        and an edge-padded version to catch faces spanning the seam.
+        For equirectangular images, runs detection on:
+        1. Original image
+        2. Edge-padded version (for seam split faces)
+        3. Horizon strip patches (undistorted local squares)
 
         Args:
             image: OpenCV image (BGR format)
@@ -679,11 +675,11 @@ class PrivacyBlurEnsemble:
         all_regions: list[BlurRegion] = []
         height, width = image.shape[:2]
 
-        # Run detection on original image
+        # 1. Run detection on original image
         original_regions = self._run_detection(image)
         all_regions.extend(original_regions)
 
-        # Run edge-aware detection
+        # 2. Run edge-aware detection
         if self.edge_aware:
             # Create edge-padded image
             padded_image, pad_width = create_edge_padded_image(image)
@@ -706,7 +702,11 @@ class PrivacyBlurEnsemble:
                 translated = translate_edge_detections(edge_regions, width, pad_width)
                 all_regions.extend(translated)
 
-        # Merge overlapping regions
+        # 3. Run patch-based detection on horizon strip
+        patch_regions = self._run_patch_detection(image)
+        all_regions.extend(patch_regions)
+
+        # Merge all overlapping regions
         merged = self._merge_overlapping(all_regions)
 
         return merged

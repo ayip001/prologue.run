@@ -468,8 +468,8 @@ def process_gpx(
 
 def save_processed_gpx(data: dict, output_path: Path) -> None:
     """Save processed GPX data to JSON file."""
-    with open(output_path, "w") as f:
-        json.dump(data, f, indent=2)
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
     console.print(f"\n[green]Saved processed GPX to:[/] {output_path}")
 
 

@@ -72,9 +72,13 @@ def get_connection():
             for k, v in query_params.items():
                 params[k] = v[0]
 
-        return psycopg2.connect(**params)
+        conn = psycopg2.connect(**params)
+        conn.set_client_encoding("UTF8")
+        return conn
 
-    return psycopg2.connect(conn_str)
+    conn = psycopg2.connect(conn_str)
+    conn.set_client_encoding("UTF8")
+    return conn
 
 
 def init_schema(schema_path: Optional[Path] = None) -> bool:
@@ -128,7 +132,7 @@ def load_race_config(config_path: Path) -> dict:
     Returns:
         Dict with race configuration
     """
-    with open(config_path) as f:
+    with open(config_path, encoding="utf-8") as f:
         if config_path.suffix in (".yaml", ".yml"):
             return yaml.safe_load(f)
         else:
@@ -193,7 +197,7 @@ def insert_race(config: dict, update_if_exists: bool = False) -> Optional[str]:
             "slug", "name", "description", "flag_emoji", "recorded_year",
             "recorded_by", "distance_meters", "race_date", "city", "country",
             "elevation_gain", "elevation_loss", "elevation_bars", "minimap_url",
-            "card_image_url", "tier", "total_images", "capture_date", "capture_device",
+            "card_image_url", "official_url", "tier", "total_images", "capture_date", "capture_device",
             "status", "is_testing", "storage_bucket", "storage_prefix"
         ]
 
@@ -245,7 +249,7 @@ def _update_race(cur, conn, race_id: str, config: dict) -> Optional[str]:
         "name", "description", "flag_emoji", "recorded_year", "recorded_by",
         "distance_meters", "race_date", "city", "country", "elevation_gain",
         "elevation_loss", "elevation_bars", "minimap_url", "card_image_url",
-        "tier", "total_images", "capture_date", "capture_device", "status",
+        "official_url", "tier", "total_images", "capture_date", "capture_device", "status",
         "is_testing", "storage_bucket", "storage_prefix"
     ]
 

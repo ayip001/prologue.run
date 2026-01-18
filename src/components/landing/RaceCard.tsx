@@ -22,6 +22,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
   const pathRef = useRef<HTMLDivElement>(null);
   const rotationRef = useRef({ angle: 0, animationId: null as number | null, isHovering: false });
   const t = useTranslations("raceCard");
+  const tDistances = useTranslations("distances");
 
   useEffect(() => {
     const card = cardRef.current;
@@ -144,7 +145,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
 
         {/* Tier Badge */}
         {race.tier && (
-          <GoldBadge tier={race.tier} className="absolute top-3 right-3" />
+          <GoldBadge tier={race.tier} className="absolute top-0 right-0" />
         )}
       </div>
 
@@ -161,9 +162,11 @@ export function RaceCard({ race, className }: RaceCardProps) {
                 {race.name}
               </h3>
             </div>
-            {race.city && race.country && (
+            {(race.city || race.country) && (
               <p className="text-sm dark:text-slate-400 light:text-slate-600">
-                {race.city}, {race.country}
+                {race.city}
+                {race.city && race.country && ", "}
+                {race.country}
               </p>
             )}
           </div>
@@ -173,7 +176,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
         <div className="flex items-center gap-4 mb-4 text-sm dark:text-slate-400 light:text-slate-600">
           <div className="flex items-center gap-1.5">
             <Route className="h-4 w-4" />
-            <span>{formatRaceDistance(race.distanceMeters)}</span>
+            <span>{formatRaceDistance(race.distanceMeters, tDistances)}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <Mountain className="h-4 w-4" />

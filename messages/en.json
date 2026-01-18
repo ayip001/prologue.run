@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "title": "prologue.run - Scout Your Next Race",
-    "description": "Preview marathon routes through interactive 360° street-level imagery. Know exactly what to expect before race day.",
+    "title": "Prologue.run - Street View for Runners",
+    "description": "Immerse yourself in the virtual marathon course before race day. Master the elevation, anticipate the turns, and build race-day confidence with interactive 360° imagery.",
     "keywords": "marathon, running, 360 view, street view, race preview, route viewer"
   },
   "navbar": {
@@ -11,138 +11,133 @@
     "language": "Language"
   },
   "hero": {
-    "title": "Scout Your ",
-    "titleHighlight": "Next Race",
-    "description": "Preview marathon routes through interactive 360° street-level imagery. Know exactly what to expect before race day.",
-    "browseMoreRaces": "Browse More Races",
+    "title": "Street View ",
+    "titleHighlight": "for Runners",
+    "description": "Immerse yourself in the virtual marathon course before race day. Master the elevation, anticipate the turns, and build race-day confidence with interactive 360° imagery.",
+    "browseMoreRaces": "Explore Races",
     "comingSoon": "Coming Soon!",
-    "learnMore": "Learn More"
+    "learnMore": "Why Use Prologue?"
+  },
+  "distances": {
+    "marathon": "Marathon",
+    "halfMarathon": "Half Marathon",
+    "10k": "10K",
+    "5k": "5K"
+  },
+  "tiers": {
+    "gold": "World Athletics Gold Label",
+    "silver": "World Athletics Silver Label",
+    "bronze": "World Athletics Bronze Label"
   },
   "features": {
-    "title": "Why Prologue?",
-    "subtitle": "Know the course before you run it. Mental preparation is half the battle.",
+    "title": "The Runner's Edge",
+    "subtitle": "Eliminate the unknown. Master the course before race day.",
     "streetView": {
-      "title": "360° Street View",
-      "description": "Never ran this marathon before? Immerse yourself in the race route from the runner's perspective."
+      "title": "Runner’s Eye View",
+      "description": "Experience the course from a first-person perspective. See what the runner sees, not just a line on a map."
     },
     "fullRoute": {
-      "title": "Full Route Coverage",
-      "description": "Every kilometer covered, from start to finish. Never take a wrong turn. No surprises on race day."
+      "title": "Every Kilometer Covered",
+      "description": "From the starting gun to the finish line. Visualize the entire journey and own the route."
     },
     "raceDetails": {
-      "title": "Race Details",
-      "description": "Prepare yourself for the race with detailed elevation profiles and distance markers."
+      "title": "Master the Terrain",
+      "description": "Sync the street view with elevation data. Know exactly where the hills are so you can plan your pacing strategy."
     },
-    "fastSmooth": {
-      "title": "Fast & Smooth",
-      "description": "Optimized loading with progressive image quality for a seamless viewing experience."
+    "poi": {
+      "title": "Aid & Amenities",
+      "description": "Pinpoint every water station, fuel stop, and restroom. Plan your nutrition strategy with precision. (Coming Soon)"
     }
   },
   "story": {
     "title": "About Prologue.run",
-    "paragraph1": "Hi, I'm Angus, an avid runner and developer.",
-    "paragraph2": "Like many other runners, I enjoy running marathons outside of my hometown, and I sometimes just wish to see the route before running it (like reading the prologue for a book!). Then I noticed my 360 camera that's been gathering dust, and that's how this idea came to be.",
-    "paragraph3": "Prologue.run allows you to preview the route of a race before you run it, like using Google Maps' Street View feature. Right now, the selection of races is limited to races that I have run, but I plan to add more races in the future as I complete more races. If you have a race that you would like to see on Prologue.run, or if you want to help log a race, please let me know by emailing me at"
+    "paragraph1": "Hi, I'm Angus, a developer who loves running.",
+    "paragraph2": "Like many of you, I love traveling for marathons. But I often wished I could see the course before race day—just like reading the prologue of a book. One day, I looked at the 360° camera gathering dust on my shelf, and the idea clicked.",
+    "paragraph3": "Prologue.run is essentially Street View for marathons. Currently, the library is limited to courses I've personally run, but I plan to expand it as I cross more finish lines. If there's a specific race you'd like to see, or if you want to contribute by logging a route yourself, hit me up at:"
   },
   "methodology": {
-    "title": "How it Works",
-    "subtitle": "From the first kilometer to the final upload, here is how we bring the race to your screen.",
+    "title": "The Tech Stack",
+    "subtitle": "From raw capture to the final pixel, here's how we build the simulation.",
     "capture": {
       "title": "Capture",
-      "step1": "Carry a 360 camera to a race",
-      "step2": "Set interval photo mode on a 10s timer",
-      "step3": "Run the entire track from start to finish"
+      "step1": "On-course capture with 360° hardware",
+      "step2": "High-frequency time-lapse at ~10s intervals",
+      "step3": "Complete coverage from start to finish"
     },
     "processing": {
       "title": "Processing",
-      "step1": "Gyro-stabilize to keep the view facing forward",
-      "step2": "AI-driven face and plate blurring for privacy",
-      "step3": "Generate equirectangular tiles and sync to DB",
-      "step4": "Map GPX coordinates to the image sequence",
-      "step5": "New route is published and ready to scout"
+      "step1": "Gyro-based stabilization to lock forward view",
+      "step2": "AI-driven privacy blurring (faces & plates)",
+      "step3": "Generating equirectangular tiles for WebGL",
+      "step4": "Mapping GPX coordinates to image frames",
+      "step5": "Route deployed and ready to scout"
     }
   },
-  "faq": {
+"faq": {
     "title": "Frequently Asked Questions",
-    "subtitle": "Got questions? We've got answers.",
+    "subtitle": "Questions about the platform, privacy, and looking silly.",
     "items": {
       "fewEntries": {
-        "q": "Why are there so few entries?",
-        "a": "This project started when I decided to run the Hong Kong Marathon in 2026, so I'll need some time to collect more races. I really do hope this project will make preparing for certain races easier."
+        "q": "Why is the race library limited?",
+        "a": "I'm building this catalog one race at a time, starting with my own journey to the 2026 HK Marathon. The library will grow as I (and the community) run more races."
       },
       "lookRidiculous": {
-        "q": "Do you feel stupid for looking absolutely ridiculous at a race?",
-        "a": "No, but thanks for asking."
+        "q": "Do you feel ridiculous running with that camera?",
+        "a": "Absolutely. But hey, someone has to sacrifice their coolness so you can scout the course. You're welcome."
       },
       "lowQuality": {
-        "q": "Why are some photos so low quality?",
-        "a": "Because my 360 camera (the Insta360 X4 at the moment) is not very good in low-light conditions."
+        "q": "Why the image quality varies?",
+        "a": "It depends heavily on the camera hardware and lighting conditions. Until I can run a marathon carrying a cinema rig, we're doing our best with consumer 360° cams."
       },
       "jankyControls": {
-        "q": "Why is the route viewer camera control so janky?",
-        "a": "Although I want to make it as nice as Google Maps Street View, I'm unfortunately not a billion-dollar corporation. This is just a part-time passion project."
+        "q": "Why isn't the viewer as smooth as Google Maps?",
+        "a": "Google has thousands of engineers; Prologue has one. I built a custom rendering engine to make this possible on the web. It's constantly improving, so thanks for your patience."
       },
-      "faceNotBlurred": {
-        "q": "Why isn't my face blurred?",
-        "a": "The image detection model isn't perfect and will make mistakes. If you feel bothered, please go to the privacy policy page and take a look at how to send a content removal request."
-      },
-      "blurFace": {
-        "q": "Can you blur my face/license plate?",
-        "a": "Sure, go to the privacy policy page and take a look at how to send a content removal request."
-      },
-      "blurBib": {
-        "q": "Can you blur my bib?",
-        "a": "No—not that I don't want to, but I haven't found a good enough YOLO model that does that reliably."
-      },
-      "unblurFace": {
-        "q": "Can you unblur my face?",
-        "a": "No."
-      },
-      "recordRace": {
-        "q": "Can you record this race or that race?",
-        "a": "Feel free to suggest some races you'd like to see. I'm planning to sign up for majors, so let's see how my luck holds up. If you are an organizer, feel free to reach out and send me an entry—if my schedule allows, I'd be more than happy to oblige. For longer races (>50km) like HK100, Translantau, or even Four Trails, I'll need additional support or will have to record them in multiple sessions."
+      "privacy": {
+        "q": "How do you handle privacy (faces/plates)?",
+        "a": "We use AI to automatically blur faces and license plates. If we missed something, let us know. If you want us to *unblur* your face... sorry, the answer is no."
       },
       "helpRecord": {
-        "q": "Can I help record a race for you?",
-        "a": "Yes, it would be much appreciated! Though you'll also need to bring your own equipment (if you're in Hong Kong, I can lend you my selfie stick/helmet and the 360 camera), have enough batteries to last the whole race, be able to finish the race, face the direction you're running during the race, be able to export your GPX file from your watch, and have the patience to deal with me. I'll run you through the process if you really want to help."
+        "q": "Can I contribute a race route?",
+        "a": "Yes! If you have a 360° camera and can record a full race, I'd love to host your route. Reach out, and I'll guide you through the process."
       },
       "getAnything": {
-        "q": "Do I get anything if I help you record a race?",
-        "a": "You'll get a sense of pride and accomplishment. I'll also put your name or @ on the race card that you record."
+        "q": "Do I get paid for recording a race?",
+        "a": "No cash, but you will unlock a massive 'sense of pride and accomplishment'. Plus, you'll get full credit on the race card forever."
       },
       "sponsorships": {
-        "q": "Will you take sponsorships?",
-        "a": "Sure, I'm open to it."
+        "q": "Do you accept sponsorships?",
+        "a": "Sure, I'm open to it. Let's talk."
       },
       "addFeature": {
-        "q": "Can you add this feature?",
-        "a": "It depends. Feel free to go to GitHub and leave a feature request on the discussions tab. Or better yet, ask your favorite AI agent to build it out and submit a PR."
+        "q": "Can you add a specific feature?",
+        "a": "Maybe! Feel free to open a discussion on GitHub. Or better yet, ask your favorite AI agent to build it and submit a PR."
       },
       "howItWorks": {
-        "q": "How does the 360 panoramic photo viewer work?",
-        "a": "It takes an equirectangular image (2:1 aspect ratio) and projects it as a texture onto a sphere in WebGL. Yes, I had to bring my own panoramic viewer because none of the existing libraries were suitable—or I was too junior to make them work. Either way, this should be usable enough for the average athlete to preview a race route."
+        "q": "How does the viewer work?",
+        "a": "It projects equirectangular images onto a WebGL sphere. I had to build a custom viewer because existing libraries didn't fit my needs. It's homegrown code, but it gets the job done."
       },
       "isFree": {
-        "q": "Is this free?",
-        "a": "Yes. Why are you still here? Go click on a race and take a look already!"
+        "q": "Is Prologue free?",
+        "a": "Yes, 100%. If it helps you get a PB, that's payment enough."
       }
     }
   },
   "contact": {
-    "title": "Get in Touch",
-    "description": "Contact me if you want to help log a race, want your race logged, or to report an issue.",
+    "title": "Let's Connect",
+    "description": "Whether you're looking to contribute a route, request a new race, or spot a bug, I'm all ears.",
     "emailMe": "Email Me",
-    "reportIssue": "Report an Issue on GitHub"
+    "reportIssue": "Open an Issue"
   },
   "footer": {
-    "tagline": "Preview marathon routes through interactive 360° street-level imagery. Scout your next race from anywhere in the world.",
+    "tagline": "Immerse yourself in the virtual marathon course before race day. Master the elevation, anticipate the turns, and build race-day confidence with interactive 360° imagery.",
     "links": "Links",
     "browseRaces": "Browse Races",
     "features": "Features",
     "termsOfService": "Terms of Service",
     "privacyPolicy": "Privacy Policy",
     "contact": "Contact",
-    "copyright": "© {year} prologue.run. All rights reserved.",
+    "copyright": "© {year} Prologue.run. All rights reserved.",
     "madeWith": "Made with",
     "forRunners": "for runners",
     "buyMeCoffee": "Buy me a coffee"
@@ -161,14 +156,14 @@
     "loading": "Loading viewer..."
   },
   "racePage": {
-    "notFoundTitle": "Race Not Found - prologue.run",
+    "notFoundTitle": "Race Not Found - Prologue.run",
     "metaDescription": "Preview the {raceName} route through interactive 360° street-level imagery."
   },
   "privacy": {
     "title": "Privacy Policy",
     "section1": {
       "title": "1. Information We Collect",
-      "paragraph1": "prologue.run does not require a login, and we do not provide a way for users to upload data. We do not collect personal information such as names, email addresses, or phone numbers unless you contact us directly.",
+      "paragraph1": "Prologue.run does not require a login, and we do not provide a way for users to upload data. We do not collect personal information such as names, email addresses, or phone numbers unless you contact us directly.",
       "paragraph2": "We use standard web analytics to understand how our site is used. This data is anonymous and helps us improve the user experience."
     },
     "section2": {
@@ -177,7 +172,7 @@
     },
     "section3": {
       "title": "3. Content Removal Requests",
-      "paragraph1": "If you appear in a photo or 360° view on prologue.run and wish to be removed, please contact us at",
+      "paragraph1": "If you appear in a photo or 360° view on Prologue.run and wish to be removed, please contact us at",
       "requirements": "To process your request, you must:",
       "requirement1": "Include the exact link to the view where you are visible.",
       "requirement2": "Submit proof that you are the person in the imagery.",
@@ -200,15 +195,15 @@
     "title": "Terms of Service",
     "section1": {
       "title": "1. Acceptance of Terms",
-      "paragraph1": "By accessing and using prologue.run, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our service."
+      "paragraph1": "By accessing and using Prologue.run, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our service."
     },
     "section2": {
       "title": "2. Description of Service",
-      "paragraph1": "prologue.run provides interactive 360° street-level imagery of race routes for preview purposes. The service is provided \"as is\" and \"as available\". We do not require user accounts, and there is no facility for users to upload content."
+      "paragraph1": "Prologue.run provides interactive 360° street-level imagery of race routes for preview purposes. The service is provided \"as is\" and \"as available\". We do not require user accounts, and there is no facility for users to upload content."
     },
     "section3": {
       "title": "3. Use of Content",
-      "paragraph1": "All imagery and data provided on prologue.run are for personal, non-commercial use only. You may not scrape, download, or redistribute the content without explicit permission."
+      "paragraph1": "All imagery and data provided on Prologue.run are for personal, non-commercial use only. You may not scrape, download, or redistribute the content without explicit permission."
     },
     "section4": {
       "title": "4. Privacy and Data",
@@ -216,7 +211,7 @@
     },
     "section5": {
       "title": "5. Limitation of Liability",
-      "paragraph1": "prologue.run is not responsible for any inaccuracies in the imagery or route data. Users should rely on official race information for accurate course details. We are not liable for any damages arising from the use of this service."
+      "paragraph1": "Prologue.run is not responsible for any inaccuracies in the imagery or route data. Users should rely on official race information for accurate course details. We are not liable for any damages arising from the use of this service."
     },
     "section6": {
       "title": "6. Changes to Terms",

@@ -12,8 +12,12 @@ import { getAllRaces } from "@/lib/db";
 import type { RaceCardData } from "@/types";
 import type { Locale } from "@/i18n/config";
 import { locales, defaultLocale } from "@/i18n/config";
+import { ENABLE_CACHING, CACHE_REVALIDATE_SECONDS } from "@/lib/constants";
 
-export const dynamic = "force-dynamic";
+// When caching is enabled, use ISR with revalidation
+// When disabled (during development/uploads), force dynamic rendering
+export const dynamic = ENABLE_CACHING ? "auto" : "force-dynamic";
+export const revalidate = ENABLE_CACHING ? CACHE_REVALIDATE_SECONDS : 0;
 
 interface PageProps {
   params: Promise<{ locale: string }>;
@@ -69,7 +73,7 @@ export default async function HomePage({ params }: PageProps) {
   // Fetch races from database
   let races: RaceCardData[];
   try {
-    races = await getAllRaces();
+    races = await getAllRaces(locale);
   } catch (error) {
     console.error("HOMEPAGE FETCH ERROR:", error);
     races = [];

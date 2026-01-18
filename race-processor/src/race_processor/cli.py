@@ -994,7 +994,7 @@ def db_insert_images(slug_or_id: str, records_path: Path) -> None:
         console.print(f"[red]Race not found:[/] {slug_or_id}")
         raise SystemExit(1)
 
-    with open(records_path) as f:
+    with open(records_path, encoding="utf-8") as f:
         records = json.load(f)
 
     success = insert_images(race["id"], records)
@@ -1097,7 +1097,7 @@ def db_update(slug_or_id: str, config_path: Path) -> None:
         "name", "description", "flag_emoji", "recorded_year", "recorded_by",
         "distance_meters", "race_date", "city", "country", "elevation_gain",
         "elevation_loss", "elevation_bars", "minimap_url", "card_image_url",
-        "tier", "total_images", "capture_date", "capture_device", "status",
+        "official_url", "tier", "total_images", "capture_date", "capture_device", "status",
         "is_testing", "storage_bucket", "storage_prefix"
     ]
 

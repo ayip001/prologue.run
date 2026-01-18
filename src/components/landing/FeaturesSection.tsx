@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Camera, Eye, Map, Zap } from "lucide-react";
+import { Camera, Eye, Map, MapPin } from "lucide-react";
 import { GlassPanel } from "@/components/shared/GlassPanel";
 
 export function FeaturesSection() {
@@ -24,9 +24,9 @@ export function FeaturesSection() {
       descriptionKey: "raceDetails.description" as const,
     },
     {
-      icon: Zap,
-      titleKey: "fastSmooth.title" as const,
-      descriptionKey: "fastSmooth.description" as const,
+      icon: MapPin,
+      titleKey: "poi.title" as const,
+      descriptionKey: "poi.description" as const,
     },
   ];
 

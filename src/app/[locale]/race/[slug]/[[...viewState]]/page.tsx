@@ -13,6 +13,8 @@ import { parseViewState } from "@/lib/viewState";
 import { RaceViewer } from "@/components/viewer/RaceViewer";
 import {
   ENABLE_TESTING_CARDS,
+  ENABLE_CACHING,
+  CACHE_REVALIDATE_SECONDS,
   TEST_CARD_DATA,
   TEST_VIEWER_IMAGE_URL,
   DEFAULT_VIEW,
@@ -20,7 +22,10 @@ import {
 import { defaultLocale, locales } from "@/i18n/config";
 import type { Race } from "@/types";
 
-export const dynamic = "force-dynamic";
+// When caching is enabled, use ISR with revalidation
+// When disabled (during development/uploads), force dynamic rendering
+export const dynamic = ENABLE_CACHING ? "auto" : "force-dynamic";
+export const revalidate = ENABLE_CACHING ? CACHE_REVALIDATE_SECONDS : 0;
 
 // Mock data for test route
 const TEST_RACE: Race = {
@@ -84,14 +89,23 @@ function ViewerSkeleton() {
 }
 
 export default async function RaceViewerPage({ params }: PageProps) {
-  const { locale, slug, viewState: viewStateSegments } = await params;
+  const resolvedParams = await params;
+  const { locale, slug, viewState: viewStateSegments } = resolvedParams;
+
+  // Debug: log params to understand URL parsing
+  console.log("[RaceViewerPage] params:", JSON.stringify(resolvedParams));
 
   // Enable static rendering
   setRequestLocale(locale);
 
+  // Reconstruct view state string - join all segments in case commas split them
+  // This handles both: ["@75,320.8h,18.3p"] and ["@75", "320.8h", "18.3p"]
+  const viewStateStr = viewStateSegments?.length
+    ? viewStateSegments.join(",")
+    : "@0";
+
   // Handle test route
   if (slug === "card-preview" && ENABLE_TESTING_CARDS) {
-    const viewStateStr = viewStateSegments?.[0] || "@0";
     const parsedViewState = parseViewState(viewStateStr);
 
     return (
@@ -114,7 +128,7 @@ export default async function RaceViewerPage({ params }: PageProps) {
   // Fetch race data
   let race;
   try {
-    race = await getRaceBySlug(slug);
+    race = await getRaceBySlug(slug, locale);
   } catch {
     race = null;
   }
@@ -123,28 +137,25 @@ export default async function RaceViewerPage({ params }: PageProps) {
     notFound();
   }
 
-  // Get translation for the race if available
-  const translation = await getRaceTranslation(race.id, locale);
-  const translatedRace = translation
-    ? {
-        ...race,
-        name: translation.name || race.name,
-        description: translation.description || race.description,
-        city: translation.city || race.city,
-        country: translation.country || race.country,
-      }
-    : race;
-
-  // Parse view state from URL
-  const viewStateStr = viewStateSegments?.[0] || "@0";
+  // Parse view state from URL (viewStateStr already constructed above)
   const parsedViewState = parseViewState(viewStateStr);
 
-  // Fetch related data in parallel
-  const [images, waypoints, elevationPoints] = await Promise.all([
-    getImageMetadataByRaceId(race.id),
-    getWaypointsByRaceId(race.id),
-    getElevationPointsByRaceId(race.id),
-  ]);
+  // Fetch related data in parallel with error handling
+  let images, waypoints, elevationPoints;
+  try {
+    [images, waypoints, elevationPoints] = await Promise.all([
+      getImageMetadataByRaceId(race.id),
+      getWaypointsByRaceId(race.id),
+      getElevationPointsByRaceId(race.id),
+    ]);
+  } catch (error) {
+    console.error("Error fetching race data:", error);
+    notFound();
+  }
+
+  // Clamp initial position to valid range to prevent out-of-bounds access
+  const maxPosition = Math.max(0, images.length - 1);
+  const clampedPosition = Math.min(parsedViewState?.position ?? 0, maxPosition);
 
   // Build elevation profile
   const elevationProfile =
@@ -163,7 +174,7 @@ export default async function RaceViewerPage({ params }: PageProps) {
   return (
     <Suspense fallback={<ViewerSkeleton />}>
       <RaceViewer
-        race={translatedRace}
+        race={race}
         images={images}
         waypoints={waypoints.map((w) => ({
           name: w.name,
@@ -171,7 +182,7 @@ export default async function RaceViewerPage({ params }: PageProps) {
           endDistanceMeters: w.endDistanceMeters,
         }))}
         elevationProfile={elevationProfile}
-        initialPosition={parsedViewState?.position ?? 0}
+        initialPosition={clampedPosition}
         initialHeading={parsedViewState?.heading ?? DEFAULT_VIEW.heading}
         initialPitch={parsedViewState?.pitch ?? DEFAULT_VIEW.pitch}
         initialFov={parsedViewState?.fov ?? DEFAULT_VIEW.fov}
@@ -181,7 +192,12 @@ export default async function RaceViewerPage({ params }: PageProps) {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { locale, slug } = await params;
+  const resolvedParams = await params;
+  const { locale, slug } = resolvedParams;
+
+  // Debug: log params
+  console.log("[generateMetadata] params:", JSON.stringify(resolvedParams));
+
   const t = await getTranslations({ locale, namespace: "racePage" });
 
   const baseUrl = "https://prologue.run";
@@ -204,7 +220,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   let race;
   try {
-    race = await getRaceBySlug(slug);
+    race = await getRaceBySlug(slug, locale);
   } catch {
     race = null;
   }
@@ -215,9 +231,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     };
   }
 
-  // Get translated race name if available
-  const translation = await getRaceTranslation(race.id, locale);
-  const raceName = translation?.name || race.name;
+  const raceName = race.name;
 
   const canonicalUrl =
     locale === defaultLocale ? `${baseUrl}${path}` : `${baseUrl}/${locale}${path}`;
