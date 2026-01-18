@@ -1145,7 +1145,13 @@ def db_update(slug_or_id: str, config_path: Path) -> None:
     "gpx_path",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
 )
-def db_update_gpx(slug_or_id: str, gpx_path: Path) -> None:
+@click.option(
+    "--smoothing",
+    type=float,
+    default=1.0,
+    help="Elevation smoothing threshold in meters (default: 1.0). Higher values filter more noise.",
+)
+def db_update_gpx(slug_or_id: str, gpx_path: Path, smoothing: float) -> None:
     """Update race distance and elevation stats from GPX file.
 
     Extracts the following from the GPX track:
@@ -1158,7 +1164,7 @@ def db_update_gpx(slug_or_id: str, gpx_path: Path) -> None:
     \b
     Examples:
       race-processor db update-gpx test-route-01 ./track.gpx
-      race-processor db update-gpx f5df5237-7b9b-4ab1-90ce-e5d3b00e9acc ./route.gpx
+      race-processor db update-gpx test-route-01 ./track.gpx --smoothing 3.0
     """
     from .utils.db import get_race, update_race_gpx_stats
     from .utils.gpx_process import extract_gpx_race_stats
@@ -1170,9 +1176,10 @@ def db_update_gpx(slug_or_id: str, gpx_path: Path) -> None:
 
     console.print(f"[bold]Updating race from GPX:[/] {race['slug']}")
     console.print(f"  GPX file: {gpx_path}")
+    console.print(f"  Smoothing threshold: {smoothing} m")
 
     # Extract stats from GPX
-    stats = extract_gpx_race_stats(gpx_path)
+    stats = extract_gpx_race_stats(gpx_path, elevation_threshold=smoothing)
     if not stats:
         console.print("[red]Failed to extract stats from GPX file[/]")
         raise SystemExit(1)
@@ -1197,6 +1204,49 @@ def db_update_gpx(slug_or_id: str, gpx_path: Path) -> None:
 
     if not success:
         raise SystemExit(1)
+
+
+@main.command("gpx-stats")
+@click.argument(
+    "gpx_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--smoothing",
+    type=float,
+    default=1.0,
+    help="Elevation smoothing threshold in meters (default: 1.0). Higher values filter more noise.",
+)
+def gpx_stats(gpx_path: Path, smoothing: float) -> None:
+    """Preview GPX file statistics without updating database.
+
+    Shows distance, elevation gain/loss, and elevation range.
+    Use --smoothing to adjust how much GPS noise is filtered.
+
+    \b
+    Examples:
+      race-processor gpx-stats ./track.gpx
+      race-processor gpx-stats ./track.gpx --smoothing 0.5
+      race-processor gpx-stats ./track.gpx --smoothing 3.0
+    """
+    from .utils.gpx_process import extract_gpx_race_stats
+
+    console.print(f"[bold]GPX Stats Preview[/]")
+    console.print(f"  File: {gpx_path}")
+    console.print(f"  Smoothing threshold: {smoothing} m")
+    console.print()
+
+    stats = extract_gpx_race_stats(gpx_path, elevation_threshold=smoothing)
+    if not stats:
+        console.print("[red]Failed to extract stats from GPX file[/]")
+        raise SystemExit(1)
+
+    console.print(f"  [cyan]Distance:[/]        {stats['distance_meters']:,} m ({stats['distance_meters']/1000:.2f} km)")
+    console.print(f"  [cyan]Elevation gain:[/]  +{stats['elevation_gain']:,} m")
+    console.print(f"  [cyan]Elevation loss:[/]  -{stats['elevation_loss']:,} m")
+    console.print(f"  [cyan]Elevation min:[/]   {stats['elevation_min']:,} m")
+    console.print(f"  [cyan]Elevation max:[/]   {stats['elevation_max']:,} m")
+    console.print(f"  [cyan]Elevation bars:[/]  {len(stats.get('elevation_bars', []))} samples")
 
 
 @db.command("delete")
