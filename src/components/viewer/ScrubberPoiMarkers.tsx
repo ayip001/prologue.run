@@ -1,7 +1,13 @@
 "use client";
 
 import type { PoiMarker } from "@/types";
+import { POI_TYPES } from "@/types";
 import { PoiIcon } from "./PoiIcon";
+
+const POI_ORDER = POI_TYPES.reduce((acc, type, index) => {
+  acc[type] = index;
+  return acc;
+}, {} as Record<string, number>);
 
 interface ScrubberPoiMarkersProps {
   poiMarkers: PoiMarker[] | null | undefined;
@@ -33,8 +39,10 @@ export function ScrubberPoiMarkers({
             className="absolute -translate-x-1/2"
             style={{ left }}
           >
-            {marker.pois.map((type, index) => (
-              <button
+            {[...marker.pois]
+              .sort((a, b) => POI_ORDER[a] - POI_ORDER[b])
+              .map((type, index) => (
+                <button
                 key={`${marker.imageIndex}-${type}-${index}`}
                 type="button"
                 className="absolute -translate-x-1/2 pointer-events-auto"
