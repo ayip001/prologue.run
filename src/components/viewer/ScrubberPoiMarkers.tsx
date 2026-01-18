@@ -3,6 +3,7 @@
 import type { PoiMarker } from "@/types";
 import { POI_TYPES } from "@/types";
 import { PoiIcon } from "./PoiIcon";
+import { cn } from "@/lib/utils";
 
 const POI_ORDER = POI_TYPES.reduce((acc, type, index) => {
   acc[type] = index;
@@ -45,10 +46,16 @@ export function ScrubberPoiMarkers({
                 <button
                 key={`${marker.imageIndex}-${type}-${index}`}
                 type="button"
-                className="absolute -translate-x-1/2 pointer-events-auto"
                 style={{
-                  bottom: index * (markerSize + STACK_GAP),
+                  // @ts-ignore
+                  "--poi-bottom": `${index * (markerSize + STACK_GAP)}px`,
+                  // @ts-ignore
+                  "--poi-bottom-mobile": `${index * (8 + 4)}px`,
                 }}
+                className={cn(
+                  "absolute -translate-x-1/2 pointer-events-auto transition-all",
+                  "bottom-[var(--poi-bottom-mobile)] sm:bottom-[var(--poi-bottom)]"
+                )}
                 onClick={(event) => {
                   event.stopPropagation();
                   onPoiClick(marker.imageIndex);

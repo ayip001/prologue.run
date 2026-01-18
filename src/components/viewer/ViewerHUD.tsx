@@ -36,9 +36,6 @@ export function ViewerHUD({
         className
       )}
     >
-      {/* Top gradient scrim */}
-      <div className="absolute inset-0 h-32 bg-scrim-top pointer-events-none" />
-
       {/* HUD content */}
       <div className="relative px-4 pt-4 flex items-start justify-between">
         {/* Left side - Context & Metrics */}
@@ -46,13 +43,12 @@ export function ViewerHUD({
           className="flex flex-col gap-2 pointer-events-auto"
           onPointerDown={(e) => e.stopPropagation()}
         >
-          {/* Logo */}
-          <div className="mb-2">
-            <Logo size="sm" showText={false} />
-          </div>
-
           {/* Context panel */}
-          <ContextPanel raceName={raceName} waypointName={waypointName} />
+          <ContextPanel 
+            raceName={raceName} 
+            waypointName={waypointName} 
+            className="hidden sm:block"
+          />
 
           {/* Metrics */}
           <MetricsPanel
@@ -67,7 +63,12 @@ export function ViewerHUD({
           className="pointer-events-auto"
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <Button variant="ghost" size="icon" asChild>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            asChild
+            className="rounded-full dark:bg-slate-900/40 light:bg-white/40 backdrop-blur-sm border dark:border-white/10 light:border-slate-200 dark:text-white light:text-slate-900 hover:bg-coral hover:text-white transition-all"
+          >
             <Link href="/" aria-label="Close viewer">
               <X className="h-5 w-5" />
             </Link>

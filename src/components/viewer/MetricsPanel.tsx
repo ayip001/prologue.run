@@ -27,11 +27,11 @@ export function MetricsPanel({
           <span className="text-lg font-semibold dark:text-white light:text-slate-900">
             {formatDistanceCompact(distanceMeters)}
           </span>
-          <span className="text-xs dark:text-slate-400 light:text-slate-500">/</span>
-          <span className="text-xs dark:text-slate-400 light:text-slate-500">
+          <span className="text-xs dark:text-slate-400 light:text-slate-700">/</span>
+          <span className="text-xs dark:text-slate-400 light:text-slate-700">
             {formatDistanceCompact(totalDistanceMeters)}
           </span>
-          <span className="text-xs dark:text-slate-400 light:text-slate-500">km</span>
+          <span className="text-xs dark:text-slate-400 light:text-slate-700">km</span>
         </div>
       </GlassPanel>
 
@@ -39,11 +39,11 @@ export function MetricsPanel({
       <GlassPanel className="px-3 py-2 flex items-center gap-2">
         <Mountain className="h-4 w-4 text-golden" />
         <div className="flex items-baseline gap-1">
-          <span className="text-xs dark:text-slate-400 light:text-slate-500 mr-1">↑</span>
+          <span className="text-xs dark:text-slate-400 light:text-slate-700 mr-1">↑</span>
           <span className="text-lg font-semibold dark:text-white light:text-slate-900">
             {formatElevationCompact(totalAscentM)}
           </span>
-          <span className="text-xs dark:text-slate-400 light:text-slate-500">m</span>
+          <span className="text-xs dark:text-slate-400 light:text-slate-700">m</span>
         </div>
       </GlassPanel>
     </div>

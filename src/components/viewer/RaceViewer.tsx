@@ -14,6 +14,7 @@ import { ViewerHUD } from "./ViewerHUD";
 import { NavigationChevrons } from "./NavigationChevrons";
 import { ProgressScrubber } from "./ProgressScrubber";
 import { ElevationProfile } from "./ElevationProfile";
+import { PoiLegend } from "./PoiLegend";
 
 interface ImageMeta {
   id: string;
@@ -166,6 +167,15 @@ export function RaceViewer({
     return images[state.currentIndex];
   }, [images, state.currentIndex]);
 
+  // Calculate unique POI types present on this route
+  const activePoiTypes = useMemo(() => {
+    const types = new Set<string>();
+    race.poiMarkers?.forEach((marker) => {
+      marker.pois.forEach((type) => types.add(type));
+    });
+    return Array.from(types) as Poi["type"][];
+  }, [race.poiMarkers]);
+
   return (
     <div className="fixed inset-0 bg-slate-950">
       {/* Panorama Canvas */}
@@ -208,6 +218,8 @@ export function RaceViewer({
             currentDistance={state.currentDistance}
           />
         )}
+
+        <PoiLegend activeTypes={activePoiTypes} />
 
         {/* Progress Scrubber */}
         <ProgressScrubber
