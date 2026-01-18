@@ -1,3 +1,5 @@
+import type { RaceCardData } from "@/types";
+
 // CDN and storage configuration
 export const CDN_BASE_URL =
   process.env.NEXT_PUBLIC_CDN_BASE_URL || "https://images.prologue.run";
@@ -5,11 +7,10 @@ export const CDN_BASE_URL =
 // Testing card configuration
 export const ENABLE_TESTING_CARDS = false;
 
-export const TEST_CARD_DATA = {
+export const TEST_CARD_DATA: RaceCardData = {
   id: "card-preview",
   slug: "card-preview",
   name: "Card Preview",
-  description: "This card did not come from the database.",
   flagEmoji: "🧪",
   recordedYear: 2024,
   recordedBy: "Developer",
@@ -23,6 +24,7 @@ export const TEST_CARD_DATA = {
   minimapUrl: "https://images.prologue.run/races/test-route-02/public/minimap.webp",
   elevationBars: [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 30, 35, 40, 45, 50, 55, 60, 65],
   totalImages: 1,
+  isTesting: true,
   officialUrl: "/",
 };
 

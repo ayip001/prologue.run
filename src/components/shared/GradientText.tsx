@@ -14,7 +14,7 @@ export function GradientText({
   return (
     <Component
       className={cn(
-        "bg-accent-gradient bg-clip-text text-transparent",
+        "text-gradient",
         className
       )}
     >
