@@ -140,7 +140,7 @@ function normalizePois(value: unknown): ImageMeta["pois"] {
         visibleOnImage: typed.visibleOnImage ?? true,
       };
     })
-    .filter(Boolean) as ImageMeta["pois"];
+    .filter((poi): poi is Poi => poi !== null);
 
   return normalized.length > 0 ? normalized : [];
 }
@@ -166,7 +166,7 @@ function normalizePoiMarkers(value: unknown): PoiMarker[] | null {
         pois,
       };
     })
-    .filter(Boolean) as PoiMarker[];
+    .filter((marker): marker is PoiMarker => marker !== null);
 
   return normalized.length > 0 ? normalized : [];
 }
