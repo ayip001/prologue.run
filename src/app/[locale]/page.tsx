@@ -6,6 +6,7 @@ import { HeroSection } from "@/components/landing/HeroSection";
 import { FeaturesSection } from "@/components/landing/FeaturesSection";
 import { StorySection } from "@/components/landing/StorySection";
 import { MethodologySection } from "@/components/landing/MethodologySection";
+import { FAQSection } from "@/components/landing/FAQSection";
 import { ContactSection } from "@/components/landing/ContactSection";
 import { getAllRaces } from "@/lib/db";
 import type { RaceCardData } from "@/types";
@@ -82,6 +83,7 @@ export default async function HomePage({ params }: PageProps) {
         <FeaturesSection />
         <StorySection />
         <MethodologySection />
+        <FAQSection />
         <ContactSection />
       </main>
       <Footer />

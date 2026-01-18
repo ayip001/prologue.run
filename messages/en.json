@@ -62,6 +62,72 @@
       "step5": "New route is published and ready to scout"
     }
   },
+  "faq": {
+    "title": "Frequently Asked Questions",
+    "subtitle": "Got questions? We've got answers.",
+    "items": {
+      "fewEntries": {
+        "q": "Why are there so few entries?",
+        "a": "This project started when I decided to run the Hong Kong Marathon in 2026, so I'll need some time to collect more races. I really do hope this project will make preparing for certain races easier."
+      },
+      "lookRidiculous": {
+        "q": "Do you feel stupid for looking absolutely ridiculous at a race?",
+        "a": "No, but thanks for asking."
+      },
+      "lowQuality": {
+        "q": "Why are some photos so low quality?",
+        "a": "Because my 360 camera (the Insta360 X4 at the moment) is not very good in low-light conditions."
+      },
+      "jankyControls": {
+        "q": "Why is the route viewer camera control so janky?",
+        "a": "Although I want to make it as nice as Google Maps Street View, I'm unfortunately not a billion-dollar corporation. This is just a part-time passion project."
+      },
+      "faceNotBlurred": {
+        "q": "Why isn't my face blurred?",
+        "a": "The image detection model isn't perfect and will make mistakes. If you feel bothered, please go to the privacy policy page and take a look at how to send a content removal request."
+      },
+      "blurFace": {
+        "q": "Can you blur my face/license plate?",
+        "a": "Sure, go to the privacy policy page and take a look at how to send a content removal request."
+      },
+      "blurBib": {
+        "q": "Can you blur my bib?",
+        "a": "No—not that I don't want to, but I haven't found a good enough YOLO model that does that reliably."
+      },
+      "unblurFace": {
+        "q": "Can you unblur my face?",
+        "a": "No."
+      },
+      "recordRace": {
+        "q": "Can you record this race or that race?",
+        "a": "Feel free to suggest some races you'd like to see. I'm planning to sign up for majors, so let's see how my luck holds up. If you are an organizer, feel free to reach out and send me an entry—if my schedule allows, I'd be more than happy to oblige. For longer races (>50km) like HK100, Translantau, or even Four Trails, I'll need additional support or will have to record them in multiple sessions."
+      },
+      "helpRecord": {
+        "q": "Can I help record a race for you?",
+        "a": "Yes, it would be much appreciated! Though you'll also need to bring your own equipment (if you're in Hong Kong, I can lend you my selfie stick/helmet and the 360 camera), have enough batteries to last the whole race, be able to finish the race, face the direction you're running during the race, be able to export your GPX file from your watch, and have the patience to deal with me. I'll run you through the process if you really want to help."
+      },
+      "getAnything": {
+        "q": "Do I get anything if I help you record a race?",
+        "a": "You'll get a sense of pride and accomplishment. I'll also put your name or @ on the race card that you record."
+      },
+      "sponsorships": {
+        "q": "Will you take sponsorships?",
+        "a": "Sure, I'm open to it."
+      },
+      "addFeature": {
+        "q": "Can you add this feature?",
+        "a": "It depends. Feel free to go to GitHub and leave a feature request on the discussions tab. Or better yet, ask your favorite AI agent to build it out and submit a PR."
+      },
+      "howItWorks": {
+        "q": "How does the 360 panoramic photo viewer work?",
+        "a": "It takes an equirectangular image (2:1 aspect ratio) and projects it as a texture onto a sphere in WebGL. Yes, I had to bring my own panoramic viewer because none of the existing libraries were suitable—or I was too junior to make them work. Either way, this should be usable enough for the average athlete to preview a race route."
+      },
+      "isFree": {
+        "q": "Is this free?",
+        "a": "Yes. Why are you still here? Go click on a race and take a look already!"
+      }
+    }
+  },
   "contact": {
     "title": "Get in Touch",
     "description": "Contact me if you want to help log a race, want your race logged, or to report an issue.",
