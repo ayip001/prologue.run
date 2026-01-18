@@ -55,6 +55,7 @@ interface ImageRow {
   heading_degrees: string | null;
   heading_to_prev: string | null;
   heading_to_next: string | null;
+  heading_offset_degrees: string | null;
   distance_from_start: number | null;
   elevation_gain_from_start: number | null;
   path_thumbnail: string;
@@ -175,6 +176,7 @@ function transformImage(row: ImageRow): ImageMeta {
     headingDegrees: row.heading_degrees ? parseFloat(row.heading_degrees) : null,
     headingToPrev: row.heading_to_prev ? parseFloat(row.heading_to_prev) : null,
     headingToNext: row.heading_to_next ? parseFloat(row.heading_to_next) : null,
+    headingOffsetDegrees: row.heading_offset_degrees ? parseFloat(row.heading_offset_degrees) : null,
     distanceFromStart: row.distance_from_start,
     elevationGainFromStart: row.elevation_gain_from_start,
     pathThumbnail: row.path_thumbnail,
@@ -356,9 +358,9 @@ export async function getImagesByRaceId(raceId: string): Promise<ImageMeta[]> {
  */
 export async function getImageMetadataByRaceId(
   raceId: string
-): Promise<Pick<ImageMeta, "id" | "positionIndex" | "latitude" | "longitude" | "altitudeMeters" | "distanceFromStart" | "elevationGainFromStart" | "capturedAt" | "headingDegrees" | "headingToPrev" | "headingToNext">[]> {
+): Promise<Pick<ImageMeta, "id" | "positionIndex" | "latitude" | "longitude" | "altitudeMeters" | "distanceFromStart" | "elevationGainFromStart" | "capturedAt" | "headingDegrees" | "headingToPrev" | "headingToNext" | "headingOffsetDegrees">[]> {
   const result = await sql<ImageRow>`
-    SELECT id, position_index, latitude, longitude, altitude_meters, distance_from_start, elevation_gain_from_start, captured_at, heading_degrees, heading_to_prev, heading_to_next
+    SELECT id, position_index, latitude, longitude, altitude_meters, distance_from_start, elevation_gain_from_start, captured_at, heading_degrees, heading_to_prev, heading_to_next, heading_offset_degrees
     FROM images
     WHERE race_id = ${raceId}
     ORDER BY position_index
@@ -376,6 +378,7 @@ export async function getImageMetadataByRaceId(
     headingDegrees: row.heading_degrees ? parseFloat(row.heading_degrees) : null,
     headingToPrev: row.heading_to_prev ? parseFloat(row.heading_to_prev) : null,
     headingToNext: row.heading_to_next ? parseFloat(row.heading_to_next) : null,
+    headingOffsetDegrees: row.heading_offset_degrees ? parseFloat(row.heading_offset_degrees) : null,
   }));
 }
 

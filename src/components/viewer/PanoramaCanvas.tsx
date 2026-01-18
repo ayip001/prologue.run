@@ -23,6 +23,7 @@ interface PanoramaCanvasProps {
   isLoading: boolean;
   onNavigateNext?: () => void;
   onNavigatePrev?: () => void;
+  headingOffset?: number;
 }
 
 // Error boundary fallback component
@@ -350,6 +351,7 @@ function PanoramaSphere({
   onCameraChange,
   onNavigateNext,
   onNavigatePrev,
+  headingOffset,
 }: {
   imageUrl: string | null;
   initialCamera: { yaw: number; pitch: number };
@@ -357,6 +359,7 @@ function PanoramaSphere({
   onCameraChange: (camera: Partial<CameraState>) => void;
   onNavigateNext?: () => void;
   onNavigatePrev?: () => void;
+  headingOffset: number;
 }) {
   const { camera: threeCamera, invalidate: invalidateFrame, gl } = useThree();
   const controlsRef = useRef<any>(null);
@@ -602,7 +605,11 @@ function PanoramaSphere({
     <>
       <ContextDebugger />
       {/* Sky sphere with panorama texture */}
-      <mesh ref={meshRef} scale={[-1, 1, 1]}>
+      <mesh 
+        ref={meshRef} 
+        scale={[-1, 1, 1]} 
+        rotation={[0, THREE.MathUtils.degToRad(-headingOffset), 0]}
+      >
         <sphereGeometry args={[500, 64, 32]} />
         <meshBasicMaterial
           ref={materialRef}
@@ -655,6 +662,7 @@ export function PanoramaCanvas({
   isLoading,
   onNavigateNext,
   onNavigatePrev,
+  headingOffset = 0,
 }: PanoramaCanvasProps) {
   const [canvasError, setCanvasError] = useState<string | null>(null);
   const [canvasReady, setCanvasReady] = useState(false);
@@ -704,6 +712,7 @@ export function PanoramaCanvas({
           onCameraChange={onCameraChange}
           onNavigateNext={onNavigateNext}
           onNavigatePrev={onNavigatePrev}
+          headingOffset={headingOffset}
         />
       </Canvas>
 

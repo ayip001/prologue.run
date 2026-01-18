@@ -27,6 +27,7 @@ interface ImageMeta {
   headingDegrees: number | null;
   headingToPrev: number | null;
   headingToNext: number | null;
+  headingOffsetDegrees: number | null;
 }
 
 interface Waypoint {
@@ -159,6 +160,11 @@ export function RaceViewer({
     [actions]
   );
 
+  // Get current image metadata for offset
+  const currentImageMetadata = useMemo(() => {
+    return images[state.currentIndex];
+  }, [images, state.currentIndex]);
+
   return (
     <div className="fixed inset-0 bg-slate-950">
       {/* Panorama Canvas */}
@@ -170,6 +176,7 @@ export function RaceViewer({
         isLoading={isLoading}
         onNavigateNext={state.currentIndex < images.length - 1 ? actions.goNext : undefined}
         onNavigatePrev={state.currentIndex > 0 ? actions.goPrevious : undefined}
+        headingOffset={currentImageMetadata?.headingOffsetDegrees ?? 0}
       />
 
       {/* HUD Overlay */}

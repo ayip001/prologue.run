@@ -57,6 +57,7 @@ const TEST_IMAGES = [
     headingDegrees: null,
     headingToPrev: null,
     headingToNext: null,
+    headingOffsetDegrees: null,
     pathThumbnail: "",
     pathMedium: "",
     pathFull: "",
