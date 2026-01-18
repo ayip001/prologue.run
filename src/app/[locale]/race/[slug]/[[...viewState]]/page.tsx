@@ -89,7 +89,11 @@ function ViewerSkeleton() {
 }
 
 export default async function RaceViewerPage({ params }: PageProps) {
-  const { locale, slug, viewState: viewStateSegments } = await params;
+  const resolvedParams = await params;
+  const { locale, slug, viewState: viewStateSegments } = resolvedParams;
+
+  // Debug: log params to understand URL parsing
+  console.log("[RaceViewerPage] params:", JSON.stringify(resolvedParams));
 
   // Enable static rendering
   setRequestLocale(locale);
@@ -196,7 +200,12 @@ export default async function RaceViewerPage({ params }: PageProps) {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { locale, slug } = await params;
+  const resolvedParams = await params;
+  const { locale, slug } = resolvedParams;
+
+  // Debug: log params
+  console.log("[generateMetadata] params:", JSON.stringify(resolvedParams));
+
   const t = await getTranslations({ locale, namespace: "racePage" });
 
   const baseUrl = "https://prologue.run";
