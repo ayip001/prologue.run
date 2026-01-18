@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Plus, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -7,6 +10,8 @@ interface AddRouteCardProps {
 }
 
 export function AddRouteCard({ className }: AddRouteCardProps) {
+  const t = useTranslations("addRouteCard");
+
   return (
     <div
       className={cn(
@@ -22,16 +27,16 @@ export function AddRouteCard({ className }: AddRouteCardProps) {
         </div>
 
         <h3 className="text-lg font-semibold dark:text-white light:text-slate-900 mb-2">
-          Add Your Race
+          {t("title")}
         </h3>
         <p className="text-sm dark:text-slate-400 light:text-slate-600 mb-6 max-w-[200px]">
-          Have a race you'd like to see? Let us know!
+          {t("description")}
         </p>
 
         <Button variant="secondary" asChild>
           <a href="mailto:hello@prologue.run?subject=Race%20Request">
             <Mail className="mr-2 h-4 w-4" />
-            Request Race
+            {t("requestRace")}
           </a>
         </Button>
       </div>

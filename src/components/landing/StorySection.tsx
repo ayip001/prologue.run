@@ -1,27 +1,29 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useTranslations } from "next-intl";
 
 export function StorySection() {
   const [opacity, setOpacity] = useState(0);
   const sectionRef = useRef<HTMLDivElement>(null);
+  const t = useTranslations("story");
 
   useEffect(() => {
     const handleScroll = () => {
       if (!sectionRef.current) return;
-      
+
       const rect = sectionRef.current.getBoundingClientRect();
       const viewportHeight = window.innerHeight;
-      
+
       // Start and finish fading at certain percentage of the viewport height
-      const start = viewportHeight * 0.2; 
+      const start = viewportHeight * 0.2;
       const end = viewportHeight * 0.4;
-      
+
       const current = rect.top;
-      
+
       let progress = (start - current) / (start - end);
       progress = Math.max(0, Math.min(1, progress));
-      
+
       setOpacity(progress);
     };
 
@@ -39,24 +41,23 @@ export function StorySection() {
           {/* Left Text */}
           <div className="flex-1 space-y-6">
             <h2 className="text-3xl md:text-4xl font-bold dark:text-white light:text-slate-900">
-              About Prologue.run
+              {t("title")}
             </h2>
             <p className="text-lg dark:text-slate-400 light:text-slate-600 leading-relaxed">
-              Hi, I'm Angus, an avid runner and developer.
+              {t("paragraph1")}
             </p>
             <p className="text-lg dark:text-slate-400 light:text-slate-600 leading-relaxed">
-              Like many other runners, I enjoy running marathons outside of my hometown,
-              and I sometimes just wish to see the route before running it (like
-              reading the prologue for a book!). Then I noticed my 360 camera
-              that's been gathering dust, and that's how this idea came to be.
+              {t("paragraph2")}
             </p>
             <p className="text-lg dark:text-slate-400 light:text-slate-600 leading-relaxed">
-              Prologue.run allows you to preview the route of a race before you run it,
-              like using Google Maps' Street View feature. Right now, the selection of races is limited
-              to races that I have run, but I plan to add more races in the future as I complete more races.
-              If you have a race that you would like to see on Prologue.run, or if you want to help log a race,
-              please let me know by emailing me at&nbsp;
-              <a href="mailto:hello@prologue.run" className="text-coral hover:underline">hello@prologue.run</a>.
+              {t("paragraph3")}&nbsp;
+              <a
+                href="mailto:hello@prologue.run"
+                className="text-coral hover:underline"
+              >
+                hello@prologue.run
+              </a>
+              .
             </p>
           </div>
 
@@ -75,7 +76,7 @@ export function StorySection() {
             </div>
 
             {/* Overlay Image */}
-            <div 
+            <div
               className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none"
               style={{ opacity }}
             >

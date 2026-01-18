@@ -1,9 +1,13 @@
-import Link from "next/link";
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Github, Heart, Coffee } from "lucide-react";
 import { Logo } from "./Logo";
+import { Link } from "@/i18n/navigation";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  const t = useTranslations("footer");
 
   return (
     <footer className="border-t dark:border-white/5 light:border-slate-200 dark:bg-slate-950 light:bg-slate-50">
@@ -13,21 +17,22 @@ export function Footer() {
           <div className="md:col-span-2">
             <Logo className="mb-4" />
             <p className="text-sm dark:text-slate-400 light:text-slate-600 max-w-md">
-              Preview marathon routes through interactive 360° street-level imagery.
-              Scout your next race from anywhere in the world.
+              {t("tagline")}
             </p>
           </div>
 
           {/* Links */}
           <div>
-            <h4 className="font-semibold dark:text-slate-100 light:text-slate-900 mb-4">Links</h4>
+            <h4 className="font-semibold dark:text-slate-100 light:text-slate-900 mb-4">
+              {t("links")}
+            </h4>
             <ul className="space-y-2">
               <li>
                 <Link
                   href="/#races"
                   className="text-sm dark:text-slate-400 dark:hover:text-white light:text-slate-600 light:hover:text-slate-900 transition-colors"
                 >
-                  Browse Races
+                  {t("browseRaces")}
                 </Link>
               </li>
               <li>
@@ -35,7 +40,7 @@ export function Footer() {
                   href="/#features"
                   className="text-sm dark:text-slate-400 dark:hover:text-white light:text-slate-600 light:hover:text-slate-900 transition-colors"
                 >
-                  Features
+                  {t("features")}
                 </Link>
               </li>
               <li>
@@ -43,7 +48,7 @@ export function Footer() {
                   href="/terms"
                   className="text-sm dark:text-slate-400 dark:hover:text-white light:text-slate-600 light:hover:text-slate-900 transition-colors"
                 >
-                  Terms of Service
+                  {t("termsOfService")}
                 </Link>
               </li>
               <li>
@@ -51,7 +56,7 @@ export function Footer() {
                   href="/privacy"
                   className="text-sm dark:text-slate-400 dark:hover:text-white light:text-slate-600 light:hover:text-slate-900 transition-colors"
                 >
-                  Privacy Policy
+                  {t("privacyPolicy")}
                 </Link>
               </li>
               <li>
@@ -70,7 +75,9 @@ export function Footer() {
 
           {/* Contact */}
           <div>
-            <h4 className="font-semibold dark:text-slate-100 light:text-slate-900 mb-4">Contact</h4>
+            <h4 className="font-semibold dark:text-slate-100 light:text-slate-900 mb-4">
+              {t("contact")}
+            </h4>
             <ul className="space-y-2">
               <li>
                 <a
@@ -87,11 +94,11 @@ export function Footer() {
         {/* Bottom */}
         <div className="mt-12 pt-8 border-t dark:border-white/5 light:border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm dark:text-slate-500 light:text-slate-500">
-            © {currentYear} prologue.run. All rights reserved.
+            {t("copyright", { year: currentYear })}
           </p>
           <div className="flex flex-col md:flex-row items-center gap-4">
             <p className="text-sm dark:text-slate-500 light:text-slate-500 flex items-center gap-1">
-              Made with <Heart className="h-4 w-4 text-coral" /> for runners
+              {t("madeWith")} <Heart className="h-4 w-4 text-coral" /> {t("forRunners")}
             </p>
             <span className="hidden md:block dark:text-slate-700 light:text-slate-300">|</span>
             <a
@@ -101,7 +108,7 @@ export function Footer() {
               className="text-sm dark:text-slate-500 dark:hover:text-white light:text-slate-500 light:hover:text-slate-900 transition-colors flex items-center gap-1.5 group"
             >
               <Coffee className="h-4 w-4 text-amber-500 group-hover:animate-bounce" />
-              Buy me a coffee
+              {t("buyMeCoffee")}
             </a>
           </div>
         </div>

@@ -1,42 +1,47 @@
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Camera, RefreshCw, Upload, MapPin, Flag, Zap, ShieldCheck, Footprints } from "lucide-react";
 import { GlassPanel } from "@/components/shared/GlassPanel";
 
 export function MethodologySection() {
+  const t = useTranslations("methodology");
+
   const captureSteps = [
     {
       icon: Footprints,
-      text: "Carry a 360 camera to a race",
+      textKey: "capture.step1" as const,
     },
     {
       icon: Zap,
-      text: "Set interval photo mode on a 10s timer",
+      textKey: "capture.step2" as const,
     },
     {
       icon: Flag,
-      text: "Run the entire track from start to finish",
+      textKey: "capture.step3" as const,
     },
   ];
 
   const processSteps = [
     {
       icon: RefreshCw,
-      text: "Gyro-stabilize to keep the view facing forward",
+      textKey: "processing.step1" as const,
     },
     {
       icon: ShieldCheck,
-      text: "AI-driven face and plate blurring for privacy",
+      textKey: "processing.step2" as const,
     },
     {
       icon: Upload,
-      text: "Generate equirectangular tiles and sync to DB",
+      textKey: "processing.step3" as const,
     },
     {
       icon: MapPin,
-      text: "Map GPX coordinates to the image sequence",
+      textKey: "processing.step4" as const,
     },
     {
       icon: Flag,
-      text: "New route is published and ready to scout",
+      textKey: "processing.step5" as const,
     },
   ];
 
@@ -45,10 +50,10 @@ export function MethodologySection() {
       <div className="container mx-auto px-4">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold dark:text-white light:text-slate-900 mb-4">
-            How it Works
+            {t("title")}
           </h2>
           <p className="dark:text-slate-400 light:text-slate-600 max-w-2xl mx-auto">
-            From the first kilometer to the final upload, here is how we bring the race to your screen.
+            {t("subtitle")}
           </p>
         </div>
 
@@ -59,7 +64,9 @@ export function MethodologySection() {
               <div className="p-2 bg-coral/20 rounded-lg">
                 <Camera className="h-6 w-6 text-coral" />
               </div>
-              <h3 className="text-2xl font-bold dark:text-white light:text-slate-900">Capture</h3>
+              <h3 className="text-2xl font-bold dark:text-white light:text-slate-900">
+                {t("capture.title")}
+              </h3>
             </div>
 
             <ul className="space-y-6">
@@ -68,7 +75,9 @@ export function MethodologySection() {
                   <div className="flex-shrink-0 w-8 h-8 dark:bg-white/5 light:bg-white rounded flex items-center justify-center">
                     <step.icon className="h-4 w-4 dark:text-slate-300 light:text-slate-600" />
                   </div>
-                  <span className="dark:text-slate-300 light:text-slate-600 leading-snug">{step.text}</span>
+                  <span className="dark:text-slate-300 light:text-slate-600 leading-snug">
+                    {t(step.textKey)}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -80,7 +89,9 @@ export function MethodologySection() {
               <div className="p-2 bg-blue-500/20 rounded-lg">
                 <RefreshCw className="h-6 w-6 text-blue-400" />
               </div>
-              <h3 className="text-2xl font-bold dark:text-white light:text-slate-900">Processing</h3>
+              <h3 className="text-2xl font-bold dark:text-white light:text-slate-900">
+                {t("processing.title")}
+              </h3>
             </div>
 
             <ul className="space-y-6">
@@ -89,7 +100,9 @@ export function MethodologySection() {
                   <div className="flex-shrink-0 w-8 h-8 dark:bg-white/5 light:bg-white rounded flex items-center justify-center">
                     <step.icon className="h-4 w-4 dark:text-slate-300 light:text-slate-600" />
                   </div>
-                  <span className="dark:text-slate-300 light:text-slate-600 leading-snug">{step.text}</span>
+                  <span className="dark:text-slate-300 light:text-slate-600 leading-snug">
+                    {t(step.textKey)}
+                  </span>
                 </li>
               ))}
             </ul>

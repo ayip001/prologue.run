@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import { ArrowRight, Link as LinkIcon, Mountain, Route } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { RaceCardData } from "@/types";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatRaceDistance, formatElevationSummary } from "@/lib/formatters";
 import { getMinimapUrl } from "@/lib/imageUrl";
+import { Link } from "@/i18n/navigation";
 
 interface RaceCardProps {
   race: RaceCardData;
@@ -20,6 +21,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const pathRef = useRef<HTMLDivElement>(null);
   const rotationRef = useRef({ angle: 0, animationId: null as number | null, isHovering: false });
+  const t = useTranslations("raceCard");
 
   useEffect(() => {
     const card = cardRef.current;
@@ -36,13 +38,13 @@ export function RaceCard({ race, className }: RaceCardProps) {
 
     const handleMouseEnter = () => {
       rotationRef.current.isHovering = true;
-      
+
       // Sync starting angle with current computed style to prevent jumps
       const style = window.getComputedStyle(path);
       const matrix = new DOMMatrix(style.transform);
       const currentRotation = Math.atan2(matrix.b, matrix.a) * (180 / Math.PI);
       rotationRef.current.angle = currentRotation;
-      
+
       path.style.transition = 'none';
       animate();
     };
@@ -56,10 +58,10 @@ export function RaceCard({ race, className }: RaceCardProps) {
       // Snap to nearest upright position (multiple of 360)
       const rounds = Math.round(rotationRef.current.angle / 360);
       const targetAngle = rounds * 360;
-      
+
       path.style.transition = 'transform 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
       rotationRef.current.angle = targetAngle;
-      
+
       requestAnimationFrame(() => {
         path.style.transform = `rotateZ(${targetAngle}deg)`;
       });
@@ -77,8 +79,8 @@ export function RaceCard({ race, className }: RaceCardProps) {
     };
   }, []);
 
-  const minimapUrl = race.minimapUrl?.startsWith("/") 
-    ? race.minimapUrl 
+  const minimapUrl = race.minimapUrl?.startsWith("/")
+    ? race.minimapUrl
     : getMinimapUrl(race.slug, race.minimapUrl);
 
   return (
@@ -125,7 +127,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
         {minimapUrl && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-8 preserve-3d">
             <div className="relative w-full h-full pitch-wrapper preserve-3d">
-              <div 
+              <div
                 ref={pathRef}
                 className="relative w-full h-full opacity-60 group-hover:opacity-100 transition-opacity duration-500"
               >
@@ -184,32 +186,33 @@ export function RaceCard({ race, className }: RaceCardProps) {
         {/* Recorded By */}
         {race.recordedBy && race.recordedYear && (
           <p className="text-xs dark:text-slate-500 light:text-slate-500 mb-4">
-            Recorded by {race.recordedBy} ({race.recordedYear})
+            {t("recordedBy", { name: race.recordedBy, year: race.recordedYear })}
           </p>
         )}
 
         {/* Actions */}
         <div className="grid grid-cols-2 gap-2">
-          <Link href={`/race/${race.slug}`}>
-            <Button className="w-full group/btn">
-              View Route
+          <Button asChild className="w-full group/btn">
+            <Link href={`/race/${race.slug}`}>
+              {t("viewRoute")}
               <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
-            </Button>
-          </Link>
-          
-          <a 
-            href={race.officialUrl || "#"} 
-            target="_blank" 
-            rel="noopener noreferrer"
+            </Link>
+          </Button>
+
+          <Button
+            asChild
+            variant="secondary"
+            className="w-full gap-2"
           >
-            <Button
-              variant="secondary"
-              className="w-full gap-2"
+            <a
+              href={race.officialUrl || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
             >
               <LinkIcon className="h-4 w-4" />
-              Official Site
-            </Button>
-          </a>
+              {t("officialSite")}
+            </a>
+          </Button>
         </div>
       </div>
     </div>

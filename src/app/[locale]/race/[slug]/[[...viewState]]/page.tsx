@@ -1,10 +1,23 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { getRaceBySlug, getImageMetadataByRaceId, getWaypointsByRaceId, getElevationPointsByRaceId } from "@/lib/db";
+import { setRequestLocale, getTranslations } from "next-intl/server";
+import type { Metadata } from "next";
+import {
+  getRaceBySlug,
+  getImageMetadataByRaceId,
+  getWaypointsByRaceId,
+  getElevationPointsByRaceId,
+  getRaceTranslation,
+} from "@/lib/db";
 import { parseViewState } from "@/lib/viewState";
 import { RaceViewer } from "@/components/viewer/RaceViewer";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ENABLE_TESTING_CARDS, TEST_CARD_DATA, TEST_VIEWER_IMAGE_URL, DEFAULT_VIEW } from "@/lib/constants";
+import {
+  ENABLE_TESTING_CARDS,
+  TEST_CARD_DATA,
+  TEST_VIEWER_IMAGE_URL,
+  DEFAULT_VIEW,
+} from "@/lib/constants";
+import { defaultLocale, locales } from "@/i18n/config";
 import type { Race } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -25,32 +38,35 @@ const TEST_RACE: Race = {
   updatedAt: "2024-01-01T00:00:00Z",
 };
 
-const TEST_IMAGES = [{
-  id: "test-image-1",
-  raceId: "card-preview",
-  positionIndex: 0,
-  latitude: 0,
-  longitude: 0,
-  altitudeMeters: 0,
-  distanceFromStart: 0,
-  elevationGainFromStart: 0,
-  capturedAt: "2024-01-01T00:00:00Z",
-  headingDegrees: null,
-  headingToPrev: null,
-  headingToNext: null,
-  pathThumbnail: "",
-  pathMedium: "",
-  pathFull: "",
-  fileSizeThumb: null,
-  fileSizeMedium: null,
-  fileSizeFull: null,
-  hasBlurApplied: false,
-  blurRegionsCount: 0,
-  createdAt: "2024-01-01T00:00:00Z",
-}];
+const TEST_IMAGES = [
+  {
+    id: "test-image-1",
+    raceId: "card-preview",
+    positionIndex: 0,
+    latitude: 0,
+    longitude: 0,
+    altitudeMeters: 0,
+    distanceFromStart: 0,
+    elevationGainFromStart: 0,
+    capturedAt: "2024-01-01T00:00:00Z",
+    headingDegrees: null,
+    headingToPrev: null,
+    headingToNext: null,
+    pathThumbnail: "",
+    pathMedium: "",
+    pathFull: "",
+    fileSizeThumb: null,
+    fileSizeMedium: null,
+    fileSizeFull: null,
+    hasBlurApplied: false,
+    blurRegionsCount: 0,
+    createdAt: "2024-01-01T00:00:00Z",
+  },
+];
 
 interface PageProps {
   params: Promise<{
+    locale: string;
     slug: string;
     viewState?: string[];
   }>;
@@ -68,7 +84,10 @@ function ViewerSkeleton() {
 }
 
 export default async function RaceViewerPage({ params }: PageProps) {
-  const { slug, viewState: viewStateSegments } = await params;
+  const { locale, slug, viewState: viewStateSegments } = await params;
+
+  // Enable static rendering
+  setRequestLocale(locale);
 
   // Handle test route
   if (slug === "card-preview" && ENABLE_TESTING_CARDS) {
@@ -97,13 +116,24 @@ export default async function RaceViewerPage({ params }: PageProps) {
   try {
     race = await getRaceBySlug(slug);
   } catch {
-    // Database not available
     race = null;
   }
 
   if (!race) {
     notFound();
   }
+
+  // Get translation for the race if available
+  const translation = await getRaceTranslation(race.id, locale);
+  const translatedRace = translation
+    ? {
+        ...race,
+        name: translation.name || race.name,
+        description: translation.description || race.description,
+        city: translation.city || race.city,
+        country: translation.country || race.country,
+      }
+    : race;
 
   // Parse view state from URL
   const viewStateStr = viewStateSegments?.[0] || "@0";
@@ -117,22 +147,23 @@ export default async function RaceViewerPage({ params }: PageProps) {
   ]);
 
   // Build elevation profile
-  const elevationProfile = elevationPoints.length > 0
-    ? {
-        points: elevationPoints.map((p) => ({
-          distance: p.distanceMeters,
-          elevation: p.elevationMeters,
-        })),
-        totalDistance: race.distanceMeters,
-        minElevation: Math.min(...elevationPoints.map((p) => p.elevationMeters)),
-        maxElevation: Math.max(...elevationPoints.map((p) => p.elevationMeters)),
-      }
-    : null;
+  const elevationProfile =
+    elevationPoints.length > 0
+      ? {
+          points: elevationPoints.map((p) => ({
+            distance: p.distanceMeters,
+            elevation: p.elevationMeters,
+          })),
+          totalDistance: race.distanceMeters,
+          minElevation: Math.min(...elevationPoints.map((p) => p.elevationMeters)),
+          maxElevation: Math.max(...elevationPoints.map((p) => p.elevationMeters)),
+        }
+      : null;
 
   return (
     <Suspense fallback={<ViewerSkeleton />}>
       <RaceViewer
-        race={race}
+        race={translatedRace}
         images={images}
         waypoints={waypoints.map((w) => ({
           name: w.name,
@@ -149,18 +180,24 @@ export default async function RaceViewerPage({ params }: PageProps) {
   );
 }
 
-export async function generateMetadata({ params }: PageProps) {
-  const { slug } = await params;
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { locale, slug } = await params;
+  const t = await getTranslations({ locale, namespace: "racePage" });
+
+  const baseUrl = "https://prologue.run";
+  const path = `/race/${slug}`;
 
   // Handle test route metadata
   if (slug === "card-preview" && ENABLE_TESTING_CARDS) {
     return {
       title: `${TEST_RACE.name} - prologue.run`,
-      description: `Preview the ${TEST_RACE.name} route through interactive 360° street-level imagery.`,
+      description: t("metaDescription", { raceName: TEST_RACE.name }),
       openGraph: {
         title: `${TEST_RACE.name} - prologue.run`,
-        description: `Preview the ${TEST_RACE.name} route through interactive 360° street-level imagery.`,
-        images: TEST_RACE.cardImageUrl ? [{ url: TEST_RACE.cardImageUrl }] : undefined,
+        description: t("metaDescription", { raceName: TEST_RACE.name }),
+        images: TEST_RACE.cardImageUrl
+          ? [{ url: TEST_RACE.cardImageUrl }]
+          : undefined,
       },
     };
   }
@@ -174,17 +211,34 @@ export async function generateMetadata({ params }: PageProps) {
 
   if (!race) {
     return {
-      title: "Race Not Found - prologue.run",
+      title: t("notFoundTitle"),
     };
   }
 
+  // Get translated race name if available
+  const translation = await getRaceTranslation(race.id, locale);
+  const raceName = translation?.name || race.name;
+
+  const canonicalUrl =
+    locale === defaultLocale ? `${baseUrl}${path}` : `${baseUrl}/${locale}${path}`;
+
   return {
-    title: `${race.name} - prologue.run`,
-    description: `Preview the ${race.name} route through interactive 360° street-level imagery.`,
+    title: `${raceName} - prologue.run`,
+    description: t("metaDescription", { raceName }),
+    alternates: {
+      canonical: canonicalUrl,
+      languages: Object.fromEntries(
+        locales.map((l) => [
+          l === "zh-hk" ? "zh-Hant-HK" : l,
+          l === defaultLocale ? `${baseUrl}${path}` : `${baseUrl}/${l}${path}`,
+        ])
+      ),
+    },
     openGraph: {
-      title: `${race.name} - prologue.run`,
-      description: `Preview the ${race.name} route through interactive 360° street-level imagery.`,
+      title: `${raceName} - prologue.run`,
+      description: t("metaDescription", { raceName }),
       images: race.cardImageUrl ? [{ url: race.cardImageUrl }] : undefined,
+      locale: locale === "zh-hk" ? "zh_HK" : "en_US",
     },
   };
 }
