@@ -217,8 +217,6 @@ export function Navbar({ className, transparent = false }: NavbarProps) {
                 ))}
               </div>
             </div>
-              </div>
-            </div>
           </div>
         </div>
       )}
