@@ -4,7 +4,7 @@
 
 Prologue.run is an interactive web platform that allows runners to "scout" race courses before race day. Using 360° panoramic imagery captured from a runner's perspective, users can virtually experience the route, study elevation changes, and plan their race strategy with confidence.
 
-**[Live Demo](https://prologue.run) | [Report Bug**](https://github.com/ayip001/prologue.run/issues)
+[Live Demo](https://prologue.run) | [Report Bug](https://github.com/ayip001/prologue.run/issues)
 
 ## ✨ Features
 
