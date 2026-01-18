@@ -213,64 +213,126 @@ function transformElevationPoint(row: ElevationPointRow): ElevationPoint {
 /**
  * Get all races that are ready for display.
  */
-export async function getAllRaces(): Promise<RaceCardData[]> {
+export async function getAllRaces(locale: string = "en"): Promise<RaceCardData[]> {
   // Only bypass cache during development/race uploads
   if (!ENABLE_CACHING) {
     noStore();
   }
   
-  // If testing cards are disabled, only show non-testing races
-  // We use COALESCE(is_testing, FALSE) to treat NULL as not testing
-  const result = ENABLE_TESTING_CARDS
-    ? await sql<RaceRow>`
-        SELECT
-          id, slug, name, flag_emoji, recorded_year, recorded_by,
-          distance_meters, elevation_gain, elevation_loss, city, country,
-          tier, card_image_url, minimap_url, elevation_bars, total_images, 
-          COALESCE(is_testing, FALSE) as is_testing
-        FROM races
-        WHERE status = 'ready'
-        ORDER BY created_at DESC
-      `
-    : await sql<RaceRow>`
-        SELECT
-          id, slug, name, flag_emoji, recorded_year, recorded_by,
-          distance_meters, elevation_gain, elevation_loss, city, country,
-          tier, card_image_url, minimap_url, elevation_bars, total_images, 
-          COALESCE(is_testing, FALSE) as is_testing
-        FROM races
-        WHERE status = 'ready' AND COALESCE(is_testing, FALSE) = FALSE
-        ORDER BY created_at DESC
-      `;
+  try {
+    // Attempt to fetch with translations
+    const result = ENABLE_TESTING_CARDS
+      ? await sql<RaceRow>`
+          SELECT 
+            r.id, r.slug, 
+            COALESCE(t.name, r.name) as name, 
+            r.flag_emoji, r.recorded_year, r.recorded_by,
+            r.distance_meters, r.elevation_gain, r.elevation_loss, 
+            COALESCE(t.city, r.city) as city, 
+            COALESCE(t.country, r.country) as country,
+            r.tier, r.card_image_url, r.minimap_url, r.elevation_bars, r.total_images, 
+            COALESCE(r.is_testing, FALSE) as is_testing
+          FROM races r
+          LEFT JOIN race_translations t ON r.id = t.race_id AND t.locale = ${locale}
+          WHERE r.status = 'ready'
+          ORDER BY r.created_at DESC
+        `
+      : await sql<RaceRow>`
+          SELECT 
+            r.id, r.slug, 
+            COALESCE(t.name, r.name) as name, 
+            r.flag_emoji, r.recorded_year, r.recorded_by,
+            r.distance_meters, r.elevation_gain, r.elevation_loss, 
+            COALESCE(t.city, r.city) as city, 
+            COALESCE(t.country, r.country) as country,
+            r.tier, r.card_image_url, r.minimap_url, r.elevation_bars, r.total_images, 
+            COALESCE(r.is_testing, FALSE) as is_testing
+          FROM races r
+          LEFT JOIN race_translations t ON r.id = t.race_id AND t.locale = ${locale}
+          WHERE r.status = 'ready' AND COALESCE(r.is_testing, FALSE) = FALSE
+          ORDER BY r.created_at DESC
+        `;
 
-  return result.rows.map(transformRaceCard);
+    return result.rows.map(transformRaceCard);
+  } catch (error) {
+    console.error("Error fetching races with translations, falling back to base data:", error);
+    
+    // Fallback to base data if translations table fails
+    const result = ENABLE_TESTING_CARDS
+      ? await sql<RaceRow>`
+          SELECT *, COALESCE(is_testing, FALSE) as is_testing
+          FROM races
+          WHERE status = 'ready'
+          ORDER BY created_at DESC
+        `
+      : await sql<RaceRow>`
+          SELECT *, COALESCE(is_testing, FALSE) as is_testing
+          FROM races
+          WHERE status = 'ready' AND COALESCE(is_testing, FALSE) = FALSE
+          ORDER BY created_at DESC
+        `;
+    return result.rows.map(transformRaceCard);
+  }
 }
 
 /**
  * Get a single race by slug.
  */
-export async function getRaceBySlug(slug: string): Promise<Race | null> {
+export async function getRaceBySlug(slug: string, locale: string = "en"): Promise<Race | null> {
   // Only bypass cache during development/race uploads
   if (!ENABLE_CACHING) {
     noStore();
   }
-  const result = await sql<RaceRow>`
-    SELECT *
-    FROM races
-    WHERE slug = ${slug} AND status = 'ready'
-    LIMIT 1
-  `;
+  
+  try {
+    const result = await sql<RaceRow>`
+      SELECT 
+        r.id, r.slug, r.flag_emoji, r.recorded_year, r.recorded_by,
+        r.distance_meters, r.race_date, r.elevation_gain, r.elevation_loss,
+        r.elevation_bars, r.minimap_url, r.card_image_url, r.tier,
+        r.total_images, r.capture_date, r.capture_device, r.status,
+        r.is_testing, r.storage_bucket, r.storage_prefix, r.total_views,
+        r.created_at, r.updated_at,
+        COALESCE(t.name, r.name) as name,
+        COALESCE(t.description, r.description) as description,
+        COALESCE(t.city, r.city) as city,
+        COALESCE(t.country, r.country) as country
+      FROM races r
+      LEFT JOIN race_translations t ON r.id = t.race_id AND t.locale = ${locale}
+      WHERE r.slug = ${slug} AND r.status = 'ready'
+      LIMIT 1
+    `;
 
-  if (result.rows.length === 0) return null;
-  
-  const race = transformRace(result.rows[0]);
-  
-  // If it's a testing race and testing is disabled, hide it
-  if (race.isTesting && !ENABLE_TESTING_CARDS) {
-    return null;
+    if (result.rows.length === 0) return null;
+    
+    const race = transformRace(result.rows[0]);
+    
+    // If it's a testing race and testing is disabled, hide it
+    if (race.isTesting && !ENABLE_TESTING_CARDS) {
+      return null;
+    }
+    
+    return race;
+  } catch (error) {
+    console.error("Error fetching race with translations, falling back to base data:", error);
+    
+    const result = await sql<RaceRow>`
+      SELECT *, COALESCE(is_testing, FALSE) as is_testing
+      FROM races
+      WHERE slug = ${slug} AND status = 'ready'
+      LIMIT 1
+    `;
+
+    if (result.rows.length === 0) return null;
+    
+    const race = transformRace(result.rows[0]);
+    
+    if (race.isTesting && !ENABLE_TESTING_CARDS) {
+      return null;
+    }
+    
+    return race;
   }
-  
-  return race;
 }
 
 /**
