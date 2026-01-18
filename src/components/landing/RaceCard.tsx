@@ -161,9 +161,11 @@ export function RaceCard({ race, className }: RaceCardProps) {
                 {race.name}
               </h3>
             </div>
-            {race.city && race.country && (
+            {(race.city || race.country) && (
               <p className="text-sm dark:text-slate-400 light:text-slate-600">
-                {race.city}, {race.country}
+                {race.city}
+                {race.city && race.country && ", "}
+                {race.country}
               </p>
             )}
           </div>
