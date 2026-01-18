@@ -29,6 +29,7 @@ class DetectionSource(Enum):
 
     FACE_YOLO_NANO = "face_yolo_n"
     FACE_YOLO_MEDIUM = "face_yolo_m"
+    FACE_PATCH = "face_patch"
     LICENSE_PLATE = "plate"
     VEHICLE = "vehicle"
     EDGE_WRAPPED = "edge_wrapped"
@@ -556,6 +557,93 @@ class PrivacyBlurEnsemble:
 
         return all_regions
 
+    def _run_patch_detection(
+        self,
+        image: np.ndarray,
+    ) -> list[BlurRegion]:
+        """
+        Run face detection on overlapping patches within the horizon strip.
+
+        Targets the region between 25% and 55% from the bottom of the image.
+        """
+        if not self.face_detector:
+            return []
+
+        height, width = image.shape[:2]
+
+        # Calculate strip coordinates (25% to 55% from bottom)
+        # 25% from bottom = 75% from top
+        # 55% from bottom = 45% from top
+        y1 = int(height * 0.45)
+        y2 = int(height * 0.75)
+        strip_h = y2 - y1
+
+        if strip_h <= 0:
+            return []
+
+        # Square box size equals strip height
+        box_size = strip_h
+        overlap = int(box_size * 0.1)
+        step = box_size - overlap
+
+        patch_regions: list[BlurRegion] = []
+
+        x = 0
+        while x < width:
+            # Determine if we need to wrap around the seam
+            is_wrap_around = x + box_size > width
+
+            if not is_wrap_around:
+                patch = image[y1:y2, x : x + box_size]
+            else:
+                # Construct wrap-around patch
+                left_part = image[y1:y2, x : width]
+                right_part = image[y1:y2, 0 : box_size - (width - x)]
+                patch = np.concatenate([left_part, right_part], axis=1)
+
+            # Run detection on patch
+            results = self.face_detector(patch, conf=self.conf_threshold, verbose=False)
+
+            for r in results:
+                for box in r.boxes:
+                    bx1, by1, bx2, by2 = box.xyxy[0].cpu().numpy()
+
+                    # Calculate center relative to patch
+                    p_cx = (bx1 + bx2) / 2
+                    p_cy = (by1 + by2) / 2
+                    p_w = bx2 - bx1
+                    p_h = by2 - by1
+
+                    # Translate to original coordinates
+                    orig_x = (x + p_cx) % width
+                    orig_y = y1 + p_cy
+
+                    # Check if this specific detection spans the seam in a wrap-around patch
+                    spans_edge = False
+                    if is_wrap_around:
+                        split_x = width - x
+                        if bx1 < split_x and bx2 > split_x:
+                            spans_edge = True
+
+                    patch_regions.append(
+                        BlurRegion(
+                            x=int(orig_x),
+                            y=int(orig_y),
+                            width=int(p_w),
+                            height=int(p_h),
+                            confidence=float(box.conf[0]),
+                            source=DetectionSource.FACE_PATCH,
+                            spans_edge=spans_edge
+                        )
+                    )
+
+            if is_wrap_around:
+                break # Finished last (wrapped) patch
+
+            x += step
+
+        return patch_regions
+
     def detect_all(
         self,
         image: np.ndarray,
@@ -563,8 +651,10 @@ class PrivacyBlurEnsemble:
         """
         Run all detectors and return merged blur regions.
 
-        For equirectangular images, runs detection on both the original
-        and an edge-padded version to catch faces spanning the seam.
+        For equirectangular images, runs detection on:
+        1. Original image
+        2. Edge-padded version (for seam split faces)
+        3. Horizon strip patches (undistorted local squares)
 
         Args:
             image: OpenCV image (BGR format)
@@ -585,11 +675,11 @@ class PrivacyBlurEnsemble:
         all_regions: list[BlurRegion] = []
         height, width = image.shape[:2]
 
-        # Run detection on original image
+        # 1. Run detection on original image
         original_regions = self._run_detection(image)
         all_regions.extend(original_regions)
 
-        # Run edge-aware detection
+        # 2. Run edge-aware detection
         if self.edge_aware:
             # Create edge-padded image
             padded_image, pad_width = create_edge_padded_image(image)
@@ -612,7 +702,11 @@ class PrivacyBlurEnsemble:
                 translated = translate_edge_detections(edge_regions, width, pad_width)
                 all_regions.extend(translated)
 
-        # Merge overlapping regions
+        # 3. Run patch-based detection on horizon strip
+        patch_regions = self._run_patch_detection(image)
+        all_regions.extend(patch_regions)
+
+        # Merge all overlapping regions
         merged = self._merge_overlapping(all_regions)
 
         return merged
