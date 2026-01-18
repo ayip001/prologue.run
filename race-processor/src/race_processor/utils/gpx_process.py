@@ -496,7 +496,11 @@ def _print_summary(result: dict) -> None:
     console.print(table)
 
 
-def extract_gpx_race_stats(gpx_path: Path, num_elevation_bars: int = 175) -> dict:
+def extract_gpx_race_stats(
+    gpx_path: Path,
+    num_elevation_bars: int = 175,
+    elevation_threshold: float = 1.0,
+) -> dict:
     """
     Extract race-level statistics from GPX file for updating race records.
 
@@ -506,7 +510,8 @@ def extract_gpx_race_stats(gpx_path: Path, num_elevation_bars: int = 175) -> dic
 
     Args:
         gpx_path: Path to GPX file
-        num_elevation_bars: Number of bars for elevation visualization (default 35)
+        num_elevation_bars: Number of bars for elevation visualization (default 175)
+        elevation_threshold: Minimum elevation change in meters to count (default 1.0)
 
     Returns:
         Dict with keys: distance_meters, elevation_gain, elevation_loss,
@@ -521,9 +526,9 @@ def extract_gpx_race_stats(gpx_path: Path, num_elevation_bars: int = 175) -> dic
     distances = calculate_cumulative_distances(points)
     total_distance_m = distances[-1] if distances else 0
 
-    # Calculate elevation stats with noise filtering (3m threshold like Garmin)
+    # Calculate elevation stats with noise filtering
     elevations = [p.get("elevation", 0) for p in points]
-    total_gain, total_loss = calculate_elevation_stats(elevations, threshold=1.0)
+    total_gain, total_loss = calculate_elevation_stats(elevations, threshold=elevation_threshold)
 
     # Calculate min/max elevation
     elevation_min = int(round(min(elevations))) if elevations else 0
