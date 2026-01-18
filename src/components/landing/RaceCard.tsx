@@ -28,6 +28,9 @@ export function RaceCard({ race, className }: RaceCardProps) {
     const path = pathRef.current;
     if (!card || !path) return;
 
+    // Capture ref value for cleanup to avoid stale reference
+    const rotation = rotationRef.current;
+
     const animate = () => {
       if (!rotationRef.current.isHovering) return;
 
@@ -73,8 +76,8 @@ export function RaceCard({ race, className }: RaceCardProps) {
     return () => {
       card.removeEventListener('mouseenter', handleMouseEnter);
       card.removeEventListener('mouseleave', handleMouseLeave);
-      if (rotationRef.current.animationId) {
-        cancelAnimationFrame(rotationRef.current.animationId);
+      if (rotation.animationId) {
+        cancelAnimationFrame(rotation.animationId);
       }
     };
   }, []);
