@@ -16,7 +16,7 @@ export function ScrubberPoiMarkers({
   poiMarkers,
   totalDistance,
   onPoiClick,
-  markerSize = 12,
+  markerSize = 24,
 }: ScrubberPoiMarkersProps) {
   if (!poiMarkers || poiMarkers.length === 0) return null;
 
@@ -37,7 +37,7 @@ export function ScrubberPoiMarkers({
               <button
                 key={`${marker.imageIndex}-${type}-${index}`}
                 type="button"
-                className="absolute pointer-events-auto"
+                className="absolute -translate-x-1/2 pointer-events-auto"
                 style={{
                   bottom: index * (markerSize + STACK_GAP),
                 }}

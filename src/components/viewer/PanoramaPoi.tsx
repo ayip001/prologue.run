@@ -14,6 +14,7 @@ interface PanoramaPoiProps {
 
 export function PanoramaPoi({ poi, headingOffset = 0 }: PanoramaPoiProps) {
   const spriteRef = useRef<THREE.Sprite>(null);
+  const pulseRef = useRef<THREE.Sprite>(null);
   const config = POI_CONFIG[poi.type];
 
   const adjustedHeading = (poi.heading - headingOffset + 360) % 360;
@@ -52,22 +53,69 @@ export function PanoramaPoi({ poi, headingOffset = 0 }: PanoramaPoiProps) {
     return tex;
   }, [config.color, config.emoji]);
 
+  const pulseTexture = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    const size = 128;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+
+    ctx.clearRect(0, 0, size, size);
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - 6, 0, Math.PI * 2);
+    ctx.fillStyle = config.color;
+    ctx.fill();
+
+    return new THREE.CanvasTexture(canvas);
+  }, [config.color]);
+
   useFrame(({ clock }) => {
-    if (!spriteRef.current) return;
-    const pulse = 1 + Math.sin(clock.getElapsedTime() * 2) * 0.08;
-    spriteRef.current.scale.setScalar(8 * pulse);
+    if (!spriteRef.current || !pulseRef.current) return;
+    
+    const t = clock.getElapsedTime() * 0.5;
+    const progress = t % 1;
+    
+    // Static main icon at 80% opacity
+    spriteRef.current.scale.setScalar(8);
+    if (spriteRef.current.material) {
+      spriteRef.current.material.opacity = 0.8;
+    }
+
+    // Expanding pulse
+    const pulseScale = 8 * (1 + progress); // Scale from 1x to 2x
+    const pulseOpacity = 0.4 * (1 - progress); // Fade out
+    
+    pulseRef.current.scale.setScalar(pulseScale);
+    if (pulseRef.current.material) {
+      pulseRef.current.material.opacity = pulseOpacity;
+    }
   });
 
-  if (!texture) return null;
+  if (!texture || !pulseTexture) return null;
 
   return (
-    <sprite ref={spriteRef} position={position}>
-      <spriteMaterial
-        map={texture}
-        transparent
-        depthTest={false}
-        depthWrite={false}
-      />
-    </sprite>
+    <group position={position}>
+      {/* Expanding Pulse */}
+      <sprite ref={pulseRef}>
+        <spriteMaterial
+          map={pulseTexture}
+          transparent
+          depthTest={false}
+          depthWrite={false}
+        />
+      </sprite>
+      
+      {/* Main Static Icon */}
+      <sprite ref={spriteRef}>
+        <spriteMaterial
+          map={texture}
+          transparent
+          depthTest={false}
+          depthWrite={false}
+        />
+      </sprite>
+    </group>
   );
 }
+

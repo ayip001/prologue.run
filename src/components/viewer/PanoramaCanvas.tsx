@@ -498,7 +498,7 @@ function PanoramaSphere({
     const { yaw, pitch } = initialCameraRef.current;
 
     const azimuthRad = THREE.MathUtils.degToRad(yaw + HEADING_OFFSET);
-    const polarRad = THREE.MathUtils.degToRad(90 - pitch);
+    const polarRad = THREE.MathUtils.degToRad(90 + pitch);
 
     const wasDamping = controls.enableDamping;
     controls.enableDamping = false;
@@ -515,7 +515,7 @@ function PanoramaSphere({
         const currentAzimuth = THREE.MathUtils.radToDeg(controlsRef.current.getAzimuthalAngle());
         const currentPolar = THREE.MathUtils.radToDeg(controlsRef.current.getPolarAngle());
         const heading = ((currentAzimuth - HEADING_OFFSET) % 360 + 360) % 360;
-        const finalPitch = 90 - currentPolar;
+        const finalPitch = currentPolar - 90;
         onCameraChange({ yaw: heading, pitch: finalPitch });
       }
     }, 50);
@@ -528,7 +528,7 @@ function PanoramaSphere({
     const controls = controlsRef.current;
     const azimuth = THREE.MathUtils.radToDeg(controls.getAzimuthalAngle());
     const polar = THREE.MathUtils.radToDeg(controls.getPolarAngle());
-    const pitch = 90 - polar;
+    const pitch = polar - 90;
     const heading = ((azimuth - HEADING_OFFSET) % 360 + 360) % 360;
 
     onCameraChange({ yaw: heading, pitch });
