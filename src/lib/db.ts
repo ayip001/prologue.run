@@ -140,7 +140,7 @@ function normalizePois(value: unknown): ImageMeta["pois"] {
         visibleOnImage: typed.visibleOnImage ?? true,
       };
     })
-    .filter(Boolean) as ImageMeta["pois"];
+    .filter(Boolean) as NonNullable<ImageMeta["pois"]>;
 
   return normalized.length > 0 ? normalized : [];
 }
