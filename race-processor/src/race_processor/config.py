@@ -205,6 +205,9 @@ class PipelineConfig(BaseModel):
     gpx_path: Path | None = Field(default=None, description="Path to GPX track for GPS override")
     gpx_offset: float = Field(default=0.0, description="Time offset in seconds for GPX matching")
 
+    # Image filtering
+    skip_first: int = Field(default=0, description="Skip the first N images during intake")
+
     # Component configs
     face_detection: FaceDetectionConfig = Field(default_factory=FaceDetectionConfig)
     body_pose: BodyPoseConfig = Field(default_factory=BodyPoseConfig)

@@ -150,6 +150,7 @@ def run_intake(
     input_dir: Path,
     output_dir: Path,
     race_slug: str,
+    skip_first: int = 0,
 ) -> Optional[IntakeManifest]:
     """
     Process intake step: extract EXIF, sort by timestamp, rename sequentially.
@@ -158,6 +159,7 @@ def run_intake(
         input_dir: Directory containing source images (JPG/PNG)
         output_dir: Directory to write renamed images and metadata.json
         race_slug: Identifier for this race
+        skip_first: Number of images to skip from the beginning (after sorting)
 
     Returns:
         IntakeManifest with all image metadata, or None if no images found
@@ -194,6 +196,19 @@ def run_intake(
             return (1, "", path.name)  # Files without timestamp go to end
 
     images_with_exif.sort(key=sort_key)
+
+    # Skip first N images if requested
+    if skip_first > 0:
+        if skip_first >= len(images_with_exif):
+            console.print(f"  [red]Cannot skip {skip_first} images - only {len(images_with_exif)} available[/]")
+            return None
+        skipped = images_with_exif[:skip_first]
+        images_with_exif = images_with_exif[skip_first:]
+        console.print(f"  [yellow]Skipping first {skip_first} images:[/]")
+        for path, _ in skipped[:5]:  # Show first 5 skipped
+            console.print(f"    - {path.name}")
+        if len(skipped) > 5:
+            console.print(f"    ... and {len(skipped) - 5} more")
 
     # Check for images without timestamps
     no_timestamp = [p.name for p, e in images_with_exif if not e["captured_at"]]

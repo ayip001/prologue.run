@@ -496,7 +496,7 @@ def _print_summary(result: dict) -> None:
     console.print(table)
 
 
-def extract_gpx_race_stats(gpx_path: Path, num_elevation_bars: int = 150) -> dict:
+def extract_gpx_race_stats(gpx_path: Path, num_elevation_bars: int = 175) -> dict:
     """
     Extract race-level statistics from GPX file for updating race records.
 
