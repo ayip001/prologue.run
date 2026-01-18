@@ -1,12 +1,17 @@
 import { sql } from "@vercel/postgres";
 import { unstable_noStore as noStore } from 'next/cache';
 import { ENABLE_TESTING_CARDS, ENABLE_CACHING } from './constants';
+import {
+  POI_TYPES,
+} from "@/types";
 import type {
   Race,
   RaceCardData,
   ImageMeta,
   Waypoint,
   ElevationPoint,
+  PoiMarker,
+  PoiType,
 } from "@/types";
 
 // ============================================================================
@@ -28,11 +33,7 @@ interface RaceRow {
   elevation_gain: number | null;
   elevation_loss: number | null;
   elevation_bars: number[] | null;
-  poi_markers: Array<{
-    imageIndex: number;
-    distanceFromStart: number;
-    pois: string[];
-  }> | null;
+  poi_markers: unknown;
   minimap_url: string | null;
   card_image_url: string | null;
   official_url: string | null;
@@ -63,12 +64,7 @@ interface ImageRow {
   heading_offset_degrees: string | null;
   distance_from_start: number | null;
   elevation_gain_from_start: number | null;
-  pois: Array<{
-    type: string;
-    heading: number;
-    pitch: number;
-    visibleOnImage: boolean;
-  }> | null;
+  pois: unknown;
   path_thumbnail: string;
   path_medium: string;
   path_full: string;
@@ -119,6 +115,62 @@ export interface RaceTranslation {
 // Transform Functions
 // ============================================================================
 
+const POI_TYPE_SET = new Set<PoiType>(POI_TYPES);
+
+function isPoiType(value: string): value is PoiType {
+  return POI_TYPE_SET.has(value as PoiType);
+}
+
+function normalizePois(value: unknown): ImageMeta["pois"] {
+  if (!Array.isArray(value)) return null;
+  const normalized = value
+    .map((poi) => {
+      if (!poi || typeof poi !== "object") return null;
+      const typed = poi as {
+        type?: string;
+        heading?: number;
+        pitch?: number;
+        visibleOnImage?: boolean;
+      };
+      if (!typed.type || !isPoiType(typed.type)) return null;
+      return {
+        type: typed.type,
+        heading: typeof typed.heading === "number" ? typed.heading : 0,
+        pitch: typeof typed.pitch === "number" ? typed.pitch : 0,
+        visibleOnImage: typed.visibleOnImage ?? true,
+      };
+    })
+    .filter(Boolean) as ImageMeta["pois"];
+
+  return normalized.length > 0 ? normalized : [];
+}
+
+function normalizePoiMarkers(value: unknown): PoiMarker[] | null {
+  if (!Array.isArray(value)) return null;
+  const normalized = value
+    .map((marker) => {
+      if (!marker || typeof marker !== "object") return null;
+      const typed = marker as {
+        imageIndex?: number;
+        distanceFromStart?: number;
+        pois?: string[];
+      };
+      if (typeof typed.imageIndex !== "number") return null;
+      const pois = Array.isArray(typed.pois)
+        ? typed.pois.filter((poi): poi is PoiType => isPoiType(poi))
+        : [];
+      return {
+        imageIndex: typed.imageIndex,
+        distanceFromStart:
+          typeof typed.distanceFromStart === "number" ? typed.distanceFromStart : 0,
+        pois,
+      };
+    })
+    .filter(Boolean) as PoiMarker[];
+
+  return normalized.length > 0 ? normalized : [];
+}
+
 function transformRace(row: RaceRow): Race {
   return {
     id: row.id,
@@ -135,7 +187,7 @@ function transformRace(row: RaceRow): Race {
     elevationGain: row.elevation_gain,
     elevationLoss: row.elevation_loss,
     elevationBars: row.elevation_bars,
-    poiMarkers: row.poi_markers,
+    poiMarkers: normalizePoiMarkers(row.poi_markers),
     minimapUrl: row.minimap_url,
     cardImageUrl: row.card_image_url,
     officialUrl: row.official_url,
@@ -191,7 +243,7 @@ function transformImage(row: ImageRow): ImageMeta {
     headingOffsetDegrees: row.heading_offset_degrees ? parseFloat(row.heading_offset_degrees) : null,
     distanceFromStart: row.distance_from_start,
     elevationGainFromStart: row.elevation_gain_from_start,
-    pois: row.pois,
+    pois: normalizePois(row.pois),
     pathThumbnail: row.path_thumbnail,
     pathMedium: row.path_medium,
     pathFull: row.path_full,
@@ -392,7 +444,7 @@ export async function getImageMetadataByRaceId(
     headingToPrev: row.heading_to_prev ? parseFloat(row.heading_to_prev) : null,
     headingToNext: row.heading_to_next ? parseFloat(row.heading_to_next) : null,
     headingOffsetDegrees: row.heading_offset_degrees ? parseFloat(row.heading_offset_degrees) : null,
-    pois: row.pois,
+    pois: normalizePois(row.pois),
   }));
 }
 
