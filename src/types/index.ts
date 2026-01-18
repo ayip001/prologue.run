@@ -17,6 +17,7 @@ export interface Race {
   elevationGain: number | null;
   elevationLoss: number | null;
   elevationBars: number[] | null;
+  poiMarkers: PoiMarker[] | null;
   minimapUrl: string | null;
   cardImageUrl: string | null;
   officialUrl: string | null;
@@ -33,6 +34,33 @@ export interface Race {
   updatedAt: string;
 }
 
+export const POI_TYPES = [
+  "toilet",
+  "checkpoint",
+  "water",
+  "energy-drink",
+  "food",
+  "first-aid",
+  "scenic-spot",
+  "warning-spot",
+  "cheer-zone",
+] as const;
+
+export type PoiType = (typeof POI_TYPES)[number];
+
+export interface Poi {
+  type: PoiType;
+  heading: number;
+  pitch: number;
+  visibleOnImage: boolean;
+}
+
+export interface PoiMarker {
+  imageIndex: number;
+  distanceFromStart: number;
+  pois: PoiType[];
+}
+
 export interface ImageMeta {
   id: string;
   raceId: string;
@@ -47,6 +75,7 @@ export interface ImageMeta {
   headingOffsetDegrees: number | null;
   distanceFromStart: number | null;
   elevationGainFromStart: number | null;
+  pois: Poi[] | null;
   pathThumbnail: string;
   pathMedium: string;
   pathFull: string;
@@ -118,7 +147,7 @@ export interface RaceDetailResponse {
   race: Race;
   images: Pick<
     ImageMeta,
-    "id" | "positionIndex" | "latitude" | "longitude" | "distanceFromStart" | "elevationGainFromStart" | "capturedAt" | "headingDegrees" | "headingToPrev" | "headingToNext" | "headingOffsetDegrees"
+    "id" | "positionIndex" | "latitude" | "longitude" | "distanceFromStart" | "elevationGainFromStart" | "capturedAt" | "headingDegrees" | "headingToPrev" | "headingToNext" | "headingOffsetDegrees" | "pois"
   >[];
   waypoints: Pick<Waypoint, "name" | "distanceMeters" | "endDistanceMeters">[];
 }

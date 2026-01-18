@@ -3,11 +3,15 @@
 import { useRef, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { formatDistanceCompact } from "@/lib/formatters";
+import type { PoiMarker } from "@/types";
+import { ScrubberPoiMarkers } from "./ScrubberPoiMarkers";
 
 interface ProgressScrubberProps {
   totalDistance: number;
   currentDistance: number;
   elevationBars?: number[] | null;
+  poiMarkers?: PoiMarker[] | null;
+  onPoiClick?: (imageIndex: number) => void;
   onSeek: (distance: number) => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
@@ -18,6 +22,8 @@ export function ProgressScrubber({
   totalDistance,
   currentDistance,
   elevationBars,
+  poiMarkers,
+  onPoiClick,
   onSeek,
   onDragStart,
   onDragEnd,
@@ -107,6 +113,12 @@ export function ProgressScrubber({
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
+        <ScrubberPoiMarkers
+          poiMarkers={poiMarkers}
+          totalDistance={totalDistance}
+          onPoiClick={onPoiClick ?? (() => {})}
+        />
+
         {/* Elevation bars */}
         {elevationBars && elevationBars.length > 0 && (
           <div className="absolute inset-0 flex items-end pointer-events-none">

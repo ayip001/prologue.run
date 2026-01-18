@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useEffect, useState } from "react";
-import type { Race, ElevationProfile as ElevationProfileType } from "@/types";
+import type { Race, ElevationProfile as ElevationProfileType, Poi } from "@/types";
 import { useViewer } from "@/hooks/useViewer";
 import { useImageLoader } from "@/hooks/useImageLoader";
 import { useKeyboardNav } from "@/hooks/useKeyboardNav";
@@ -23,6 +23,7 @@ interface ImageMeta {
   altitudeMeters: number | null;
   distanceFromStart: number | null;
   elevationGainFromStart: number | null;
+  pois: Poi[] | null;
   capturedAt: string;
   headingDegrees: number | null;
   headingToPrev: number | null;
@@ -177,6 +178,7 @@ export function RaceViewer({
         onNavigateNext={state.currentIndex < images.length - 1 ? actions.goNext : undefined}
         onNavigatePrev={state.currentIndex > 0 ? actions.goPrevious : undefined}
         headingOffset={currentImageMetadata?.headingOffsetDegrees ?? 0}
+        pois={currentImageMetadata?.pois ?? []}
       />
 
       {/* HUD Overlay */}
@@ -212,6 +214,8 @@ export function RaceViewer({
           totalDistance={race.distanceMeters}
           currentDistance={state.currentDistance}
           elevationBars={race.elevationBars}
+          poiMarkers={race.poiMarkers ?? []}
+          onPoiClick={actions.goToIndex}
           onSeek={handleSeek}
         />
       </div>
