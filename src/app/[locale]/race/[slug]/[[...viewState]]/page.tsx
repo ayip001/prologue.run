@@ -13,6 +13,8 @@ import { parseViewState } from "@/lib/viewState";
 import { RaceViewer } from "@/components/viewer/RaceViewer";
 import {
   ENABLE_TESTING_CARDS,
+  ENABLE_CACHING,
+  CACHE_REVALIDATE_SECONDS,
   TEST_CARD_DATA,
   TEST_VIEWER_IMAGE_URL,
   DEFAULT_VIEW,
@@ -20,7 +22,10 @@ import {
 import { defaultLocale, locales } from "@/i18n/config";
 import type { Race } from "@/types";
 
-export const dynamic = "force-dynamic";
+// When caching is enabled, use ISR with revalidation
+// When disabled (during development/uploads), force dynamic rendering
+export const dynamic = ENABLE_CACHING ? "auto" : "force-dynamic";
+export const revalidate = ENABLE_CACHING ? CACHE_REVALIDATE_SECONDS : 0;
 
 // Mock data for test route
 const TEST_RACE: Race = {
