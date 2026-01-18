@@ -29,7 +29,6 @@ class DetectionSource(Enum):
 
     FACE_YOLO_NANO = "face_yolo_n"
     FACE_YOLO_MEDIUM = "face_yolo_m"
-    BODY_POSE_HEAD = "body_pose_head"
     LICENSE_PLATE = "plate"
     VEHICLE = "vehicle"
     EDGE_WRAPPED = "edge_wrapped"
@@ -415,7 +414,6 @@ class PrivacyBlurEnsemble:
         self.conf_threshold = conf_threshold
         self._models_loaded = False
         self.face_detector = None
-        self.pose_detector = None
         self.plate_detector = None
 
         if mode == "full" and models_dir:
@@ -439,14 +437,6 @@ class PrivacyBlurEnsemble:
             else:
                 console.print(f"  [yellow]Warning: Face model not found[/]")
 
-            # Check for pose model
-            pose_path = self.models_dir / "yolov8n-pose.pt"
-            if pose_path.exists():
-                self.pose_detector = YOLO(str(pose_path))
-                console.print(f"  [green]Loaded pose model:[/] {pose_path.name}")
-            else:
-                console.print(f"  [yellow]Warning: Pose model not found[/]")
-
             # Check for plate model
             plate_path = self.models_dir / "yolov8n-plate.pt"
             if plate_path.exists():
@@ -466,7 +456,6 @@ class PrivacyBlurEnsemble:
 
             self._models_loaded = (
                 self.face_detector is not None 
-                or self.pose_detector is not None 
                 or self.plate_detector is not None
             )
 
@@ -510,71 +499,7 @@ class PrivacyBlurEnsemble:
                         )
                     )
 
-        # 2. Pose Detection (to find heads when faces aren't visible)
-        if self.pose_detector:
-            results = self.pose_detector(image, conf=self.conf_threshold, verbose=False)
-            for r in results:
-                if not r.keypoints or r.keypoints.data.shape[0] == 0:
-                    continue
-                
-                # keypoints are [N, 17, 3] or [17, 3]
-                kps = r.keypoints.data[0].cpu().numpy()
-                
-                # COCO Keypoints: 5=l-shoulder, 6=r-shoulder
-                l_sh = kps[5]
-                r_sh = kps[6]
-                
-                # Check if shoulders are visible (conf > 0.5)
-                if l_sh[2] > 0.5 and r_sh[2] > 0.5:
-                    # Calculate shoulder midpoint and width
-                    mid_x = (l_sh[0] + r_sh[0]) / 2
-                    mid_y = (l_sh[1] + r_sh[1]) / 2
-                    sh_width = np.sqrt((l_sh[0] - r_sh[0])**2 + (l_sh[1] - r_sh[1])**2)
-                    
-                    # Estimate head: 
-                    # 1. Center is above the shoulder midpoint
-                    # 2. Head height/width is proportional to shoulder width
-                    head_size = sh_width * 0.8  # Head is roughly 80% of shoulder width
-                    head_y_offset = sh_width * 0.5  # Shift up by 50% of shoulder width
-                    
-                    all_regions.append(
-                        BlurRegion(
-                            x=int(mid_x),
-                            y=int(mid_y - head_y_offset),
-                            width=int(head_size),
-                            height=int(head_size * 1.2),
-                            confidence=float((l_sh[2] + r_sh[2]) / 2),
-                            source=DetectionSource.BODY_POSE_HEAD,
-                        )
-                    )
-                
-                # Fallback: if shoulders aren't visible, try facial features (0-4)
-                else:
-                    head_points = kps[:5]
-                    visible = head_points[head_points[:, 2] > 0.5]
-                    if len(visible) > 0:
-                        # Create a box around visible head points
-                        min_x, min_y = np.min(visible[:, :2], axis=0)
-                        max_x, max_y = np.max(visible[:, :2], axis=0)
-                        
-                        # Expand the box slightly
-                        w = max_x - min_x
-                        h = max_y - min_y
-                        w = max(w, 20)  # Min size
-                        h = max(h, 20)
-                        
-                        all_regions.append(
-                            BlurRegion(
-                                x=int((min_x + max_x) / 2),
-                                y=int((min_y + max_y) / 2),
-                                width=int(w * 1.5),
-                                height=int(h * 1.5),
-                                confidence=float(np.mean(visible[:, 2])),
-                                source=DetectionSource.BODY_POSE_HEAD,
-                            )
-                        )
-
-        # 3. Two-Stage Plate Detection (Vehicle -> Plate)
+        # 2. Two-Stage Plate Detection (Vehicle -> Plate)
         if self.vehicle_detector and self.plate_detector:
             # Detect vehicles first (COCO: 2=car, 3=motorcycle, 5=bus, 7=truck)
             v_results = self.vehicle_detector(image, conf=0.3, classes=[2, 3, 5, 7], verbose=False)
@@ -628,25 +553,6 @@ class PrivacyBlurEnsemble:
                                         source=DetectionSource.LICENSE_PLATE,
                                     )
                                 )
-
-        # 4. Fallback: Standalone Plate Detection
-        # (Only if no plates were found via vehicles, or just to be safe)
-        if self.plate_detector:
-            p_results = self.plate_detector(image, conf=self.conf_threshold, verbose=False)
-            for p_r in p_results:
-                for p_box in p_r.boxes:
-                    x1, y1, x2, y2 = p_box.xyxy[0].cpu().numpy()
-                    conf = float(p_box.conf[0])
-                    all_regions.append(
-                        BlurRegion(
-                            x=int((x1 + x2) / 2),
-                            y=int((y1 + y2) / 2),
-                            width=int(x2 - x1),
-                            height=int(y2 - y1),
-                            confidence=conf,
-                            source=DetectionSource.LICENSE_PLATE,
-                        )
-                    )
 
         return all_regions
 
