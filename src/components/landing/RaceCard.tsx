@@ -145,7 +145,7 @@ export function RaceCard({ race, className }: RaceCardProps) {
 
         {/* Tier Badge */}
         {race.tier && (
-          <GoldBadge tier={race.tier} className="absolute top-3 right-3" />
+          <GoldBadge tier={race.tier} className="absolute top-0 right-0" />
         )}
       </div>
 

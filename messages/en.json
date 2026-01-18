@@ -24,6 +24,11 @@
     "10k": "10K",
     "5k": "5K"
   },
+  "tiers": {
+    "gold": "World Athletics Gold Label",
+    "silver": "World Athletics Silver Label",
+    "bronze": "World Athletics Bronze Label"
+  },
   "features": {
     "title": "The Runner's Edge",
     "subtitle": "Eliminate the unknown. Master the course before race day.",
