@@ -10,7 +10,7 @@ export const ENABLE_TESTING_CARDS = false;
 // Caching configuration
 // Set to false during active development/race uploads for immediate updates
 // Set to true for production to reduce costs and improve performance
-export const ENABLE_CACHING = true;
+export const ENABLE_CACHING = false;
 
 // Cache duration in seconds (1 hour default)
 export const CACHE_REVALIDATE_SECONDS = 3600;
