@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useState, useEffect, useRef } from "react";
+import { useCallback, useState, useEffect, useRef, useMemo } from "react";
 import type { CameraState, ViewerState, ViewerActions } from "@/types";
 import { DEFAULT_VIEW, CAMERA_CONSTRAINTS } from "@/lib/constants";
 import { normalizeHeading, clampPitch, clampFov, parseViewState } from "@/lib/viewState";
+import { computeVisualDistances, findIndexByVisualDistance } from "@/lib/visualDistance";
 
 interface UseViewerOptions {
   totalImages: number;
@@ -15,6 +16,7 @@ interface UseViewerOptions {
 interface UseViewerReturn {
   state: ViewerState;
   actions: ViewerActions;
+  totalVisualDistance: number;
 }
 
 export function useViewer({
@@ -23,9 +25,16 @@ export function useViewer({
   initialPosition = 0,
   initialCamera,
 }: UseViewerOptions): UseViewerReturn {
+  // Compute visual distances for scrubber positioning (handles GPS gaps in tunnels)
+  const visualDistances = useMemo(
+    () => computeVisualDistances(images),
+    [images]
+  );
+
   const [state, setState] = useState<ViewerState>(() => ({
     currentIndex: Math.max(0, Math.min(initialPosition, totalImages - 1)),
     currentDistance: images[initialPosition]?.distanceFromStart ?? 0,
+    currentVisualDistance: visualDistances[initialPosition] ?? 0,
     camera: {
       yaw: normalizeHeading(initialCamera?.yaw ?? DEFAULT_VIEW.heading),
       pitch: clampPitch(initialCamera?.pitch ?? DEFAULT_VIEW.pitch),
@@ -67,6 +76,7 @@ export function useViewer({
         ...prev,
         currentIndex: clampedIndex,
         currentDistance: images[clampedIndex]?.distanceFromStart ?? 0,
+        currentVisualDistance: visualDistances[clampedIndex] ?? 0,
         camera: {
           yaw: parsed.heading,
           pitch: parsed.pitch,
@@ -74,7 +84,7 @@ export function useViewer({
         },
       }));
     }
-  }, []);  // Empty deps - run only on mount
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps -- run only on mount
 
   // Update distance when index changes
   useEffect(() => {
@@ -88,9 +98,10 @@ export function useViewer({
       setState((prev) => ({
         ...prev,
         currentDistance: image.distanceFromStart ?? 0,
+        currentVisualDistance: visualDistances[state.currentIndex] ?? 0,
       }));
     }
-  }, [state.currentIndex, images]);
+  }, [state.currentIndex, images, visualDistances]);
 
   // Actions
   const goToIndex = useCallback(
@@ -108,22 +119,12 @@ export function useViewer({
 
   const goToDistance = useCallback(
     (distanceM: number) => {
-      // Find the image closest to the target distance
-      let closestIndex = 0;
-      let closestDiff = Infinity;
-
-      for (let i = 0; i < images.length; i++) {
-        const imgDist = images[i].distanceFromStart ?? 0;
-        const diff = Math.abs(imgDist - distanceM);
-        if (diff < closestDiff) {
-          closestDiff = diff;
-          closestIndex = i;
-        }
-      }
-
+      // Find the image closest to the target visual distance
+      // This uses visual distances to properly handle GPS gaps (tunnels)
+      const closestIndex = findIndexByVisualDistance(distanceM, visualDistances);
       goToIndex(closestIndex);
     },
-    [images, goToIndex]
+    [visualDistances, goToIndex]
   );
 
   const goNext = useCallback(() => {
@@ -171,5 +172,11 @@ export function useViewer({
     seekByDrag,
   };
 
-  return { state, actions };
+  // Total visual distance is the last visual distance value (or real total if empty)
+  const totalVisualDistance =
+    visualDistances.length > 0
+      ? visualDistances[visualDistances.length - 1]
+      : 0;
+
+  return { state, actions, totalVisualDistance };
 }
