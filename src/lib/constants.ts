@@ -82,7 +82,7 @@ export const URL_UPDATE_DEBOUNCE_MS = 300;
 
 // Scrubber POI snapping
 // Fraction of total distance within which the scrubber snaps to nearest POI marker
-export const SCRUBBER_POI_SNAP_STRENGTH = 0.005;
+export const SCRUBBER_POI_SNAP_STRENGTH = 0.003;
 
 // Race tier colors
 export const TIER_COLORS = {
