@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { formatDistanceCompact } from "@/lib/formatters";
+import { SCRUBBER_POI_SNAP_STRENGTH } from "@/lib/constants";
 import type { PoiMarker } from "@/types";
 import { ScrubberPoiMarkers } from "./ScrubberPoiMarkers";
 
@@ -30,14 +31,61 @@ export function ProgressScrubber({
   className,
 }: ProgressScrubberProps) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const activePointerId = useRef<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [hoverDistance, setHoverDistance] = useState<number | null>(null);
   const [hoverX, setHoverX] = useState<number>(0);
+  const [activePoiImageIndex, setActivePoiImageIndex] = useState<number | null>(null);
 
   const progress = totalDistance > 0 ? (currentDistance / totalDistance) * 100 : 0;
 
+  const getSnapRange = useCallback(() => {
+    return totalDistance * SCRUBBER_POI_SNAP_STRENGTH;
+  }, [totalDistance]);
+
+  const getNearestPoiMarker = useCallback(
+    (distance: number) => {
+      if (!poiMarkers || poiMarkers.length === 0) return null;
+      let closest: PoiMarker | null = null;
+      let smallestDelta = Number.POSITIVE_INFINITY;
+
+      for (const marker of poiMarkers) {
+        const delta = Math.abs(marker.distanceFromStart - distance);
+        if (delta < smallestDelta) {
+          smallestDelta = delta;
+          closest = marker;
+        }
+      }
+
+      return closest;
+    },
+    [poiMarkers]
+  );
+
+  const getSnappedDistance = useCallback(
+    (distance: number) => {
+      const nearest = getNearestPoiMarker(distance);
+      if (!nearest) {
+        return { distance, snappedMarker: null as PoiMarker | null };
+      }
+
+      const snapRange = getSnapRange();
+      if (snapRange <= 0) {
+        return { distance, snappedMarker: null as PoiMarker | null };
+      }
+
+      const delta = Math.abs(nearest.distanceFromStart - distance);
+      if (delta <= snapRange) {
+        return { distance: nearest.distanceFromStart, snappedMarker: nearest };
+      }
+
+      return { distance, snappedMarker: null as PoiMarker | null };
+    },
+    [getNearestPoiMarker, getSnapRange]
+  );
+
   const getDistanceFromEvent = useCallback(
-    (e: React.MouseEvent | MouseEvent): number => {
+    (e: React.MouseEvent | React.PointerEvent | MouseEvent): number => {
       if (!trackRef.current) return 0;
       const rect = trackRef.current.getBoundingClientRect();
       const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
@@ -47,42 +95,56 @@ export function ProgressScrubber({
     [totalDistance]
   );
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
       e.preventDefault();
+      activePointerId.current = e.pointerId;
+      trackRef.current?.setPointerCapture(e.pointerId);
       setIsDragging(true);
       onDragStart?.();
 
       const distance = getDistanceFromEvent(e);
-      onSeek(distance);
-
-      const handleMouseMove = (e: MouseEvent) => {
-        const distance = getDistanceFromEvent(e);
-        onSeek(distance);
-      };
-
-      const handleMouseUp = () => {
-        setIsDragging(false);
-        onDragEnd?.();
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", handleMouseUp);
-      };
-
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
+      const { distance: snappedDistance, snappedMarker } = getSnappedDistance(distance);
+      setActivePoiImageIndex(snappedMarker?.imageIndex ?? null);
+      onSeek(snappedDistance);
     },
-    [getDistanceFromEvent, onSeek, onDragStart, onDragEnd]
+    [getDistanceFromEvent, getSnappedDistance, onSeek, onDragStart]
+  );
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!isDragging || activePointerId.current !== e.pointerId) return;
+      e.preventDefault();
+      const distance = getDistanceFromEvent(e);
+      const { distance: snappedDistance, snappedMarker } = getSnappedDistance(distance);
+      setActivePoiImageIndex(snappedMarker?.imageIndex ?? null);
+      onSeek(snappedDistance);
+    },
+    [getDistanceFromEvent, getSnappedDistance, isDragging, onSeek]
+  );
+
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      if (activePointerId.current !== e.pointerId) return;
+      trackRef.current?.releasePointerCapture(e.pointerId);
+      activePointerId.current = null;
+      setIsDragging(false);
+      onDragEnd?.();
+    },
+    [onDragEnd]
   );
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
+      if (isDragging) return;
       if (!trackRef.current) return;
       const rect = trackRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
       setHoverX(x);
       setHoverDistance(getDistanceFromEvent(e));
     },
-    [getDistanceFromEvent]
+    [getDistanceFromEvent, isDragging]
   );
 
   const handleMouseLeave = useCallback(() => {
@@ -90,6 +152,11 @@ export function ProgressScrubber({
       setHoverDistance(null);
     }
   }, [isDragging]);
+
+  useEffect(() => {
+    const { snappedMarker } = getSnappedDistance(currentDistance);
+    setActivePoiImageIndex(snappedMarker?.imageIndex ?? null);
+  }, [currentDistance, getSnappedDistance]);
 
   return (
     <div className={cn("relative", className)}>
@@ -108,8 +175,11 @@ export function ProgressScrubber({
       {/* Track */}
       <div
         ref={trackRef}
-        className="relative h-12 bg-slate-800/80 backdrop-blur-md border-t border-slate-600 cursor-pointer"
-        onMouseDown={handleMouseDown}
+        className="relative h-12 bg-slate-800/80 backdrop-blur-md border-t border-slate-600 cursor-pointer touch-none"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
@@ -117,6 +187,7 @@ export function ProgressScrubber({
           poiMarkers={poiMarkers}
           totalDistance={totalDistance}
           onPoiClick={onPoiClick ?? (() => {})}
+          activePoiImageIndex={activePoiImageIndex}
         />
 
         {/* Elevation bars */}
