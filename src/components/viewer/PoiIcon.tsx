@@ -8,16 +8,24 @@ interface PoiIconProps {
   type: PoiType;
   size?: number;
   className?: string;
+  showEmojiOnMobile?: boolean;
 }
 
-export function PoiIcon({ type, size = 16, className }: PoiIconProps) {
+export function PoiIcon({
+  type,
+  size = 16,
+  className,
+  showEmojiOnMobile = false,
+}: PoiIconProps) {
   const config = POI_CONFIG[type];
 
   return (
     <div
       className={cn(
         "flex items-center justify-center rounded-full border border-slate-400/50 shadow-sm leading-none flex-shrink-0 transition-all",
-        "w-2 h-2 sm:w-[var(--poi-size)] sm:h-[var(--poi-size)]",
+        showEmojiOnMobile
+          ? "w-[var(--poi-size)] h-[var(--poi-size)]"
+          : "w-2 h-2 sm:w-[var(--poi-size)] sm:h-[var(--poi-size)]",
         className
       )}
       style={{
@@ -29,7 +37,10 @@ export function PoiIcon({ type, size = 16, className }: PoiIconProps) {
     >
       <span
         aria-hidden="true"
-        className="hidden sm:flex items-center justify-center"
+        className={cn(
+          "items-center justify-center",
+          showEmojiOnMobile ? "flex" : "hidden sm:flex"
+        )}
         style={{ fontSize: `${size * 0.7}px` }}
       >
         {config.emoji}

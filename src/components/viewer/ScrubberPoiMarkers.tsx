@@ -15,6 +15,7 @@ interface ScrubberPoiMarkersProps {
   totalDistance: number;
   onPoiClick: (imageIndex: number) => void;
   markerSize?: number;
+  activeMarkerImageIndex?: number | null;
 }
 
 const STACK_GAP = 4;
@@ -24,6 +25,7 @@ export function ScrubberPoiMarkers({
   totalDistance,
   onPoiClick,
   markerSize = 24,
+  activeMarkerImageIndex,
 }: ScrubberPoiMarkersProps) {
   if (!poiMarkers || poiMarkers.length === 0) return null;
 
@@ -33,6 +35,7 @@ export function ScrubberPoiMarkers({
         const distanceRatio =
           totalDistance > 0 ? marker.distanceFromStart / totalDistance : 0;
         const left = `${Math.min(100, Math.max(0, distanceRatio * 100))}%`;
+        const isActive = marker.imageIndex === activeMarkerImageIndex;
 
         return (
           <div
@@ -44,30 +47,38 @@ export function ScrubberPoiMarkers({
               .sort((a, b) => POI_ORDER[a] - POI_ORDER[b])
               .map((type, index) => (
                 <button
-                key={`${marker.imageIndex}-${type}-${index}`}
-                type="button"
-                style={{
-                  // @ts-ignore
-                  "--poi-bottom": `${index * (markerSize + STACK_GAP)}px`,
-                  // @ts-ignore
-                  "--poi-bottom-mobile": `${index * (8 + 4)}px`,
-                }}
-                className={cn(
-                  "absolute -translate-x-1/2 pointer-events-auto transition-all",
-                  "bottom-[var(--poi-bottom-mobile)] sm:bottom-[var(--poi-bottom)]"
-                )}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onPoiClick(marker.imageIndex);
-                }}
-                onMouseDown={(event) => {
-                  event.stopPropagation();
-                }}
-                aria-label={`Go to ${type} point of interest`}
-              >
-                <PoiIcon type={type} size={markerSize} />
-              </button>
-            ))}
+                  key={`${marker.imageIndex}-${type}-${index}`}
+                  type="button"
+                  style={{
+                    // @ts-ignore
+                    "--poi-bottom": `${index * (markerSize + STACK_GAP)}px`,
+                    // @ts-ignore
+                    "--poi-bottom-mobile": `${index * (8 + 4)}px`,
+                  }}
+                  className={cn(
+                    "absolute -translate-x-1/2 pointer-events-auto transition-all",
+                    "bottom-[var(--poi-bottom-mobile)] sm:bottom-[var(--poi-bottom)]",
+                    isActive && "scale-110"
+                  )}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onPoiClick(marker.imageIndex);
+                  }}
+                  onMouseDown={(event) => {
+                    event.stopPropagation();
+                  }}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                  }}
+                  aria-label={`Go to ${type} point of interest`}
+                >
+                  <PoiIcon
+                    type={type}
+                    size={markerSize}
+                    showEmojiOnMobile={isActive}
+                  />
+                </button>
+              ))}
           </div>
         );
       })}

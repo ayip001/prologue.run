@@ -80,6 +80,10 @@ export const PRELOAD_SETTINGS = {
 // URL update debounce
 export const URL_UPDATE_DEBOUNCE_MS = 300;
 
+// Mobile scrubber POI snapping configuration
+// Represents the fraction of total distance within which the scrubber will snap to a POI.
+export const MOBILE_SCRUBBER_POI_SNAP_STRENGTH = 0.04;
+
 // Race tier colors
 export const TIER_COLORS = {
   gold: {
