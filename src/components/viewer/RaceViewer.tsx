@@ -96,7 +96,7 @@ export function RaceViewer({
   );
 
   // Viewer state
-  const { state, actions } = useViewer({
+  const { state, actions, totalVisualDistance } = useViewer({
     totalImages: images.length,
     images: mappedImages,
     initialPosition,
@@ -225,6 +225,8 @@ export function RaceViewer({
         <ProgressScrubber
           totalDistance={race.distanceMeters}
           currentDistance={state.currentDistance}
+          totalVisualDistance={totalVisualDistance}
+          currentVisualDistance={state.currentVisualDistance}
           elevationBars={race.elevationBars}
           poiMarkers={race.poiMarkers ?? []}
           onPoiClick={actions.goToIndex}

@@ -197,6 +197,7 @@ export interface CameraState {
 export interface ViewerState {
   currentIndex: number;
   currentDistance: number;
+  currentVisualDistance: number;
   camera: CameraState;
   loadedTier: "thumbnail" | "medium" | "full";
   isLoading: boolean;

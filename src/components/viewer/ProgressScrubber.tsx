@@ -10,6 +10,10 @@ import { ScrubberPoiMarkers } from "./ScrubberPoiMarkers";
 interface ProgressScrubberProps {
   totalDistance: number;
   currentDistance: number;
+  // Visual distances for scrubber positioning (handles GPS gaps in tunnels)
+  // If not provided, falls back to real distances
+  totalVisualDistance?: number;
+  currentVisualDistance?: number;
   elevationBars?: number[] | null;
   poiMarkers?: PoiMarker[] | null;
   onPoiClick?: (imageIndex: number) => void;
@@ -22,6 +26,8 @@ interface ProgressScrubberProps {
 export function ProgressScrubber({
   totalDistance,
   currentDistance,
+  totalVisualDistance,
+  currentVisualDistance,
   elevationBars,
   poiMarkers,
   onPoiClick,
@@ -37,11 +43,15 @@ export function ProgressScrubber({
   const [hoverX, setHoverX] = useState<number>(0);
   const [activePoiImageIndex, setActivePoiImageIndex] = useState<number | null>(null);
 
-  const progress = totalDistance > 0 ? (currentDistance / totalDistance) * 100 : 0;
+  // Use visual distances for positioning if provided, otherwise fall back to real distances
+  const effectiveTotalDistance = totalVisualDistance ?? totalDistance;
+  const effectiveCurrentDistance = currentVisualDistance ?? currentDistance;
+
+  const progress = effectiveTotalDistance > 0 ? (effectiveCurrentDistance / effectiveTotalDistance) * 100 : 0;
 
   const getSnapRange = useCallback(() => {
-    return totalDistance * SCRUBBER_POI_SNAP_STRENGTH;
-  }, [totalDistance]);
+    return effectiveTotalDistance * SCRUBBER_POI_SNAP_STRENGTH;
+  }, [effectiveTotalDistance]);
 
   const getNearestPoiMarker = useCallback(
     (distance: number) => {
@@ -90,9 +100,9 @@ export function ProgressScrubber({
       const rect = trackRef.current.getBoundingClientRect();
       const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
       const percentage = x / rect.width;
-      return percentage * totalDistance;
+      return percentage * effectiveTotalDistance;
     },
-    [totalDistance]
+    [effectiveTotalDistance]
   );
 
   const handlePointerDown = useCallback(
