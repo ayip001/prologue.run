@@ -108,6 +108,8 @@ export function ProgressScrubber({
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (e.pointerType === "mouse" && e.button !== 0) return;
+      // Ignore secondary pointerdowns while a drag is already active
+      if (activePointerId.current !== null) return;
       e.preventDefault();
       activePointerId.current = e.pointerId;
       trackRef.current?.setPointerCapture(e.pointerId);
